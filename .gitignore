@@ -1,0 +1,18 @@
+# Runtime state. .logs is disposable only while the daemon is stopped.
+.logs/
+obs/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+.DS_Store
