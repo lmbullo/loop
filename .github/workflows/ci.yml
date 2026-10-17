@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: compile
+        run: python -m compileall -q harness tui run.py
+      - name: line and tui audits
+        run: |
+          python run.py check lines
+          python run.py check tui
+      - name: contract
+        run: python scripts/check_manifest.py
+      - name: unit tests
+        run: python -m unittest discover -s tests -t . -v
+      - name: manifest checks
+        run: python scripts/verify.py --skip-server
+      - name: git hygiene
+        run: |
+          test -z "$(git status --porcelain)"
