@@ -1,0 +1,9 @@
+{
+"id": "task2",
+"sim": "sim2",
+"label": "task2",
+"fixture": "ws1",
+"purpose": "same fix as task with the structured edit primitive instead of python -c",
+"expected": "analyze.py must print 'code count' sorted desc and exit 0",
+"steps": [{"tool":"exec","argv":["find",".","-type","f"]},{"tool":"exec","argv":["cat","src/analyze.py"]},{"tool":"exec","argv":["python3","src/analyze.py","data/app.log"]},{"tool":"edit","path":"src/analyze.py","old":"        parts = line.split()\n","new":"        parts = line.split()\n        if not parts: continue\n"},{"tool":"edit","path":"src/analyze.py","old":"            c[parts[2]] += 1\n    for k, v in c.items():\n        print(v, k)","new":"            c[parts[2][5:]] += 1\n    for k, v in sorted(c.items(), key=lambda kv: -kv[1]):\n        print(k, v)"},{"tool":"exec","argv":["python3","src/analyze.py","data/app.log"]},{"tool":"done","result":"ok"}]
+}
