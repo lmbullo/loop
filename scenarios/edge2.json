@@ -1,0 +1,9 @@
+{
+"id": "edge2",
+"sim": "sim2",
+"label": "edge2",
+"fixture": "ws1",
+"purpose": "edge cases plus edit failure modes (no unique match, missing file)",
+"expected": "no crash; unique-match contract holds",
+"steps": [{"tool":"exec","argv":["seq","1","200000"]},{"tool":"exec","argv":["head","-c","200","/bin/ls"]},{"tool":"exec","argv":["definitely-not-a-program"]},{"tool":"exec","argv":["sleep","30"],"timeout_ms":500},{"tool":"exec","argv":["true"]},{"tool":"exec","argv":["python3","src/analyze.py","missing.log"]},{"tool":"edit","path":"src/analyze.py","old":"NOPE","new":"x"},{"tool":"done","result":"e"}]
+}
