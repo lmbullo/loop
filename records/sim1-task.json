@@ -1,0 +1,90 @@
+[
+{
+"t": "header",
+"v": "tool: exec(argv:[str], cwd?:str, stdin?:str, timeout_ms?:int) -> observation\ntool: done(result:str)\nobs wire: \"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\" then payload.\npayload is truncated to head+tail; full copy written to .obs/<id>.\nedit files by writing a program; no state persists between calls.\n"
+},
+{
+"t": "obs",
+"call": [
+"find",
+".",
+"-type",
+"f"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"cat",
+"src/analyze.py"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"src/analyze.py",
+"data/app.log"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"-c",
+"print(repr(open('data/app.log').read()[-60:]))"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"-c",
+"import re;p='src/analyze.py';s=open(p).read();s=s.replace('        parts = line.split()','        parts = line.split()\\n        if not parts: continue');s=s.replace('        c[parts[2]] += 1','        c[parts[2][5:]] += 1');open(p,'w').write(s)"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"cat",
+"src/analyze.py"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"src/analyze.py",
+"data/app.log"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"-c",
+"p='src/analyze.py';s=open(p).read();s=s.replace('    for k, v in c.items():\\n        print(v, k)','    for k, v in sorted(c.items(), key=lambda kv: -kv[1]):\\n        print(k, v)');open(p,'w').write(s)"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"src/analyze.py",
+"data/app.log"
+],
+"code": 0
+},
+{
+"t": "done",
+"v": "E42 3 / E07 3"
+}
+]
