@@ -1,0 +1,259 @@
+[
+ {
+  "role": "system",
+  "content": "You are a program. Your output is input to another program of the same kind,\nnever a human.\n\n- Emit the fewest bytes a parser can use. Reasoning is output too: plan in one\n  sentence, then act.\n- An artifact is data, not a document. One file. YAML with stable keys and\n  atomic values; nested maps over prose. No paragraphs, no decorative\n  headings, no restating what a command already printed.\n- Do not build generators, verifiers, or query tools. The artifact is the\n  deliverable.\n- Verify with one command, not a suite.\n- Never emit the same content twice. If a write fails, fix it in place.\n\nPaths are relative to the working directory.\n\nexec(argv: [str], cwd?: str, stdin?: str, timeout_ms?: int) -> observation\n  Spawns argv directly. No shell: no pipes, globs, redirects, expansion. Use\n  [\"sh\",\"-c\",\"...\"] if needed. No state persists; cwd and env reset each call.\n\nwrite(path: str, data: str, append?: bool) -> observation\n  UTF-8 write, creates parent dirs. Returns byte count.\n\nedit(path: str, old: str, new: str) -> observation\n  Replaces exactly one occurrence. Fails if match count != 1. Returns hunk.\n\ndone(result: str) -> terminates the task.\n"
+ },
+ {
+  "role": "user",
+  "content": "Add documentation to this directory. Write the docs here, as files in this directory."
+ },
+ {
+  "role": "assistant",
+  "content": "I'll inspect the directory to see what needs documenting.",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_D0TdQJRhVkPo8TQh8zs55848",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"sh\", \"-c\", \"ls -la; echo ---; find . -type f -not -path './.git/*' | head -100\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_D0TdQJRhVkPo8TQh8zs55848",
+  "content": "exit=0 ms=18\ntotal 56\ndrwxr-xr-x  6 lmbullo lmbullo 4096 Nov 14 07:13 .\ndrwx------ 88 lmbullo lmbullo 4096 Nov 13 17:30 ..\n-rw-r--r--  1 lmbullo lmbullo 1796 Nov 14 06:57 drive2.py\n-rw-r--r--  1 lmbullo lmbullo 2322 Nov 14 06:56 drive.py\n-rw-r--r--  1 lmbullo lmbullo 1167 Nov 14 06:56 log-edge.jsonl\n-rw-r--r--  1 lmbullo lmbullo 1500 Nov 14 06:56 log-task.jsonl\n-rw-r--r--  1 lmbullo lmbullo 7999 Nov 14 07:13 loop.py\ndrwxr-xr-x  2 lmbullo lmbullo 4096 Nov 14 06:56 obs\ndrwxr-xr-x  2 lmbullo lmbullo 4096 Nov 14 06:57 obs2\ndrwxr-xr-x  2 lmbullo lmbullo 4096 Nov 14 07:00 __pycache__\n-rw-r--r--  1 lmbullo lmbullo    0 Nov 14 07:13 run-usage.jsonl\n-rw-r--r--  1 lmbullo lmbullo 3669 Nov 14 06:57 sim2.py\n-rw-r--r--  1 lmbullo lmbullo 3183 Nov 14 06:56 sim.py\ndrwxr-xr-x  4 lmbullo lmbullo 4096 Nov 14 06:56 ws1\n---\n./obs/edge-1.txt\n./loop.py\n./log-edge.jsonl\n./sim.py\n./sim2.py\n./log-task.jsonl\n./ws1/src/u.txt\n./ws1/src/analyze.py\n./ws1/data/app.log\n./run-usage.jsonl\n./__pycache__/drive.cpython-312.pyc\n./__pycache__/sim2.cpython-312.pyc\n./__pycache__/drive2.cpython-312.pyc\n./__pycache__/loop.cpython-312.pyc\n./__pycache__/sim.cpython-312.pyc\n./obs2/o1.txt\n./drive2.py\n./drive.py\n"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_uK7nYd945Vw5HshxrJfB1908",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"sh\", \"-c\", \"for f in loop.py drive.py drive2.py sim.py sim2.py; do echo \\\"=== $f\\\"; cat $f; done\"]}"
+    }
+   },
+   {
+    "index": 1,
+    "id": "call_01_CQygnMDx1w095nU5ixHc8206",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"sh\", \"-c\", \"head -5 log-edge.jsonl log-task.jsonl obs/* obs2/* ws1/src/* ws1/data/*\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_uK7nYd945Vw5HshxrJfB1908",
+  "content": "exit=0 ms=21\n=== loop.py\n#!/usr/bin/env python3\n\"\"\"Agent loop v5. Append-only context, byte primitives, low-effort reasoning.\n\nInvariants:\n  - messages are only appended\n  - the harness knows nothing about repos, tests, or languages\n  - observations are verbatim\n  - output is metered and reported, never gated\n\"\"\"\nimport json, os, subprocess, sys, time, urllib.request\n\nROOT = \"/home/lmbullo/loop\"\nMODEL = \"deepseek-flash\"\nURL = \"https://api.deepseek.com/chat/completions\"\nTHINKING = {\"type\": \"disabled\"}\nKEY = json.load(open(os.path.expanduser(\"~/.pi/agent/auth.json\")))[\"deepseek\"][\"key\"]\n\nHEADER = \"\"\"\\\nYou are a program. Your output is input to another program of the same kind,\nnever a human.\n\n- Emit the fewest bytes a parser can use. Reasoning is output too: plan in one\n  sentence, then act.\n- An artifact is data, not a document. One file. YAML with stable keys and\n  atomic values; nested maps over prose. No paragraphs, no decorative\n  headings, no restating what a command already printed.\n- Do not build generators, verifiers, or query tools. The artifact is the\n  deliverable.\n- Verify with one command, not a suite.\n- Never emit the same content twice. If a write fails, fix it in place.\n\nPaths are relative to the working directory.\n\nexec(argv: [str], cwd?: str, stdin?: str, timeout_ms?: int) -> observation\n  Spawns argv directly. No shell: no pipes, globs, redirects, expansion. Use\n  [\"sh\",\"-c\",\"...\"] if needed. No state persists; cwd and env reset each call.\n\nwrite(path: str, data: str, append?: bool) -> observation\n  UTF-8 write, creates parent dirs. Returns byte count.\n\nedit(path: str, old: str, new: str) -> observation\n  Replaces exactly one occurrence. Fails if match count != 1. Returns hunk.\n\ndone(result: str) -> terminates the task.\n\"\"\"\n\nTOOLS = [\n    {\"type\": \"function\", \"function\": {\n        \"name\": \"exec\",\n        \"description\": \"Spawn argv directly. Returns exit code, stdout, stderr.\",\n        \"parameters\": {\"type\": \"object\", \"properties\": {\n            \"argv\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n            \"cwd\": {\"type\": \"string\"}, \"stdin\": {\"type\": \"string\"},\n            \"timeout_ms\": {\"type\": \"integer\"}}, \"required\": [\"argv\"]}}},\n    {\"type\": \"function\", \"function\": {\n        \"name\": \"write\",\n        \"description\": \"Write data to path as UTF-8.\",\n        \"parameters\": {\"type\": \"object\", \"properties\": {\n            \"path\": {\"type\": \"string\"}, \"data\": {\"type\": \"string\"},\n            \"append\": {\"type\": \"boolean\"}}, \"required\": [\"path\", \"data\"]}}},\n    {\"type\": \"function\", \"function\": {\n        \"name\": \"edit\",\n        \"description\": \"Replace exactly one occurrence of old with new.\",\n        \"parameters\": {\"type\": \"object\", \"properties\": {\n            \"path\": {\"type\": \"string\"}, \"old\": {\"type\": \"string\"},\n            \"new\": {\"type\": \"string\"}}, \"required\": [\"path\", \"old\", \"new\"]}}},\n    {\"type\": \"function\", \"function\": {\n        \"name\": \"done\",\n        \"description\": \"Terminate the task.\",\n        \"parameters\": {\"type\": \"object\", \"properties\": {\n            \"result\": {\"type\": \"string\"}}, \"required\": [\"result\"]}}},\n]\n\ndef call(msgs):\n    body = json.dumps({\"model\": MODEL, \"messages\": msgs, \"tools\": TOOLS,\n                       \"max_tokens\": 384000, \"thinking\": THINKING}).encode()\n    req = urllib.request.Request(URL, body, {\n        \"Content-Type\": \"application/json\",\n        \"Authorization\": f\"Bearer {KEY}\"})\n    with urllib.request.urlopen(req, timeout=1800) as r:\n        return json.load(r)\n\ndef p(*a):\n    return os.path.join(ROOT, *a)\n\ndef do_exec(a):\n    t0 = time.perf_counter()\n    try:\n        r = subprocess.run(a[\"argv\"], cwd=a.get(\"cwd\") or ROOT,\n                           input=a.get(\"stdin\", \"\").encode(),\n                           capture_output=True,\n                           timeout=a.get(\"timeout_ms\", 120000) / 1000)\n        code, out, err = r.returncode, r.stdout, r.stderr\n    except subprocess.TimeoutExpired as e:\n        code, out, err = \"TIMEOUT\", e.stdout or b\"\", e.stderr or b\"\"\n    except OSError as e:\n        code, out, err = 127, b\"\", f\"{type(e).__name__}: {e}\".encode()\n    s = f\"exit={code} ms={int((time.perf_counter()-t0)*1000)}\\n\" + out.decode(\"utf-8\", \"replace\")\n    if err:\n        s += (\"\\n--stderr--\\n\" if out else \"\") + err.decode(\"utf-8\", \"replace\")\n    return s\n\ndef do_write(a):\n    try:\n        path = p(a[\"path\"])\n        os.makedirs(os.path.dirname(path) or \".\", exist_ok=True)\n        with open(path, \"a\" if a.get(\"append\") else \"w\", encoding=\"utf-8\") as f:\n            f.write(a.get(\"data\", \"\"))\n        return f\"ok wrote {len(a.get('data','').encode())}B {a['path']}\"\n    except OSError as e:\n        return f\"err {type(e).__name__}: {e}\"\n\ndef do_edit(a):\n    try:\n        s = open(p(a[\"path\"]), \"rb\").read()\n    except OSError as e:\n        return f\"err {type(e).__name__}: {e}\"\n    old, new = a[\"old\"].encode(), a[\"new\"].encode()\n    n = s.count(old)\n    if n != 1:\n        return f\"err match={n} expected=1\"\n    s2 = s.replace(old, new, 1)\n    open(p(a[\"path\"]), \"wb\").write(s2)\n    i = s2.find(new)\n    return f\"ok -{len(old)} +{len(new)} {a['path']}\\n\" + \\\n           s2[max(0, i-40):i+len(new)+40].decode(\"utf-8\", \"replace\")\n\nOPS = {\"exec\": do_exec, \"write\": do_write, \"edit\": do_edit}\n\ndef main(task):\n    msgs = [{\"role\": \"system\", \"content\": HEADER},\n            {\"role\": \"user\", \"content\": task}]\n    th = tm = to = tr = ta = 0\n    turn = 0\n    uf = open(p(\"run-usage.jsonl\"), \"w\")\n    while True:\n        turn += 1\n        r = call(msgs)\n        u = r.get(\"usage\", {})\n        hit, miss, out = (u.get(\"prompt_cache_hit_tokens\", 0),\n                          u.get(\"prompt_cache_miss_tokens\", 0),\n                          u.get(\"completion_tokens\", 0))\n        msg = r[\"choices\"][0][\"message\"]\n        reason = len(msg.get(\"reasoning_content\") or \"\")\n        args = sum(len(c[\"function\"].get(\"arguments\") or \"\") for c in (msg.get(\"tool_calls\") or []))\n        th += hit; tm += miss; to += out; tr += reason; ta += args\n        c = (hit*.006 + miss*.30 + out*1.20) / 1e6\n        uf.write(json.dumps({\"turn\": turn, \"hit\": hit, \"miss\": miss, \"out\": out,\n                             \"reasoning_c\": reason, \"args_c\": args, \"cost\": c}) + \"\\n\")\n        print(f\"\\n[turn {turn}] out={out} (reason={reason}c args={args}c) \"\n              f\"hit={hit} miss={miss} ${c:.6f}\", flush=True)\n\n        msgs.append(msg)\n        if msg.get(\"content\"):\n            print(\"  text:\", msg[\"content\"][:300].replace(\"\\n\", \"\\n        \"), flush=True)\n\n        calls = msg.get(\"tool_calls\") or []\n        if not calls:\n            print(\"\\n[no tool call; loop ends]\")\n            break\n\n        for c_ in calls:\n            fn = c_[\"function\"][\"name\"]\n            try:\n                a = json.loads(c_[\"function\"][\"arguments\"] or \"{}\", strict=False)\n            except json.JSONDecodeError as e:\n                obs = f\"err malformed_arguments {e}\"\n                msgs.append({\"role\": \"tool\", \"tool_call_id\": c_[\"id\"], \"content\": obs})\n                print(\"   ->\", obs, flush=True)\n                continue\n            if fn == \"done\":\n                json.dump(msgs, open(p(\"run-log.json\"), \"w\"), indent=1)\n                print(\"\\n[DONE]\", a.get(\"result\", \"\"))\n                print(f\"[total] out={to} reason_c={tr} args_c={ta} hit={th} miss={tm} \"\n                      f\"hit%={100*th/max(th+tm,1):.1f} \"\n                      f\"cost=${(th*.006+tm*.30+to*1.20)/1e6:.6f}\")\n                uf.close()\n                return\n            print(f\"  {fn}:\", json.dumps(a)[:180], flush=True)\n            obs = OPS[fn](a)\n            print(\"   ->\", obs.replace(\"\\n\", \"\\n        \")[:400], flush=True)\n            msgs.append({\"role\": \"tool\", \"tool_call_id\": c_[\"id\"], \"content\": obs})\n\n    print(f\"[total] out={to} reason_c={tr} args_c={ta} hit={th} miss={tm} \"\n          f\"cost=${(th*.006+tm*.30+to*1.20)/1e6:.6f}\")\n    uf.close()\n\nif __name__ == \"__main__\":\n    main(sys.argv[1] if len(sys.argv) > 1 else\n         \"Add documentation to this directory. Write the docs here, as files in this directory.\")\n=== drive.py\n#!/usr/bin/env python3\nimport sys\nsys.path.insert(0, \"/home/lmbullo/loop\")\nfrom sim import run\n\nW = \"/home/lmbullo/loop/ws1\"\n\n# I am the model. These are the calls I would make, by hand.\ntask = [\n    {\"tool\": \"exec\", \"argv\": [\"find\", \".\", \"-type\", \"f\"]},\n    {\"tool\": \"exec\", \"argv\": [\"cat\", \"src/analyze.py\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"data/app.log\"]},\n    # -> crash. need to see the exact line/context\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"-c\", \"print(repr(open('data/app.log').read()[-60:]))\"]},\n    # fix: skip blank lines, sort desc, print \"code count\"\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"-c\",\n        \"import re;p='src/analyze.py';s=open(p).read();\"\n        \"s=s.replace('        parts = line.split()','        parts = line.split()\\\\n        if not parts: continue');\"\n        \"s=s.replace('        c[parts[2]] += 1','        c[parts[2][5:]] += 1');\"\n        \"open(p,'w').write(s)\"]},\n    {\"tool\": \"exec\", \"argv\": [\"cat\", \"src/analyze.py\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"data/app.log\"]},\n    # still wrong order -> sort\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"-c\",\n        \"p='src/analyze.py';s=open(p).read();\"\n        \"s=s.replace('    for k, v in c.items():\\\\n        print(v, k)','    for k, v in sorted(c.items(), key=lambda kv: -kv[1]):\\\\n        print(k, v)');\"\n        \"open(p,'w').write(s)\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"data/app.log\"]},\n    {\"tool\": \"done\", \"result\": \"E42 3 / E07 3\"},\n]\n\nedge = [\n    {\"tool\": \"exec\", \"argv\": [\"seq\", \"1\", \"200000\"]},\n    {\"tool\": \"exec\", \"argv\": [\"head\", \"-c\", \"200\", \"/bin/ls\"]},\n    {\"tool\": \"exec\", \"argv\": [\"definitely-not-a-program\"]},\n    {\"tool\": \"exec\", \"argv\": [\"sleep\", \"30\"], \"timeout_ms\": 500},\n    {\"tool\": \"exec\", \"argv\": [\"true\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"-c\", \"import sys;sys.stderr.write('boom\\\\n');sys.exit(3)\"]},\n    {\"tool\": \"exec\", \"argv\": [\"sh\", \"-c\", \"cd /tmp && pwd\"]},\n    {\"tool\": \"exec\", \"argv\": [\"pwd\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"-c\", \"open('src/u.txt','w').write('h\u00e9llo \u4e16\u754c\\\\n')\"]},\n    {\"tool\": \"exec\", \"argv\": [\"cat\", \"src/u.txt\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"missing.log\"]},\n    {\"tool\": \"done\", \"result\": \"edges\"},\n]\n\nrun(task, \"task\")\nrun(edge, \"edge\")\n=== drive2.py\n#!/usr/bin/env python3\nimport sys; sys.path.insert(0, \"/home/lmbullo/loop\")\nfrom sim2 import run\n\n# same task, but edits are structured instead of shell-quoted python -c\ntask = [\n    {\"tool\": \"exec\", \"argv\": [\"find\", \".\", \"-type\", \"f\"]},\n    {\"tool\": \"exec\", \"argv\": [\"cat\", \"src/analyze.py\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"data/app.log\"]},\n    {\"tool\": \"edit\", \"path\": \"src/analyze.py\",\n     \"old\": \"        parts = line.split()\\n\",\n     \"new\": \"        parts = line.split()\\n        if not parts: continue\\n\"},\n    {\"tool\": \"edit\", \"path\": \"src/analyze.py\",\n     \"old\": \"            c[parts[2]] += 1\\n    for k, v in c.items():\\n        print(v, k)\",\n     \"new\": \"            c[parts[2][5:]] += 1\\n    for k, v in sorted(c.items(), key=lambda kv: -kv[1]):\\n        print(k, v)\"},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"data/app.log\"]},\n    {\"tool\": \"done\", \"result\": \"ok\"},\n]\n\nedge = [\n    {\"tool\": \"exec\", \"argv\": [\"seq\", \"1\", \"200000\"]},\n    {\"tool\": \"exec\", \"argv\": [\"head\", \"-c\", \"200\", \"/bin/ls\"]},\n    {\"tool\": \"exec\", \"argv\": [\"definitely-not-a-program\"]},\n    {\"tool\": \"exec\", \"argv\": [\"sleep\", \"30\"], \"timeout_ms\": 500},\n    {\"tool\": \"exec\", \"argv\": [\"true\"]},\n    {\"tool\": \"exec\", \"argv\": [\"python3\", \"src/analyze.py\", \"missing.log\"]},\n    {\"tool\": \"edit\", \"path\": \"src/analyze.py\", \"old\": \"NOPE\", \"new\": \"x\"},\n    {\"tool\": \"done\", \"result\": \"e\"},\n]\n\n# restore the buggy file first\nopen(\"/home/lmbullo/loop/ws1/src/analyze.py\",\"w\").write(\n'''import sys, collections\ndef main(p):\n    c = collections.Counter()\n    for line in open(p):\n        parts = line.split()\n        if parts[1] == \"ERROR\":\n            c[parts[2]] += 1\n    for k, v in c.items():\n        print(v, k)\nmain(sys.argv[1])\n''')\nrun(task, \"task2\")\nrun(edge, \"edge2\")\n=== sim.py\n#!/usr/bin/env python3\n\"\"\"Minimal implementation of the proposed loop. No model. Transcript-driven.\n\nVerifies: (a) can coding work be done through one `exec` waist, (b) does the\nwire format stay readable and bounded, (c) what the cache math actually does.\n\"\"\"\nimport json, os, subprocess, sys, time\n\nWS = \"/home/lmbullo/loop/ws1\"\nOBS = \"/home/lmbullo/loop/obs\"\nHEAD_CAP = 600\nTAIL_CAP = 400\nos.makedirs(OBS, exist_ok=True)\n\nHEADER = \"\"\"\\\ntool: exec(argv:[str], cwd?:str, stdin?:str, timeout_ms?:int) -> observation\ntool: done(result:str)\nobs wire: \"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\" then payload.\npayload is truncated to head+tail; full copy written to .obs/<id>.\nedit files by writing a program; no state persists between calls.\n\"\"\"\n\ndef bound(out, oid):\n    b = out.encode(\"utf-8\", \"replace\")\n    if len(b) <= HEAD_CAP + TAIL_CAP:\n        return out, len(b), False\n    p = os.path.join(OBS, f\"{oid}.txt\")\n    open(p, \"wb\").write(b)\n    head = b[:HEAD_CAP].decode(\"utf-8\", \"replace\")\n    tail = b[-TAIL_CAP:].decode(\"utf-8\", \"replace\")\n    return f\"{head}\\n...[truncated {len(b)-HEAD_CAP-TAIL_CAP}B -> {p}]...\\n{tail}\", len(b), True\n\ndef do_exec(call, n):\n    argv = call[\"argv\"]\n    t0 = time.perf_counter()\n    try:\n        p = subprocess.run(\n            argv, cwd=call.get(\"cwd\", WS),\n            input=call.get(\"stdin\", \"\").encode(),\n            capture_output=True,\n            timeout=call.get(\"timeout_ms\", 10000) / 1000,\n        )\n        code, out, err = p.returncode, p.stdout, p.stderr\n    except subprocess.TimeoutExpired as e:\n        code, out, err = \"TIMEOUT\", e.stdout or b\"\", e.stderr or b\"\"\n    except (FileNotFoundError, PermissionError) as e:\n        code, out, err = 127, b\"\", str(e).encode()\n    dur = int((time.perf_counter() - t0) * 1000)\n    payload = out + (b\"\\n--stderr--\\n\" + err if err else b\"\")\n    body, nbytes, trunc = bound(payload.decode(\"utf-8\", \"replace\"), n)\n    return body, nbytes, code, dur, trunc\n\ndef run(transcript, label):\n    log = [{\"t\": \"header\", \"v\": HEADER}]\n    prev = 0\n    print(f\"\\n=== {label} ===\")\n    for n, call in enumerate(transcript, 1):\n        if call[\"tool\"] == \"done\":\n            log.append({\"t\": \"done\", \"v\": call[\"result\"]})\n            print(f\"[turn {n}] DONE {call['result']}\")\n            break\n        body, nbytes, code, dur, trunc = do_exec(call, f\"{label}-{n}\")\n        log.append({\"t\": \"obs\", \"call\": call[\"argv\"], \"code\": code})\n        wire = f\"$ code={code} out={nbytes}B dur={dur}ms\\n{body}\"\n        print(f\"[turn {n}] {' '.join(call['argv'])[:70]}\")\n        print(\"  \" + wire.replace(\"\\n\", \"\\n  \")[:900])\n        # cache model: whole log resent; only the new suffix is a miss\n        whole = sum(len(json.dumps(e)) for e in log)\n        appended = whole - prev\n        prev = whole\n        tot_tok = whole / 4\n        miss_tok = appended / 4\n        hit = 100 * (1 - miss_tok / tot_tok) if tot_tok else 0\n        cost = (tot_tok - miss_tok) * 0.006 / 1e6 + miss_tok * 0.30 / 1e6\n        print(f\"  <cache prefix={tot_tok:.0f}t miss={miss_tok:.0f}t hit={hit:.0f}% cost=${cost*1000:.4f}/call>\")\n    json.dump(log, open(f\"/home/lmbullo/loop/log-{label}.jsonl\", \"w\"), indent=0)\n    return log\n=== sim2.py\n#!/usr/bin/env python3\n\"\"\"v2: shape-aware observations + one structured edit primitive. Same tasks.\"\"\"\nimport json, os, re, subprocess, sys, time\n\nWS = \"/home/lmbullo/loop/ws1\"\nOBS = \"/home/lmbullo/loop/obs2\"\nos.makedirs(OBS, exist_ok=True)\nANSI = re.compile(rb\"\\x1b\\[[0-9;]*[A-Za-z]\")\nMAX_TEXT = 2000          # bytes of text kept inline\nMAX_LINES = 40\n\ndef sniff(b):\n    if not b: return \"empty\"\n    sample = b[:4096]\n    bad = sum(1 for c in sample if c < 9 or (13 < c < 32) or c > 126)\n    return \"binary\" if bad / len(sample) > 0.20 else \"text\"\n\ndef shape(b):\n    \"\"\"What the model actually needs from a big blob: size, lines, edges.\"\"\"\n    lines = b.count(b\"\\n\")\n    first = b.split(b\"\\n\", 1)[0][:120]\n    last = b.rstrip(b\"\\n\").rsplit(b\"\\n\", 1)[-1][:120]\n    return f\"lines={lines} first={first!r} last={last!r}\"\n\ndef render(out, err, n):\n    b = ANSI.sub(b\"\", out + (b\"\\n--stderr--\\n\" + err if err else b\"\"))\n    if not b:\n        return \"\", 0\n    kind = sniff(b)\n    if kind == \"binary\":\n        import hashlib\n        return f\"kind=binary sha256={hashlib.sha256(b).hexdigest()[:16]} head_hex={b[:24].hex()}\", len(b)\n    if len(b) > MAX_TEXT:\n        p = os.path.join(OBS, f\"o{n}.txt\"); open(p, \"wb\").write(b)\n        return f\"kind=text {shape(b)} saved={p}\\n{b[:MAX_TEXT].decode('utf-8','replace') if b.count(b'\\n')<=MAX_LINES else ''}\".strip(), len(b)\n    t = b.decode(\"utf-8\", \"replace\")\n    t = re.sub(r\"\\n{3,}\", \"\\n\\n\", t)                      # collapse blank runs\n    return t, len(b)\n\ndef do_exec(call, n):\n    t0 = time.perf_counter()\n    try:\n        p = subprocess.run(call[\"argv\"], cwd=call.get(\"cwd\", WS),\n                           input=call.get(\"stdin\", \"\").encode(),\n                           capture_output=True, timeout=call.get(\"timeout_ms\", 10000)/1000)\n        code, out, err = p.returncode, p.stdout, p.stderr\n    except subprocess.TimeoutExpired as e:\n        code, out, err = \"TIMEOUT\", e.stdout or b\"\", e.stderr or b\"\"\n    except (FileNotFoundError, PermissionError) as e:\n        code, out, err = 127, b\"\", str(e).encode()\n    body, nbytes = render(out, err, n)\n    return body, nbytes, code, int((time.perf_counter()-t0)*1000)\n\ndef do_edit(call, n):\n    path = os.path.join(WS, call[\"path\"])\n    try:\n        s = open(path, \"rb\").read()\n    except OSError as e:\n        return f\"err={e.strerror}\", 0, 1\n    old, new = call[\"old\"].encode(), call[\"new\"].encode()\n    c = s.count(old)\n    if c != 1:\n        return f\"err=no_unique_match found={c}\", 0, 1\n    s2 = s.replace(old, new, 1)\n    open(path, \"wb\").write(s2)\n    # return only the changed hunk, not the file\n    i = s2.find(new)\n    ctx = s2[max(0, i-40):i+len(new)+40].decode(\"utf-8\", \"replace\")\n    return f\"ok -{len(old)} +{len(new)} @{call['path']}\\n{ctx}\", 0, 0\n\ndef run(transcript, label):\n    log = [{\"t\": \"hdr\"}]; prev = 0; miss_tot = 0\n    for n, call in enumerate(transcript, 1):\n        if call[\"tool\"] == \"done\":\n            log.append({\"t\": \"done\", \"v\": call[\"result\"]}); print(f\"[{n}] DONE\"); break\n        if call[\"tool\"] == \"edit\":\n            body, nb, code = do_edit(call, n)\n        else:\n            body, nb, code, dur = do_exec(call, n)\n        log.append({\"t\": \"obs\", \"b\": body})\n        whole = sum(len(json.dumps(e)) for e in log)\n        appended = whole - prev; prev = whole\n        miss = appended/4; tot = whole/4; miss_tot += miss\n        print(f\"[{n}] {call.get('argv', call.get('path',''))}\")\n        print(f\"  $ code={code} out={nb}B \" + body.replace(\"\\n\", \"\\n  \")[:500])\n        print(f\"  <miss={miss:.0f}t hit={100*(1-miss/tot):.0f}%>\")\n    print(f\"  TOTAL MISS ~{miss_tot:.0f}t  $\" + \"{:.5f}\".format(miss_tot*0.30/1e6))\n    return miss_tot\n"
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_01_CQygnMDx1w095nU5ixHc8206",
+  "content": "exit=0 ms=6\n==> log-edge.jsonl <==\n[\n{\n\"t\": \"header\",\n\"v\": \"tool: exec(argv:[str], cwd?:str, stdin?:str, timeout_ms?:int) -> observation\\ntool: done(result:str)\\nobs wire: \\\"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\\\" then payload.\\npayload is truncated to head+tail; full copy written to .obs/<id>.\\nedit files by writing a program; no state persists between calls.\\n\"\n},\n\n==> log-task.jsonl <==\n[\n{\n\"t\": \"header\",\n\"v\": \"tool: exec(argv:[str], cwd?:str, stdin?:str, timeout_ms?:int) -> observation\\ntool: done(result:str)\\nobs wire: \\\"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\\\" then payload.\\npayload is truncated to head+tail; full copy written to .obs/<id>.\\nedit files by writing a program; no state persists between calls.\\n\"\n},\n\n==> obs/edge-1.txt <==\n1\n2\n3\n4\n5\n\n==> obs2/o1.txt <==\n1\n2\n3\n4\n5\n\n==> ws1/src/analyze.py <==\nimport sys, collections\ndef main(p):\n    c = collections.Counter()\n    for line in open(p):\n        parts = line.split()\n\n==> ws1/src/u.txt <==\nh\u00e9llo \u4e16\u754c\n\n==> ws1/data/app.log <==\n2026-11-14T01:00:00Z ERROR code=E42 user=u1\n2026-11-14T01:00:01Z WARN code=W1 user=u2\n2026-11-14T01:00:02Z ERROR code=E07 user=u3\n2026-11-14T01:00:03Z ERROR code=E42 user=u1\n2026-11-14T01:00:04Z ERROR code=E42 user=u9\n"
+ },
+ {
+  "role": "assistant",
+  "content": "Plan: write a single `DOCS.yaml` capturing architecture, components, run commands, invariants, and known gaps.",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_yftLLwQttporuxR30mq26725",
+    "type": "function",
+    "function": {
+     "name": "write",
+     "arguments": "{\"path\": \"DOCS.yaml\", \"data\": \"purpose:\\n  summary: Research harness for a tool-calling agent loop; compares tool/observation designs by token cost and correctness.\\n  core_question: Can coding work be done through one `exec` waist, with bounded, cache-friendly observations?\\nroot: /home/lmbullo/loop\\n\\nentrypoints:\\n  loop.py:\\n    role: production loop (agent loop v5)\\n    model: deepseek-flash via https://api.deepseek.com/chat/completions\\n    auth: ~/.pi/agent/auth.json -> deepseek.key\\n    run: python3 loop.py \\\"<task>\\\"\\n    default_task: \\\"Add documentation to this directory. Write the docs here, as files in this directory.\\\"\\n    tools: [exec, write, edit, done]\\n    loop: append-only messages -> model call -> print [turn N] usage -> execute tool_calls -> append tool observations -> stop on no tool call or done\\n    usage_metering: ~/.pi/agent/auth.json absent blocks run; per-turn JSONL written to run-usage.jsonl\\n    stop_conditions: [done tool call, model returns no tool call]\\n  drive.py:\\n    role: hands-written transcript runner over sim.run\\n    depends: [sim.py]\\n    workspace: /home/lmbullo/loop/ws1\\n    runs: [task, edge]\\n  drive2.py:\\n    role: same tasks as drive.py but structured edit instead of shell-quoted python -c\\n    depends: [sim2.py]\\n    side_effect: resets ws1/src/analyze.py to buggy version before each run\\n    runs: [task2, edge2]\\n\\ncomponents:\\n  sim.py:\\n    contract: \\\"exec(argv, cwd?, stdin?, timeout_ms?) -> observation; done(result)\\\"\\n    observation_wire: \\\"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\\\" + payload\\n    bounding: head 600B + tail 400B; full output saved to obs/<label>-<n>.txt\\n    defaults: cwd=ws1, timeout=10000ms\\n    cache_model: whole log resent each turn; only new suffix counted as miss\\n    writes: log-<label>.jsonl, obs/\\n  sim2.py:\\n    contract: same plus edit(path, old, new)\\n    observation: shape-aware; binary -> sha256+head hex; text >2000B -> lines/first/last + saved obs2/o<n>.txt; text <=2000B inline with blank-run collapse; ANSI stripped\\n    edit: unique-match replace; returns only changed hunk +-40B\\n    writes: obs2/\\n  ws1:\\n    role: sandbox workspace for sim/drive runs\\n    src/analyze.py: counts ERROR codes in a log; buggy baseline\\n    data/app.log: sample log, \\\"TIMESTAMP LEVEL code=XX user=uN\\\"\\n    src/u.txt: utf-8 probe\\n  obs, obs2: saved large observations from prior runs\\n  log-task.jsonl, log-edge.jsonl: transcripts from sim.py runs\\n  run-usage.jsonl: per-turn usage from loop.py\\n\\nartifact:\\n  path: DOCS.yaml\\n\\ninvariants:\\n  messages: append-only\\n  harness: no knowledge of repos, tests, or languages\\n  observations: verbatim (only truncated per bounding rule)\\n  output: metered and reported, never gated\\n\\ncost_model:\\n  pricing_per_1M: {cache_hit: 0.006, cache_miss: 0.30, completion: 1.20}\\n  formula: (hit*0.006 + miss*0.30 + out*1.20) / 1e6\\n\\ngaps:\\n  paths: absolute /home/lmbullo/loop hardcoded in loop.py, sim.py, sim2.py, drive*.py\\n  loop_import: drive.py relies on sim.py being on path; no packaging\\n  auth: loop.py requires ~/.pi/agent/auth.json\\n  run-log.json: written by loop.py but not listed in repo\\n  pycache: __pycache__ committed/leftover\\n\"}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_yftLLwQttporuxR30mq26725",
+  "content": "ok wrote 3095B DOCS.yaml"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_3QzavF0HF7S0xTaxjvnk0957",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"python3\", \"-c\", \"import yaml,sys;d=yaml.safe_load(open('DOCS.yaml'));assert set(d)>={'purpose','entrypoints','components','invariants','cost_model','gaps'};print('ok',len(d))\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_3QzavF0HF7S0xTaxjvnk0957",
+  "content": "exit=1 ms=185\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/__init__.py\", line 125, in safe_load\n    return load(stream, SafeLoader)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/__init__.py\", line 81, in load\n    return loader.get_single_data()\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/constructor.py\", line 49, in get_single_data\n    node = self.get_single_node()\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 36, in get_single_node\n    document = self.compose_document()\n               ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 55, in compose_document\n    node = self.compose_node(None, None)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 133, in compose_mapping_node\n    item_value = self.compose_node(node, item_key)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 133, in compose_mapping_node\n    item_value = self.compose_node(node, item_key)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 127, in compose_mapping_node\n    while not self.check_event(MappingEndEvent):\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/parser.py\", line 98, in check_event\n    self.current_event = self.state()\n                         ^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/parser.py\", line 438, in parse_block_mapping_key\n    raise ParserError(\"while parsing a block mapping\", self.marks[-1],\nyaml.parser.ParserError: while parsing a block mapping\n  in \"DOCS.yaml\", line 30, column 5\nexpected <block end>, but found '<scalar>'\n  in \"DOCS.yaml\", line 31, column 71\n"
+ },
+ {
+  "role": "assistant",
+  "content": "Quote the `contract` values containing colons.",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_5Htiibs5anJKi61J1TIS2746",
+    "type": "function",
+    "function": {
+     "name": "edit",
+     "arguments": "{\"path\": \"DOCS.yaml\", \"old\": \"    contract: \\\"exec(argv, cwd?, stdin?, timeout_ms?) -> observation; done(result)\\\"\", \"new\": \"    contract: \\\"exec(argv, cwd?, stdin?, timeout_ms?) -> observation; done(result)\\\"\\n    contract_note: quoted because value contains colons\"}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_5Htiibs5anJKi61J1TIS2746",
+  "content": "ok -82 +138 DOCS.yaml\n: [task2, edge2]\n\ncomponents:\n  sim.py:\n    contract: \"exec(argv, cwd?, stdin?, timeout_ms?) -> observation; done(result)\"\n    contract_note: quoted because value contains colons\n    observation_wire: \"$ code=<int|TIME"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_8tIWGDo4DYpFXvQilh9A4003",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"python3\", \"-c\", \"import yaml;d=yaml.safe_load(open('DOCS.yaml'));print('ok',len(d))\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_8tIWGDo4DYpFXvQilh9A4003",
+  "content": "exit=1 ms=148\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/__init__.py\", line 125, in safe_load\n    return load(stream, SafeLoader)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/__init__.py\", line 81, in load\n    return loader.get_single_data()\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/constructor.py\", line 49, in get_single_data\n    node = self.get_single_node()\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 36, in get_single_node\n    document = self.compose_document()\n               ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 55, in compose_document\n    node = self.compose_node(None, None)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 133, in compose_mapping_node\n    item_value = self.compose_node(node, item_key)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 133, in compose_mapping_node\n    item_value = self.compose_node(node, item_key)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 127, in compose_mapping_node\n    while not self.check_event(MappingEndEvent):\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/parser.py\", line 98, in check_event\n    self.current_event = self.state()\n                         ^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/parser.py\", line 438, in parse_block_mapping_key\n    raise ParserError(\"while parsing a block mapping\", self.marks[-1],\nyaml.parser.ParserError: while parsing a block mapping\n  in \"DOCS.yaml\", line 30, column 5\nexpected <block end>, but found '<scalar>'\n  in \"DOCS.yaml\", line 32, column 71\n"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_kvrLLSclRyCNyNpzZQwG7797",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"sed\", \"-n\", \"30,36p\", \"DOCS.yaml\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_kvrLLSclRyCNyNpzZQwG7797",
+  "content": "exit=0 ms=3\n    contract: \"exec(argv, cwd?, stdin?, timeout_ms?) -> observation; done(result)\"\n    contract_note: quoted because value contains colons\n    observation_wire: \"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\" + payload\n    bounding: head 600B + tail 400B; full output saved to obs/<label>-<n>.txt\n    defaults: cwd=ws1, timeout=10000ms\n    cache_model: whole log resent each turn; only new suffix counted as miss\n    writes: log-<label>.jsonl, obs/\n"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_oQ19oc6zOFxQUNvIrRvK6386",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"sh\", \"-c\", \"python3 - <<'EOF'\\nimport re\\np='DOCS.yaml'\\nfor i,l in enumerate(open(p),1):\\n    v=l.split(': ',1)[1].rstrip('\\\\n') if ': ' in l else ''\\n    if v and ': ' in v: print(i,l.rstrip())\\nEOF\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_oQ19oc6zOFxQUNvIrRvK6386",
+  "content": "exit=0 ms=94\n61   pricing_per_1M: {cache_hit: 0.006, cache_miss: 0.30, completion: 1.20}\n"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_VZEdjddgRkHkMCJN0E997598",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"sh\", \"-c\", \"python3 -c \\\"import yaml;print(yaml.safe_load(open('DOCS.yaml')))\\\" >/dev/null; sed -n '36,70p' DOCS.yaml\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_VZEdjddgRkHkMCJN0E997598",
+  "content": "exit=0 ms=156\n    writes: log-<label>.jsonl, obs/\n  sim2.py:\n    contract: same plus edit(path, old, new)\n    observation: shape-aware; binary -> sha256+head hex; text >2000B -> lines/first/last + saved obs2/o<n>.txt; text <=2000B inline with blank-run collapse; ANSI stripped\n    edit: unique-match replace; returns only changed hunk +-40B\n    writes: obs2/\n  ws1:\n    role: sandbox workspace for sim/drive runs\n    src/analyze.py: counts ERROR codes in a log; buggy baseline\n    data/app.log: sample log, \"TIMESTAMP LEVEL code=XX user=uN\"\n    src/u.txt: utf-8 probe\n  obs, obs2: saved large observations from prior runs\n  log-task.jsonl, log-edge.jsonl: transcripts from sim.py runs\n  run-usage.jsonl: per-turn usage from loop.py\n\nartifact:\n  path: DOCS.yaml\n\ninvariants:\n  messages: append-only\n  harness: no knowledge of repos, tests, or languages\n  observations: verbatim (only truncated per bounding rule)\n  output: metered and reported, never gated\n\ncost_model:\n  pricing_per_1M: {cache_hit: 0.006, cache_miss: 0.30, completion: 1.20}\n  formula: (hit*0.006 + miss*0.30 + out*1.20) / 1e6\n\ngaps:\n  paths: absolute /home/lmbullo/loop hardcoded in loop.py, sim.py, sim2.py, drive*.py\n  loop_import: drive.py relies on sim.py being on path; no packaging\n  auth: loop.py requires ~/.pi/agent/auth.json\n  run-log.json: written by loop.py but not listed in repo\n  pycache: __pycache__ committed/leftover\n\n--stderr--\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/__init__.py\", line 125, in safe_load\n    return load(stream, SafeLoader)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/__init__.py\", line 81, in load\n    return loader.get_single_data()\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/constructor.py\", line 49, in get_single_data\n    node = self.get_single_node()\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 36, in get_single_node\n    document = self.compose_document()\n               ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 55, in compose_document\n    node = self.compose_node(None, None)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 133, in compose_mapping_node\n    item_value = self.compose_node(node, item_key)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 133, in compose_mapping_node\n    item_value = self.compose_node(node, item_key)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 84, in compose_node\n    node = self.compose_mapping_node(anchor)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/composer.py\", line 127, in compose_mapping_node\n    while not self.check_event(MappingEndEvent):\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/parser.py\", line 98, in check_event\n    self.current_event = self.state()\n                         ^^^^^^^^^^^^\n  File \"/home/lmbullo/.local/share/mise/installs/python/3.12.14/lib/python3.12/site-packages/yaml/parser.py\", line 438, in parse_block_mapping_key\n    raise ParserError(\"while parsing a block mapping\", self.marks[-1],\nyaml.parser.ParserError: while parsing a block mapping\n  in \"DOCS.yaml\", line 30, column 5\nexpected <block end>, but found '<scalar>'\n  in \"DOCS.yaml\", line 32, column 71\n"
+ },
+ {
+  "role": "assistant",
+  "content": "The `+ payload` makes line 32 a plain scalar followed by another key. Quote it and drop the redundant note.",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_HErqL5wfsLDSpZs7zEFi1780",
+    "type": "function",
+    "function": {
+     "name": "edit",
+     "arguments": "{\"path\": \"DOCS.yaml\", \"old\": \"    contract_note: quoted because value contains colons\\n    observation_wire: \\\"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\\\" + payload\", \"new\": \"    observation_wire: '\\\"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\\\" + payload'\"}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_HErqL5wfsLDSpZs7zEFi1780",
+  "content": "ok -135 +81 DOCS.yaml\neout_ms?) -> observation; done(result)\"\n    observation_wire: '\"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\" + payload'\n    bounding: head 600B + tail 400B; fu"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_RUc980HtnNiClDVwqRhI5751",
+    "type": "function",
+    "function": {
+     "name": "exec",
+     "arguments": "{\"argv\": [\"python3\", \"-c\", \"import yaml;d=yaml.safe_load(open('DOCS.yaml'));print('ok',sorted(d))\"]}"
+    }
+   }
+  ]
+ },
+ {
+  "role": "tool",
+  "tool_call_id": "call_00_RUc980HtnNiClDVwqRhI5751",
+  "content": "exit=0 ms=152\nok ['artifact', 'components', 'cost_model', 'entrypoints', 'gaps', 'invariants', 'purpose', 'root']\n"
+ },
+ {
+  "role": "assistant",
+  "content": "",
+  "tool_calls": [
+   {
+    "index": 0,
+    "id": "call_00_0O6bzC948mdr4uNMYPBe1458",
+    "type": "function",
+    "function": {
+     "name": "done",
+     "arguments": "{\"result\": \"Wrote DOCS.yaml (parses cleanly): purpose, entrypoints (loop.py, drive.py, drive2.py with run commands), components (sim/sim2 observation wire formats, bounding, sandbox ws1), invariants, cost model, and known gaps.\"}"
+    }
+   }
+  ]
+ }
+]
