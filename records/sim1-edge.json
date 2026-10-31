@@ -1,0 +1,102 @@
+[
+{
+"t": "header",
+"v": "tool: exec(argv:[str], cwd?:str, stdin?:str, timeout_ms?:int) -> observation\ntool: done(result:str)\nobs wire: \"$ code=<int|TIMEOUT|127> out=<bytes> dur=<ms>\" then payload.\npayload is truncated to head+tail; full copy written to .obs/<id>.\nedit files by writing a program; no state persists between calls.\n"
+},
+{
+"t": "obs",
+"call": [
+"seq",
+"1",
+"200000"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"head",
+"-c",
+"200",
+"/bin/ls"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"definitely-not-a-program"
+],
+"code": 127
+},
+{
+"t": "obs",
+"call": [
+"sleep",
+"30"
+],
+"code": "TIMEOUT"
+},
+{
+"t": "obs",
+"call": [
+"true"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"-c",
+"import sys;sys.stderr.write('boom\\n');sys.exit(3)"
+],
+"code": 3
+},
+{
+"t": "obs",
+"call": [
+"sh",
+"-c",
+"cd /tmp && pwd"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"pwd"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"-c",
+"open('src/u.txt','w').write('h\u00e9llo \u4e16\u754c\\n')"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"cat",
+"src/u.txt"
+],
+"code": 0
+},
+{
+"t": "obs",
+"call": [
+"python3",
+"src/analyze.py",
+"missing.log"
+],
+"code": 1
+},
+{
+"t": "done",
+"v": "edges"
+}
+]
