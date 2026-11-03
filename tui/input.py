@@ -1,0 +1,179 @@
+def queue_sel(app):
+    queue = app.snapshot()["queue"]
+    if queue:
+        app.qsel = min(app.qsel, len(queue) - 1)
+    return queue
+
+
+def open_prompt(app, text=""):
+    app.focus = "prompt"
+    if text:
+        app.prompt.insert(text)
+    app.dirty = True
+
+
+def close_prompt(app, clear=True):
+    if clear:
+        app.prompt.clear()
+    app.focus = "task"
+    app.dirty = True
+
+
+def submit(app):
+    text = app.prompt.text
+    if not text.strip():
+        app.say("empty task ignored")
+        close_prompt(app)
+        return
+    app.worker.enqueue(text)
+    app.prompt.remember()
+    app.prompt.clear()
+    app.focus = "task"
+    app.tsel = app.tscroll = 0
+    app.dirty = True
+
+
+def drop(app):
+    snap = app.snapshot()
+    queue = snap["queue"]
+    if not queue:
+        return
+    app.qsel = min(app.qsel, len(queue) - 1)
+    item = queue[app.qsel]
+    app.worker.drop(item["id"])
+    snap = app.snapshot()
+    app.qsel = max(0, min(app.qsel, len(snap["queue"]) - 1))
+    if not snap["queue"]:
+        app.focus = "task"
+
+
+def queue_text(app, text):
+    queue = queue_sel(app)
+    if not queue or not set(text) <= set("jJkKxd"):
+        open_prompt(app, text)
+        return
+    for ch in text:
+        if ch in "kK":
+            if ch == "K":
+                app.worker.move(queue[app.qsel]["id"], -1)
+            app.qsel = max(0, app.qsel - 1)
+        elif ch in "jJ":
+            if ch == "J":
+                app.worker.move(queue[app.qsel]["id"], 1)
+            app.qsel = min(len(queue) - 1, app.qsel + 1)
+        elif ch in "xd":
+            drop(app)
+            return
+    app.dirty = True
+
+
+def queue_key(app, key):
+    queue = queue_sel(app)
+    if key in ("up", "hist_prev"):
+        app.qsel = max(0, app.qsel - 1)
+    elif key in ("down", "hist_next"):
+        app.qsel = min(max(0, len(queue) - 1), app.qsel + 1)
+    elif key == "home":
+        app.qsel = 0
+    elif key == "end":
+        app.qsel = max(0, len(queue) - 1)
+    elif key in ("delete", "backspace"):
+        drop(app)
+    elif key in ("enter", "newline"):
+        open_prompt(app)
+    elif key in ("esc", "tab", "backtab"):
+        app.focus = "task"
+    app.dirty = True
+
+
+def prompt_key(app, key):
+    width = app.content_width()
+    height = app.layout["height"] if app.layout else 10
+    moves = {
+        "backspace": app.prompt.backspace, "delete": app.prompt.delete,
+        "left": app.prompt.left, "right": app.prompt.right,
+        "home": lambda: app.prompt.home(width), "end": lambda: app.prompt.end(width),
+        "word_left": app.prompt.word_left, "word_right": app.prompt.word_right,
+        "word_back": app.prompt.word_back, "word_next": app.prompt.word_next,
+        "kill_start": app.prompt.kill_start, "kill_end": app.prompt.kill_end,
+        "hist_prev": app.prompt.prev, "hist_next": app.prompt.next,
+        "up": lambda: app.prompt.vertical(-1, width),
+        "down": lambda: app.prompt.vertical(1, width),
+        "page_up": lambda: app.prompt.page(-1, width, height),
+        "page_down": lambda: app.prompt.page(1, width, height),
+    }
+    if key == "enter":
+        submit(app)
+    elif key == "newline":
+        app.prompt.insert("\n")
+    elif key in ("tab", "backtab"):
+        if queue_sel(app):
+            app.focus = "queue"
+        else:
+            app.focus = "task"
+        app.dirty = True
+    elif key in moves:
+        moves[key]()
+    app.dirty = True
+
+
+def task_key(app, key):
+    n = max(1, app.tview.get("n") or 1)
+    vis = max(1, app.tview.get("vis") or 1)
+    if key in ("up", "hist_prev"):
+        app.tsel = max(0, app.tsel - 1)
+    elif key in ("down", "hist_next"):
+        app.tsel = min(n - 1, app.tsel + 1)
+    elif key == "page_up":
+        app.tsel = max(0, app.tsel - vis)
+    elif key == "page_down":
+        app.tsel = min(n - 1, app.tsel + vis)
+    elif key == "home":
+        app.tsel = 0
+    elif key == "end":
+        app.tsel = n - 1
+    elif key in ("tab", "backtab"):
+        open_prompt(app)
+    app.dirty = True
+
+
+def handle(app, ev):
+    kind, value = ev
+    if kind == "paste":
+        open_prompt(app, value)
+        return
+    if kind == "text":
+        if app.focus == "queue":
+            queue_text(app, value)
+        else:
+            open_prompt(app, value)
+        return
+    if value == "ctrl_q":
+        app.quit = True
+    elif value == "ctrl_c":
+        app.prompt.clear()
+        app.say("input cleared")
+    elif value == "redraw":
+        app.scr.clear()
+        app.dirty = True
+    elif value == "retry":
+        app.worker.retry()
+        app.say("daemon retry queued")
+    elif value == "esc":
+        if app.focus == "prompt":
+            close_prompt(app)
+        else:
+            app.focus = "task"
+            app.dirty = True
+    elif value == "focus_queue":
+        if queue_sel(app) and app.focus != "queue":
+            app.focus = "queue"
+        else:
+            app.focus = "task"
+        app.dirty = True
+    elif app.focus == "queue":
+        queue_key(app, value)
+    elif app.focus == "prompt":
+        prompt_key(app, value)
+    else:
+        task_key(app, value)
