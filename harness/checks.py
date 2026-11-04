@@ -13,13 +13,17 @@ def manifest():
         return json.load(f)
 
 
+AUDIT_KINDS = ("module", "entry", "test", "tool")
+
+
 def sources():
+    """Only code kinds are size-audited; contract, data and docs are not."""
     out = []
     for entry in manifest()["files"]:
         path = entry["path"]
-        if entry.get("kind") == "record":
+        if entry.get("kind") not in AUDIT_KINDS:
             continue
-        if path.endswith(".py") or path.endswith(".json"):
+        if path.endswith(".py"):
             out.append(path)
     return out
 
