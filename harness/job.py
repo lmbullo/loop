@@ -1,6 +1,6 @@
 import os
 
-from . import record, regstore, registry
+from . import regstore, registry
 
 
 def directory():

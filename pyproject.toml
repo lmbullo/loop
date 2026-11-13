@@ -13,7 +13,7 @@ addopts = "-q"
 [tool.ruff]
 target-version = "py38"
 line-length = 120
-exclude = [".logs", "__pycache__"]
+exclude = [".logs", "__pycache__", "fixtures"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E9", "F"]

@@ -2,7 +2,7 @@ import curses
 import time
 
 from .prompt import swidth
-from .panes import attr, fit, init_colors, put, queue_block, rule, task_block
+from .panes import attr, fit, put, queue_block, rule, task_block
 
 
 def status_line(snap, width, focus):

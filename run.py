@@ -15,7 +15,7 @@ def manifest_scenarios(manifest):
 
 
 def usage(manifest):
-    lines = [f"usage: python3 run.py <command> [args]", "", manifest["purpose"]["summary"], ""]
+    lines = ["usage: python3 run.py <command> [args]", "", manifest["purpose"]["summary"], ""]
     for e in manifest["entrypoints"]:
         net = "network" if e["network"] else "offline"
         lines.append(f"  {e['id']:<6} {e['args_usage']:<34} {net:<8} {e['role']}")

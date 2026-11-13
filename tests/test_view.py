@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from harness import record, recread, recschema, view
+from harness import record, recschema, view
 from tests.support import (END, ERROR, INTERRUPTED, RESUME, RUN_ID, RUN_START, TURN,
                            event)
 
