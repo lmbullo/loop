@@ -5,7 +5,7 @@ from . import agent, config, record, recread, recwrite, view
 
 
 def resumable():
-    return [row["run_id"] for row in recread.scan() if row["state"] != "complete"]
+    return [row["run_id"] for row in recread.scan() if row["state"] not in ("complete", "running")]
 
 
 def main(argv):
@@ -28,6 +28,9 @@ def main(argv):
     if rec["state"] == "complete":
         print(f"err run={run_id} is complete (end at seq {rec['seq']}); nothing to resume", file=sys.stderr)
         return 2
+    if recread.live(run_id):
+        print(f"err run={run_id} is live (worker running); nothing to resume", file=sys.stderr)
+        return 5
 
     def emit(event):
         if as_json:

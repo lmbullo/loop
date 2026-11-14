@@ -40,6 +40,18 @@ class Worker(threading.Thread):
             return None
         return True
 
+    def cancel(self, item_id=None, run_id=None):
+        try:
+            reply = client.cancel(item_id=item_id, run_id=run_id)
+        except Exception as e:
+            self.model.say(f"cancel {type(e).__name__}: {e}")
+            return None
+        if not (reply or {}).get("changed"):
+            self.model.say("nothing to cancel")
+            return False
+        self.model.say(f"cancelled {item_id or run_id}")
+        return True
+
     def log(self, run_id):
         try:
             return client.log(run_id)

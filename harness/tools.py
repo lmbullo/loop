@@ -4,16 +4,24 @@ from . import config, observe, spawn
 
 
 def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None):
+    argv = a.get("argv")
+    if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
+        return f"err bad_args exec requires argv:list[str], got {type(argv).__name__}"
     cwd = config.resolve(a.get("cwd") or ".", sandbox or config.root())
-    code, out, err, dur = spawn.spawn(a["argv"], cwd, a.get("stdin", ""), a.get("timeout_ms", 120000), kill_group=True)
+    code, out, err, dur = spawn.spawn(argv, cwd, a.get("stdin", ""), a.get("timeout_ms", 120000), kill_group=True)
     raw = out + (b"\n--stderr--\n" + err if err else b"")
     return f"exit={code} ms={dur}\n" + observe.render_api(raw, obs_dir, name, saved=saved, rel_base=rel_base)
 
 
 def do_write(a, sandbox=None):
+    if not isinstance(a.get("path"), str) or not a["path"]:
+        return "err bad_args write requires path:str"
     data = a.get("data")
+    alias = ""
+    if data is None and isinstance(a.get("content"), str):
+        data, alias = a["content"], " note=content taken as data"
     if not isinstance(data, str):
-        return f"err bad_args write requires data:str, got {type(data).__name__}"
+        return f"err bad_args write requires data:str (content accepted), got {type(data).__name__}"
     path = config.resolve(a["path"], sandbox)
     try:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -22,12 +30,14 @@ def do_write(a, sandbox=None):
         with open(path, "a" if appending else "w", encoding="utf-8") as f:
             f.write(data)
         note = "" if prior is None else (f" appended_to={prior}B" if appending else f" replaced={prior}B")
-        return f"ok wrote {len(data.encode())}B {a['path']}{note}"
+        return f"ok wrote {len(data.encode())}B {a['path']}{note}{alias}"
     except OSError as e:
         return f"err {type(e).__name__}: {e}"
 
 
 def do_edit(a, sandbox=None):
+    if not isinstance(a.get("path"), str) or not a["path"]:
+        return "err bad_args edit requires path:str"
     for k in ("old", "new"):
         if not isinstance(a.get(k), str):
             return f"err bad_args edit requires old:str and new:str; {k} incorrect"

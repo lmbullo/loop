@@ -10,6 +10,36 @@ def _text(live):
                      for w in live)
 
 
+def _run_for_item(ident):
+    """Resolve a queue item id to its run id, even after promotion."""
+    if not ident:
+        return None
+    snap = queue.load()
+    current = snap.get("current")
+    if isinstance(current, dict) and current.get("id") == ident:
+        return current.get("run_id")
+    for item in snap.get("items") or []:
+        if item.get("id") == ident:
+            return item.get("run_id")
+    return None
+
+
+def _cancel(request):
+    """Cancel one task: drop a waiting item, else signal the live run."""
+    ident = request.get("id")
+    run_id = request.get("run_id") or _run_for_item(ident) or ident
+    if ident and queue.drop(ident):
+        return {"k": "cancelled", "kind": "queued", "id": ident, "changed": True}
+    live = [w for w in workers.live_entries()
+            if run_id and w.get("run_id") == run_id]
+    if live:
+        _interrupt(live)
+        return {"k": "cancelled", "kind": "running", "run_id": run_id,
+                "pid": live[0].get("pid"), "changed": True}
+    return {"k": "cancelled", "kind": None, "id": ident, "run_id": run_id,
+            "changed": False}
+
+
 def _interrupt(live):
     for worker in live:
         pid = worker.get("pid")
@@ -63,6 +93,8 @@ def handle(daemon, conn):
         elif cmd == "move":
             ok = queue.move(request.get("id"), int(request.get("delta") or 0))
             srvwire.send_line(conn, {"k": "ok", "changed": ok})
+        elif cmd == "cancel":
+            srvwire.send_line(conn, _cancel(request))
         elif cmd == "reload":
             data = reload.bump("server")
             live = workers.live_entries()

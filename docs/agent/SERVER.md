@@ -107,6 +107,9 @@ An item has `id` (`q000001`), `run_id`, `task`, `root`, `env`, `state`,
 - `queue.finish(state, **fields)` closes `current` with `finished_at`.
 - `queue.drop(id)` removes a waiting item.
 - `queue.move(id, delta)` swaps with a clamped neighbor.
+- `cancel` drops a waiting item by id, else interrupts the live worker whose
+  `run_id` matches; it never removes `current`, so the normal worker exit and
+  supervisor reconcile close the item as `interrupted`.
 - All mutations take `.logs/queue.json.lock`.
 
 The supervisor ticks every 0.25 s:
@@ -195,7 +198,7 @@ control plane; it does not kill the worker.
 One JSON request line in, one or more JSON lines out.
 
 Inbound commands: `ping`, `status`, `snapshot`, `runs`, `enqueue`, `drop`,
-`move`, `reload`, `stop`, `shutdown`, `run`, `attach`.
+`move`, `cancel`, `reload`, `stop`, `shutdown`, `run`, `attach`.
 
 - `run`: if a run is current or a worker is live, attach to it. Otherwise add a
   front-of-queue item and stream it. A second `api` therefore attaches to the
@@ -204,7 +207,11 @@ Inbound commands: `ping`, `status`, `snapshot`, `runs`, `enqueue`, `drop`,
 - `stop`: refuses live workers unless `force`; with force it interrupts them and
   stops the daemon.
 - `shutdown`: stops the daemon and leaves workers running.
-- `enqueue`/`drop`/`move` are the TUI's queue surface.
+- `cancel` cancels one task: an `id` that matches a waiting item is dropped;
+  otherwise `run_id` (or `id` as a fallback) names a live worker, which is
+  interrupted with SIGTERM and records an `interrupted` event. The reply is
+  `k=cancelled` with `kind=queued|running` and `changed=true|false`.
+- `enqueue`/`drop`/`move`/`cancel` are the TUI's task surface.
 
 Every reply is one or more JSON lines. `run`/`attach` first send a `hello`
 line, then record events from disk. Streaming stops at `end` or `interrupted`.

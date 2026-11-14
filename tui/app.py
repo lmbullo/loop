@@ -7,7 +7,7 @@ import termios
 import time
 import tty
 
-from . import input, keys, loginput, model, prompt, render, theme, worker
+from . import frame, input, keys, loginput, model, prompt, render, theme, worker
 
 USAGE = "usage: python3 run.py tui\n\ninteractive terminal client for this tree's daemon"
 
@@ -28,6 +28,8 @@ class App:
         self.log = None
         self.prompt_from = "task"
         self.h, self.w = scr.getmaxyx()
+        self.frame = frame.Frame(scr, sync=True)
+        self.frame.resize(self.w, self.h)
         self.dirty = True
         self.last_version = -1
         self.last_draw = 0.0
@@ -39,6 +41,11 @@ class App:
 
     def say(self, text):
         self.model.say(text)
+        self.dirty = True
+
+    def invalidate(self):
+        """Force a full repaint, e.g. after the terminal was cleared."""
+        self.frame.invalidate()
         self.dirty = True
 
     def snapshot(self):
@@ -55,9 +62,11 @@ class App:
         self.h, self.w = nh, nw
         try:
             curses.resizeterm(nh, nw)
-            self.scr.clear()
+            self.scr.erase()
         except curses.error:
             pass
+        self.frame.resize(nw, nh)
+        self.frame.invalidate()
         self.dirty = True
 
     def paint(self):
@@ -73,15 +82,13 @@ class App:
             if self.focus == "prompt":
                 ph = self.prompt.layout(self.content_width(), max_rows)["height"] + 2
             if self.prompt_h is not None and ph != self.prompt_h:
-                try:
-                    self.scr.clear()
-                except curses.error:
-                    pass
+                self.frame.invalidate()
             self.prompt_h = ph
             self.last_version = snap["version"]
             self.last_draw = now
             self.dirty = False
-            self.layout = render.draw(self.scr, snap, self.prompt, self.w, self.h,
+            self.frame.resize(self.w, self.h)
+            self.layout = render.draw(self.frame, snap, self.prompt, self.w, self.h,
                                       self.focus, self.qsel, self.tsel, self.tscroll,
                                       self.log)
             if self.layout:

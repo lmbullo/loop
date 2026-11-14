@@ -4,12 +4,6 @@ from . import job, queue, record, recread, srvwire, workers
 
 
 def target(request):
-    cur = queue.current()
-    if cur:
-        return cur["run_id"], True
-    live = workers.live_entries()
-    if live:
-        return live[0]["run_id"], True
     task = request.get("task")
     task = "No task." if not isinstance(task, str) or not task else task
     root = request.get("root")

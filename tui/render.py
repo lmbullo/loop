@@ -25,14 +25,15 @@ def status_line(snap, width, focus):
         right = notice
     elif focus == "task":
         action = "logs" if snap.get("current") or snap.get("done") else "type"
-        right = f"\u21b5 {action} \u00b7 \u21e5 prompt \u00b7 ^Q quit"
+        right = f"\u21b5 {action} \u00b7 ^X cancel \u00b7 \u21e5 prompt \u00b7 ^Q quit"
         if snap.get("current") or snap.get("queue") or snap.get("done"):
             right = "\u2191\u2193 tasks \u00b7 " + right
         if snap.get("queue"):
             right = "\u2192 queue \u00b7 " + right
     elif focus == "queue":
         right = ("\u2190 task \u00b7 \u2191\u2193 select \u00b7 "
-                 "\u21e7\u2191\u2193 move \u00b7 del drop \u00b7 \u21e5 prompt")
+                 "\u21e7\u2191\u2193 move \u00b7 del drop \u00b7 ^X cancel "
+                 "\u00b7 \u21e5 prompt")
     elif focus == "log":
         right = ("esc back \u00b7 \u2191\u2193 calls \u00b7 wheel scroll "
                  "\u00b7 \u21e5 prompt \u00b7 \u21b5 close")
@@ -92,6 +93,11 @@ def place_cursor(scr, lay, top, width, height):
 
 
 def present(scr, cursor):
+    """Flush a frame buffer, or fall back to a direct curses screen."""
+    flush = getattr(scr, "flush", None)
+    if flush is not None:
+        flush(cursor)
+        return
     try:
         curses.curs_set(1 if cursor else 0)
     except curses.error:
@@ -106,6 +112,8 @@ def present(scr, cursor):
 def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
          log=None):
     if width < 2 or height < 3:
+        scr.erase()
+        present(scr, False)
         return None
     scr.erase()
     content_w = max(1, width)

@@ -7,7 +7,7 @@ CTRL = {
     0x09: "tab", 0x0a: "newline", 0x0b: "kill_end", 0x0c: "redraw",
     0x0d: "enter", 0x0e: "hist_next", 0x0f: "focus_queue",
     0x10: "hist_prev", 0x11: "ctrl_q", 0x12: "refresh",
-    0x15: "kill_start", 0x17: "word_back", 0x7f: "backspace",
+    0x15: "kill_start", 0x17: "word_back", 0x18: "ctrl_x", 0x7f: "backspace",
 }
 
 CSI = {

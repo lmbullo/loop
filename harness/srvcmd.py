@@ -96,7 +96,7 @@ def status():
         except (OSError, ValueError):
             reply = {}
             running = False
-    interrupted = sum(1 for r in rows if r["state"] != "complete")
+    interrupted = sum(1 for r in rows if r["state"] in ("interrupted", "running"))
     run = reply.get("run") if isinstance(reply.get("run"), dict) else None
     run_id = (live[0].get("run_id") if live else None) or "-"
     run_state = "running" if live else ("complete" if run and run.get("state") == "complete" else "-")

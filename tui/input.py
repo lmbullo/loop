@@ -1,3 +1,4 @@
+from .cancel import cancel_queue, cancel_task
 from .loginput import close_log, log_key, open_log
 from .nav import queue_sel, sync_queue_sel, toggle_focus
 from .rows import task_sel
@@ -83,6 +84,8 @@ def queue_key(app, key):
         app.qsel = max(0, len(queue) - 1)
     elif key in ("delete", "backspace"):
         drop(app)
+    elif key == "ctrl_x":
+        cancel_queue(app)
     elif key in ("enter", "newline", "tab", "backtab"):
         open_prompt(app)
     elif key == "esc":
@@ -138,6 +141,8 @@ def task_key(app, key):
         app.tsel = 0
     elif key == "end":
         app.tsel = n - 1
+    elif key == "ctrl_x":
+        cancel_task(app)
     elif key in ("tab", "backtab"):
         open_prompt(app)
     elif key in ("enter", "newline"):
@@ -164,7 +169,7 @@ def handle(app, ev):
         app.prompt.clear()
         app.say("input cleared")
     elif value == "redraw":
-        app.scr.clear()
+        (getattr(app, "invalidate", None) or app.scr.clear)()
         app.dirty = True
     elif value == "retry":
         app.worker.retry()

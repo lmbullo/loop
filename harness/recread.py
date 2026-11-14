@@ -41,6 +41,20 @@ def state(events):
     return "interrupted"
 
 
+def live(run_id):
+    try:
+        from . import workers
+        return workers.live(workers.read(run_id))
+    except Exception:
+        return False
+
+
+def live_state(rec):
+    if rec["state"] == "interrupted" and live(rec["run_id"]):
+        return "running"
+    return rec["state"]
+
+
 def read(run_id):
     path = record.record_path(run_id)
     events, torn = read_raw(path, run_id)
@@ -57,7 +71,7 @@ def summary_row(rec):
     events = rec["events"]
     start = next((e["data"] for e in events if e["type"] == "run_start"), {})
     end = next((e["data"] for e in events if e["type"] == "end"), {})
-    return {"run_id": rec["run_id"], "state": rec["state"], "seq": rec["seq"],
+    return {"run_id": rec["run_id"], "state": live_state(rec), "seq": rec["seq"],
             "turns": turns(events), "ts": events[-1]["ts"] if events else None,
             "entrypoint": start.get("entrypoint"), "task": start.get("task"),
             "finish": end.get("finish"), "cost": end.get("cost"),

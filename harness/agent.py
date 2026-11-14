@@ -97,7 +97,7 @@ def read_turn(r):
             "id": call.get("id") or "", "type": call.get("type") or "function",
             "function": {"name": fn.get("name") or "",
                          "arguments": fn.get("arguments") or "{}"}})
-    return hit, miss, out, len(msg.get("reasoning_content") or ""), choice.get("finish_reason"), message
+    return hit, miss, out, len(msg.get("reasoning_content") or ""), choice.get("finish_reason"), message, msg.get("content")
 
 
 def run_calls(message, obs_dir, run_dir, root, obs_n):
@@ -167,7 +167,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None):
                                          "finish": "http_error"})
             emit(ev)
             return finish(writer, emit, events + [ev], turn, "http_error", None, 4)
-        hit, miss, out, reason, finish_reason, message = read_turn(r)
+        hit, miss, out, reason, finish_reason, message, text = read_turn(r)
         calls, done, obs_n = run_calls(message, obs_dir, run_dir, root or st["root"], obs_n)
         ev = writer.append("turn", {
             "turn": turn, "finish_reason": finish_reason,
@@ -179,7 +179,9 @@ def run_task(writer, emit, task=None, root=None, should_stop=None):
         if done is not None:
             return finish(writer, emit, events, turn, "done", done["result"], 0)
         if not message["tool_calls"]:
-            return finish(writer, emit, events, turn, "no_tool_call", None, 0)
+            ok = isinstance(text, str) and text.strip()
+            return finish(writer, emit, events, turn, "done" if ok else "no_tool_call",
+                          text.strip() if ok else None, 0)
 
 
 def main(argv):

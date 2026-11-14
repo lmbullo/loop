@@ -67,10 +67,14 @@ credentials and a network, and they cost real tokens.
 | `test_manifest.py` | contract integrity, entry imports, record/scenario checks, CLI wiring |
 | `test_checks.py` | audited kinds, line-limit failure, TUI contract |
 | `test_tui_layout.py` | fit, `›` selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette and grey prompt roles |
-| `test_tui_input.py` | arrow selection across running, queued and done, pane selection handoff, queued-row enter notice, shift+arrow reorder, delete drop, text opens prompt, wheel parser |
+| `test_tui_input.py` | arrow selection across running, queued and done, pane selection handoff, queued-row enter notice, shift+arrow reorder, delete drop, ctrl+x cancel, text opens prompt, wheel parser |
+| `test_srv_cancel.py` | cancel drops a waiting item, signals the matching live run, resolves a promoted item id to its run, falls back from id to run_id, reports no change for an unknown task |
+| `test_tui_cancel.py` | ctrl+x on the selected running/queued/done row, queue-focus cancel, prompt focus ignored, queue selection clamp |
 | `test_tui_history.py` | flat task selection map, selection window, task-focus selection across running, queued and done, done scroll/range header, scroll kept when focus leaves |
 | `test_tui_logs.py` | log projection (calls + final summary), one-line rows, height-sized log window |
 | `test_tui_loginput.py` | enter opens/closes the log, selection and free-scroll keys, refresh policy, prompt over the log and return focus |
+| `test_tui_live.py` | live log tail on open/refresh, navigation pauses it, `end` resumes it, wheel pauses it, finished logs open at the top, unchanged refresh does not dirty the frame |
+| `test_tui_frame.py` | first paint, silent identical frame, row-only repaint, stale-cell clearing, resize/invalidate full repaint, cursor visibility, bottom-right safety |
 | `test_tui_prompt.py` | prompt overlay over an open log, task body without a log, log window shrinking above the prompt |
 
 `tests/support.py` provides `sandbox()`, fixed run ids, event builders, record
@@ -201,19 +205,26 @@ set without a version strategy makes old records corrupt.
    `tui/keys.py`, `tui/nav.py`, or `tui/render.py` and the matching tests. Task
    focus carries one flat selection over the running row, queued items and the
    done list; both the queue and done windows scroll to keep it visible, and
-   queue focus remains available for reorder and drop.
+   queue focus remains available for reorder and drop. ctrl+x cancels the
+   selected row: a queued item is dropped, a live run is signalled through the
+   daemon `cancel` command, and a finished run is refused with a notice.
 4. The log view is a projection of record bytes, not daemon state: add entries
    in `harness/runlog.py`, draw them in `tui/logview.py`, and keep open/close,
    refresh, selection and free-scroll state in `tui/loginput.py`. Every entry
    is one fitted line; the visible window is the terminal body, or the body
    above the prompt when the prompt is open. Wheel/shift scroll moves the
    viewport without moving the selection, and arrow/page/home/end re-anchor
-   the selection. The prompt opens with tab/backtab or text from any focus and
-   returns to the view it overlays on esc.
-5. Run `python3 run.py check tui`; it pins fit, one-line rows, the log window,
+   the selection. A live log tail-follows its newest entry; any navigation
+   pauses the tail and `end` resumes it. The prompt opens with tab/backtab or
+   text from any focus and returns to the view it overlays on esc.
+5. Draw through `tui/frame.py`, never directly into the curses window from the
+   paint path. `Frame.flush` repaints only changed rows and emits a single
+   `doupdate`, which keeps appended live-log rows smooth. Resize and ctrl-l
+   must call `invalidate`; do not add full-screen clears between frames.
+6. Run `python3 run.py check tui`; it pins fit, one-line rows, the log window,
    the selection window, free-scroll clamping, prompt reflow and exact status
    width.
-6. Server modules must not import `tui/`.
+7. Server modules must not import `tui/`.
 
 ### Add or change docs
 

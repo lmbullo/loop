@@ -8,12 +8,17 @@ class FakeWorker:
     def __init__(self):
         self.moves = []
         self.drops = []
+        self.cancels = []
 
     def move(self, item_id, delta):
         self.moves.append((item_id, delta))
 
     def drop(self, item_id):
         self.drops.append(item_id)
+
+    def cancel(self, item_id=None, run_id=None):
+        self.cancels.append((item_id, run_id))
+        return True
 
 
 class FakeApp:
@@ -44,7 +49,7 @@ class FakeApp:
 
 
 def item(item_id, state="queued", text="task"):
-    return {"id": item_id, "state": state, "text": text}
+    return {"id": item_id, "run_id": "run-" + item_id, "state": state, "text": text}
 
 
 class ArrowFocusTest(unittest.TestCase):
@@ -153,6 +158,11 @@ class QueueArrowTest(unittest.TestCase):
 
 
 class ShiftArrowParserTest(unittest.TestCase):
+    def test_ctrl_x_parses_as_its_own_key(self):
+        parser = keys.Parser()
+        parser.feed(b"\x18")
+        self.assertEqual(parser.events(), [("key", "ctrl_x")])
+
     def test_shift_arrows_are_distinct_from_plain_arrows(self):
         parser = keys.Parser()
         parser.feed(b"\x1b[1;2A\x1b[1;2B\x1b[A\x1b[B")

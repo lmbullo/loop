@@ -98,3 +98,15 @@ def move(item_id, delta):
     if entry is None:
         return None
     return _call(entry, {"cmd": "move", "id": item_id, "delta": int(delta)})
+
+
+def cancel(item_id=None, run_id=None):
+    entry = _running()
+    if entry is None:
+        return None
+    request = {"cmd": "cancel"}
+    if item_id is not None:
+        request["id"] = item_id
+    if run_id is not None:
+        request["run_id"] = run_id
+    return _call(entry, request, timeout=5.0)

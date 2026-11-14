@@ -57,10 +57,11 @@ class AgentContextTest(unittest.TestCase):
                 "reasoning_content": "abcd",
                 "tool_calls": [{"id": "c1", "type": "function",
                                 "function": {"name": "exec", "arguments": "{}"}}]}}]}
-        hit, miss, out, reasoning, finish, message = agent.read_turn(response)
+        hit, miss, out, reasoning, finish, message, text = agent.read_turn(response)
         self.assertEqual((hit, miss, out, reasoning, finish), (1, 2, 3, 4, "tool_calls"))
         self.assertEqual(message["role"], "assistant")
         self.assertEqual(message["tool_calls"][0]["function"]["name"], "exec")
+        self.assertIsNone(text)
 
     def test_run_calls_malformed_and_done(self):
         with tempfile.TemporaryDirectory() as tmp:
