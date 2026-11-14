@@ -171,7 +171,7 @@
   {"kind":"test","path":"tests/test_tui_live.py","role":"live log tail: opens on the newest entry, refresh follows appended calls, navigation pauses the tail, end resumes it, wheel pauses it, finished logs open at the top, unchanged refresh does not dirty the frame"},
   {"kind":"module","path":"tui/probe.py","entrypoint":"probe","role":"headless renderer: takes a daemon snapshot json and prints exactly the lines the curses client would draw, so tui behavior is asserted by text compare instead of a pty+pyte harness"},
   {"kind":"module","path":"harness/fold.py","role":"pure fold over record events: totals, derived run state, pending verify command, and the message list rebuilt from turns; the only place that turns events into a request"},
-  {"kind":"module","path":"harness/verifier.py","role":"runs the task's verify command through sh -c at the run root and returns exit 0/1 plus one line of evidence"}
+  {"kind":"module","path":"harness/verifier.py","role":"runs the task's verify command through sh -c at the run root and returns the actual exit code (127 for spawn failure) plus one line of evidence"}
 ],
 "fixture_entrypoints": [
   {"baseline_behavior":"IndexError on the trailing blank line of data/app.log; nonzero exit","cwd":"fixtures/ws1","fixed_behavior":"prints '<code> <count>' sorted by count desc: E42 3, E07 3; exit 0","invoke":["python3","src/analyze.py","data/app.log"],"path":"fixtures/ws1/src/analyze.py","role":"buggy baseline the task scenarios repair"},
