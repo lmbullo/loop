@@ -94,7 +94,7 @@ modules:
     - {path: harness/assets.py, owns: "scenario load/defaults and fresh fixture mount"}
     - {path: harness/checks.py, owns: "check lines (200-line audit), check tui layout contract"}
     - {path: harness/runlog.py, owns: "pure log projection: one entry per call plus full final result, interruption, error or pending tail"}
-    - {path: tui/app.py, owns: "curses shell and raw input loop; button-event mouse tracking, drag-select highlight; one frame buffer per paint; invalidate on resize/ctrl-l"}
+    - {path: tui/app.py, owns: "curses shell and raw input loop; button-event mouse tracking, drag-select highlight; one frame buffer per paint; task/queue viewport offsets carry across paints; invalidate on resize/ctrl-l"}
     - {path: tui/client.py, owns: "snapshot/enqueue/drop/move/cancel client; done history and run log from record bytes"}
     - {path: tui/cancel.py, owns: "ctrl+x cancel actions and queue selection clamp"}
     - {path: tui/frame.py, owns: "row-diffed frame buffer; changed rows only; reverse-video highlight spans; row text for copy; synchronized doupdate"}
@@ -102,16 +102,17 @@ modules:
     - {path: tui/highlight.py, owns: "pure highlight geometry: merged screen spans, split draw ops, committed row text"}
     - {path: tui/mouse.py, owns: "SGR/X10 mouse decode and copy-on-select: anchor, drag, copy, clear, notice"}
     - {path: tui/select.py, owns: "pure selection geometry and covered text"}
-    - {path: tui/input.py, owns: "key dispatch: prompt, log open/close, selection, cancel, queue drop/reorder"}
+    - {path: tui/input.py, owns: "key dispatch: prompt, log open/close, selection, wheel viewport scroll, cancel, queue drop/reorder"}
     - {path: tui/keys.py, owns: "raw byte parser: CSI/SS3 arrows, ctrl keys, paste, SGR/X10 wheel and left-button mouse events"}
+    - {path: tui/indicator.py, owns: "one-cell scroll indicator: pure track/thumb window, no bar when rows fit, right-edge paint with a reserved content cell"}
     - {path: tui/loginput.py, owns: "log view state: run id, open/close/refresh, selection, free scroll, live tail"}
-    - {path: tui/logview.py, owns: "log renderer: header, one fitted line per call, wrapped full summary, body-sized window"}
+    - {path: tui/logview.py, owns: "log renderer: header, one fitted line per call, wrapped full summary, body-sized window, scroll indicator"}
     - {path: tui/model.py, owns: "render copy of snapshot (current, queue, done) and notices"}
-    - {path: tui/nav.py, owns: "queue cursor clamp, flat selection mirror, pane handoff"}
-    - {path: tui/panes.py, owns: "fit/clip, rules, running/queued/done rows, selection window"}
+    - {path: tui/nav.py, owns: "queue cursor clamp, flat selection mirror, pane handoff, task/queue free-scroll offsets and re-anchoring"}
+    - {path: tui/panes.py, owns: "fit/clip, rules, running/queued/done rows, selection and free-scroll windows, task-section scroll indicators"}
     - {path: tui/probe.py, owns: "headless renderer: snapshot JSON to the exact plain lines"}
     - {path: tui/prompt.py, owns: "prompt buffer, cursor, history, display-width wrapping and scroll"}
-    - {path: tui/render.py, owns: "themed renderer with frame-buffer fast path and status line"}
+    - {path: tui/render.py, owns: "themed renderer with frame-buffer fast path, task/queue viewport offsets and status line"}
     - {path: tui/rows.py, owns: "glyphs, short ids, separators, log rows, flat selection mapping, window helper"}
     - {path: tui/theme.py, owns: "grey scale plus muted state hues; init_colors"}
     - {path: tui/worker.py, owns: "snapshot polling, queue requests, selected log load"}
@@ -151,11 +152,11 @@ change_map:
   - {change: record fields or state rules, start: [manifest.record, harness/recschema.py], test: [tests/test_recschema.py, tests/test_recread.py]}
   - {change: daemon command or guard, start: [harness/srvcmd.py, harness/srvconn.py], test: [tests/test_manifest.py, scripts/verify.py --skip-server]}
   - {change: queue or worker lifecycle, start: [harness/queue.py, harness/srvwork.py, harness/worker.py], test: [tests/test_queue.py, tests/test_workers.py]}
-  - {change: TUI layout, keymap or palette, start: [tui/panes.py, tui/rows.py, tui/theme.py, tui/input.py, tui/keys.py, tui/nav.py, tui/render.py], test: [python3 run.py check tui, tests/test_tui_layout.py, tests/test_tui_input.py, tests/test_tui_keys.py, tests/test_tui_history.py]}
+  - {change: TUI layout, keymap, palette or scroll indicator, start: [tui/panes.py, tui/rows.py, tui/theme.py, tui/indicator.py, tui/input.py, tui/keys.py, tui/nav.py, tui/render.py], test: [python3 run.py check tui, tests/test_tui_layout.py, tests/test_tui_indicator.py, tests/test_tui_taskscroll.py, tests/test_tui_input.py, tests/test_tui_keys.py, tests/test_tui_history.py]}
   - {change: TUI cancel, start: [harness/srvconn.py, tui/cancel.py, tui/input.py, tui/client.py, tui/worker.py], test: [tests/test_srv_cancel.py, tests/test_tui_cancel.py]}
-  - {change: TUI log view, start: [harness/runlog.py, tui/logview.py, tui/loginput.py, tui/rows.py, tui/keys.py], test: ["python3 run.py check tui", tests/test_tui_logs.py, tests/test_tui_loginput.py, tests/test_tui_summary.py]}
+  - {change: TUI log view, start: [harness/runlog.py, tui/logview.py, tui/loginput.py, tui/indicator.py, tui/rows.py, tui/keys.py], test: ["python3 run.py check tui", tests/test_tui_logs.py, tests/test_tui_indicator.py, tests/test_tui_loginput.py, tests/test_tui_summary.py]}
   - {change: TUI drag-select copy, start: [tui/mouse.py, tui/select.py, tui/clipboard.py, tui/highlight.py, tui/frame.py, tui/app.py, tui/keys.py], test: [tests/test_tui_mouse.py, tests/test_tui_select.py, tests/test_tui_keys.py, tests/test_tui_frame.py]}
-  - {change: TUI redraw or live tail, start: [tui/frame.py, tui/app.py, tui/render.py, tui/loginput.py], test: ["python3 run.py check tui", tests/test_tui_frame.py, tests/test_tui_live.py]}
+  - {change: TUI redraw or live tail, start: [tui/frame.py, tui/app.py, tui/render.py, tui/loginput.py, tui/indicator.py], test: ["python3 run.py check tui", tests/test_tui_frame.py, tests/test_tui_live.py]}
   - {change: prompt over any view, start: [tui/input.py, tui/render.py, tui/prompt.py], test: [tests/test_tui_input.py, tests/test_tui_loginput.py, tests/test_tui_prompt.py]}
   - {change: offline scenario, start: [scenarios/, "manifest.scenarios[]"], test: ["python3 run.py sim1 <id>"]}
   - {change: new doc, start: [docs/agent/], test: ["manifest.files[]", docs/agent/index.yaml]}

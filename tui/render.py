@@ -111,7 +111,7 @@ def present(scr, cursor):
 
 
 def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
-         log=None):
+         log=None, qscroll=0, tfollow=True, qfollow=True):
     if width < 2 or height < 3:
         scr.erase()
         present(scr, False)
@@ -143,21 +143,26 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
     section, idx = task_sel(snap, tsel) if focus == "task" else (None, None)
     qsel = idx if section == "queue" else (qsel if focus == "queue" else None)
     tv = {"n": 1, "vis": 0}
+    qinfo = {}
     qvis = 0
-    dv = {"n": len(snap.get("done") or []), "vis": 0, "sel": None, "scroll": tscroll}
+    done_n = len(snap.get("done") or [])
+    dv = {"n": done_n, "vis": 0, "sel": None,
+          "scroll": max(0, min(int(tscroll or 0), done_n)), "follow": tfollow}
     if body_end > body_start:
         run_h, queue_h = body_spans(snap, body_start, body_end)
         task_end = body_start + run_h
         tv = task_block(scr, snap, body_start, task_end, width, height,
                         focus == "task" and tsel == 0)
         queue_end = queue_block(scr, snap, task_end, task_end + queue_h,
-                                width, height, qsel)
-        qvis = max(0, queue_end - task_end - 1) if nq else 0
+                                width, height, qsel, qscroll, qfollow, qinfo)
+        qvis = int(qinfo.get("vis") or 0) if nq else 0
         dsel = idx if section == "done" else None
-        dv = done_block(scr, snap, queue_end, body_end, width, height, dsel, tscroll)
+        dv = done_block(scr, snap, queue_end, body_end, width, height, dsel,
+                        tscroll, tfollow)
     n = 1 + nq + dv["n"]
     tv = {"n": n, "vis": max(1, tv.get("vis", 0) + qvis + dv["vis"]),
-          "sel": max(0, min(tsel, n - 1)), "scroll": dv["scroll"]}
+          "sel": max(0, min(tsel, n - 1)), "scroll": dv["scroll"],
+          "follow": dv.get("follow", tfollow), "queue": qinfo, "done": dv}
     if open_prompt:
         lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)
         place_cursor(scr, lay, ptop, width, height)

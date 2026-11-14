@@ -102,6 +102,18 @@ def check_tui():
     want(window(6, 4, 0, 2, False) == (6, 4, 0, 2),
          "free-scroll window moved back to the selection")
 
+    from tui.indicator import THUMB, TRACK, bar, layout
+    want(bar(4, 4, 0) is None, "scroll indicator shown when every row fits")
+    want(layout(12, 4, 4, 0) == (12, None),
+         "scroll indicator reserved a cell without overflow")
+    for total, visible in ((5, 4), (20, 6), (1000, 10)):
+        text = bar(total, visible, total - visible)
+        want(len(text) == visible, f"scroll bar length {total}/{visible}")
+        want(set(text) <= {TRACK, THUMB} and THUMB in text,
+             f"scroll bar glyphs {total}/{visible}: {text!r}")
+        want(text.endswith(THUMB), f"scroll bar not at the bottom {total}/{visible}")
+    want(layout(12, 20, 6, 0)[0] == 11, "scroll bar did not reserve its cell")
+
     from tui.logview import entry_rows, log_block
     from tui.rows import join_parts, log_parts
 
@@ -148,6 +160,21 @@ def check_tui():
                      follow=False)
     want((info["sel"], info["scroll"], info["follow"]) == (0, 5, False),
          "free-scroll log moved its selection or offset")
+
+    from tui.panes import done_block, queue_block
+    tasks = {"done": [{"id": f"r{k}", "state": "complete", "turns": 1,
+                        "cost": 0.0, "text": f"task {k}"} for k in range(8)],
+             "queue": [{"id": f"q{k}", "text": f"q{k}"} for k in range(8)]}
+    done_free = LogScreen()
+    info = done_block(done_free, tasks, 0, 6, 40, 7, sel=0, scroll=3,
+                      follow=False)
+    want((info["sel"], info["scroll"], info["follow"]) == (0, 3, False),
+         "free-scroll done list moved its selection or offset")
+    queue_free = LogScreen()
+    queue_block(queue_free, tasks, 0, 6, 40, 7, qsel=0, scroll=3,
+                follow=False)
+    want(queue_free.rows[0].startswith("queued: 4"),
+         "free-scroll queue did not keep its offset")
 
     for msg in bad:
         print("err tui " + msg, file=sys.stderr)

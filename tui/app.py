@@ -24,6 +24,9 @@ class App:
         self.qsel = 0
         self.tsel = 0
         self.tscroll = 0
+        self.qscroll = 0
+        self.tfollow = True
+        self.qfollow = True
         self.tview = {"n": 1, "vis": 1, "sel": 0, "scroll": 0}
         self.quit = False
         self.log = None
@@ -93,13 +96,19 @@ class App:
             self.frame.highlight(selection.spans(self.sel, self.w))
             self.layout = render.draw(self.frame, snap, self.prompt, self.w, self.h,
                                       self.focus, self.qsel, self.tsel, self.tscroll,
-                                      self.log)
+                                      self.log, self.qscroll, self.tfollow,
+                                      self.qfollow)
             if self.layout:
                 tv = self.layout.get("task")
                 if tv:
                     self.tview = tv
                     self.tsel = tv["sel"]
                     self.tscroll = tv["scroll"]
+                    self.tfollow = tv.get("follow", self.tfollow)
+                qv = self.layout.get("queue") or {}
+                if qv:
+                    self.qscroll = qv.get("scroll", self.qscroll)
+                    self.qfollow = qv.get("follow", self.qfollow)
                 lv = self.layout.get("log")
                 if lv and self.log is not None:
                     self.log["sel"] = lv["sel"] if lv["sel"] is not None else 0

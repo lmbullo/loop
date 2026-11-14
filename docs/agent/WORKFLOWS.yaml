@@ -11,7 +11,7 @@ ladder:
     - {n: 0, cmd: "python3 run.py --json", catches: "contract bootstrap: entrypoints, checks, scenarios, docs, invariants, env, layout, record, wire"}
     - {n: 1, cmd: "python3 -m compileall -q harness tui run.py", catches: syntax/import block}
     - {n: 2, cmd: "python3 run.py check lines", catches: "code source over 200 lines or missing"}
-    - {n: 3, cmd: "python3 run.py check tui", catches: "fit, one-line call rows, wrapped final summary, log window height, free-scroll clamping, prompt reflow, status width"}
+    - {n: 3, cmd: "python3 run.py check tui", catches: "fit, one-line call rows, wrapped final summary, log window height, task/queue/log free-scroll clamping, scroll indicator visibility/position, prompt reflow, status width"}
     - {n: 4, cmd: "python3 -m unittest discover -s tests -t .", catches: logic and CLI contracts}
     - {n: 5, cmd: "python3 scripts/check_manifest.py", catches: unregistered files, bad entries/record/checks/scenarios}
     - {n: 6, cmd: "python3 scripts/verify.py --skip-server", catches: all offline manifest checks}
@@ -63,6 +63,8 @@ test_map:
   - {test: test_srv_cancel.py, contract: cancel drops a waiting item, signals the matching live run, resolves promoted item id, id-as-run-id fallback, no change for unknown}
   - {test: test_tui_cancel.py, contract: ctrl+x on running/queued/done, queue-focus cancel, prompt focus ignored, queue clamp}
   - {test: test_tui_history.py, contract: flat task selection map, selection window, task-focus selection, done scroll/range header}
+  - {test: test_tui_taskscroll.py, contract: "task-view wheel scrolling: done and queue viewports move without moving selection, clamp at both ends and after resize/content changes, stay unscrolled when content fits, and re-anchor on selection keys"}
+  - {test: test_tui_indicator.py, contract: no bar when rows fit, one-cell track/thumb for overflow, movable/clamped thumb, reserved content cell, task and log rendering, resize/content changes}
   - {test: test_tui_logs.py, contract: "log projection (calls + full final summary), one-line call rows, height-sized log window"}
   - {test: test_tui_summary.py, contract: wrapped final summary paragraphs, fitted rows, first-row anchoring, free-scroll to the last row}
   - {test: test_tui_loginput.py, contract: enter opens/closes the log, selection/free-scroll keys, refresh policy, prompt over the log, return focus}
@@ -150,9 +152,10 @@ recipes:
     - keep it a renderer over daemon snapshots; never add queue or run authority
     - "define every color role in tui/theme.py: grey scale (muted, body, strong) plus muted state hues (accent, ok, warn, err); keep -1 background; no bold or reverse video; use the selection marker and key glyphs"
     - update tui/rows.py, tui/panes.py, tui/theme.py, tui/input.py, tui/keys.py, tui/nav.py or tui/render.py and the matching tests
-    - task focus carries one flat selection over running, queued and done; queue and done windows scroll to keep it visible; queue focus remains for reorder and drop
+    - task focus carries one flat selection over running, queued and done; queue and done windows scroll to keep it visible; wheel or shift+arrows free-scroll the done viewport, or the queue viewport when the selection is in the queue, without moving the selection, and any selection key re-anchors; queue focus remains for reorder and drop
     - "ctrl+x cancels the selected row: queued drops, live signals through the daemon cancel command, finished is refused"
     - "log view is a projection of record bytes: add entries in harness/runlog.py, draw in tui/logview.py, keep state in tui/loginput.py; tool calls are one fitted line; the final summary keeps paragraphs and wraps; the window is the terminal body or the body above the prompt; wheel/shift scroll moves the viewport; a live log tail-follows until navigation and end resumes it"
+    - "overflowing task queue/done sections and log rows share tui/indicator.py: compute the thumb from the existing window total/visible/scroll, reserve one content cell while it is visible, and draw no bar when everything fits; reuse the same offset for painting and input, clamp it on resize/content changes, and never add a second scroll state"
     - draw through tui/frame.py, never directly into the curses window from the paint path; resize and ctrl-l call invalidate
     - run python3 run.py check tui
     - server modules must not import tui/

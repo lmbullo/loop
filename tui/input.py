@@ -1,8 +1,8 @@
-from .cancel import cancel_queue, cancel_task
-from .loginput import close_log, log_key, open_log
+from .cancel import cancel_queue
+from .loginput import close_log, log_key
 from .mouse import handle as mouse_event
-from .nav import queue_sel, sync_queue_sel, toggle_focus
-from .rows import task_sel
+from .nav import (queue_sel, scroll_queue, sync_queue_sel, task_key,
+                 toggle_focus)
 
 
 def prompt_return(app):
@@ -47,7 +47,8 @@ def submit(app):
     app.prompt.remember()
     app.prompt.clear()
     app.focus = "task"
-    app.tsel = app.tscroll = 0
+    app.tsel = app.tscroll = app.qscroll = 0
+    app.tfollow = app.qfollow = True
     app.dirty = True
 
 
@@ -69,20 +70,28 @@ def queue_key(app, key):
     queue = queue_sel(app)
     if key in ("up", "hist_prev"):
         app.qsel = max(0, app.qsel - 1)
+        app.qfollow = True
     elif key in ("down", "hist_next"):
         app.qsel = min(max(0, len(queue) - 1), app.qsel + 1)
+        app.qfollow = True
     elif key == "shift_up" and queue:
         app.worker.move(queue[app.qsel]["id"], -1)
         app.qsel = max(0, app.qsel - 1)
+        app.qfollow = True
     elif key == "shift_down" and queue:
         app.worker.move(queue[app.qsel]["id"], 1)
         app.qsel = min(len(queue) - 1, app.qsel + 1)
+        app.qfollow = True
     elif key in ("left", "right"):
         toggle_focus(app)
+    elif key in ("scroll_up", "wheel_up", "scroll_down", "wheel_down"):
+        scroll_queue(app, key)
     elif key == "home":
         app.qsel = 0
+        app.qfollow = True
     elif key == "end":
         app.qsel = max(0, len(queue) - 1)
+        app.qfollow = True
     elif key in ("delete", "backspace"):
         drop(app)
     elif key == "ctrl_x":
@@ -122,37 +131,6 @@ def prompt_key(app, key):
     }
     if key in moves:
         moves[key]()
-    app.dirty = True
-
-
-def task_key(app, key):
-    n = max(1, app.tview.get("n") or 1)
-    vis = max(1, app.tview.get("vis") or 1)
-    if key in ("up", "hist_prev", "shift_up"):
-        app.tsel = max(0, app.tsel - 1)
-    elif key in ("down", "hist_next", "shift_down"):
-        app.tsel = min(n - 1, app.tsel + 1)
-    elif key in ("left", "right"):
-        toggle_focus(app)
-    elif key == "page_up":
-        app.tsel = max(0, app.tsel - vis)
-    elif key == "page_down":
-        app.tsel = min(n - 1, app.tsel + vis)
-    elif key == "home":
-        app.tsel = 0
-    elif key == "end":
-        app.tsel = n - 1
-    elif key == "ctrl_x":
-        cancel_task(app)
-    elif key in ("tab", "backtab"):
-        open_prompt(app)
-    elif key in ("enter", "newline"):
-        section, _ = task_sel(app.snapshot(), app.tsel)
-        if section == "queue":
-            app.say("queued task has no log yet")
-        elif not open_log(app):
-            open_prompt(app)
-    sync_queue_sel(app)
     app.dirty = True
 
 

@@ -40,7 +40,7 @@ symptoms:
   - {symptom: check lines fails, inspect: "python3 run.py check lines", action: "split the module or move behavior to a new module; do not raise the 200-line limit for a source file"}
   - {symptom: "check_manifest.py: unregistered source", inspect: manifest.files, action: "add the file with a kind and role; every .py under harness/, tui/, tests/, scripts/ is checked"}
   - {symptom: "check_manifest.py: bad scenario/check/record", inspect: the manifest row, action: "make argv/expect_exit/network, scenarios[] steps or record types match the tree"}
-  - {symptom: check tui fails, inspect: "tui/panes.py, tui/prompt.py, tui/render.py, tui/logview.py", action: "fix fit/reflow/width; do not weaken the audit"}
+  - {symptom: check tui fails, inspect: "tui/panes.py, tui/nav.py, tui/prompt.py, tui/render.py, tui/logview.py, tui/indicator.py", action: "fix fit/reflow/width/free-scroll/scroll-indicator math; do not weaken the audit"}
   - {symptom: sim fails, inspect: ".logs/<sim>/<label>/log.json; obs/; scenario JSON", action: "check the sim field, fixture, step schema, exit behavior and mounted workspace"}
   - {symptom: docs look stale, inspect: "manifest.json, owning module, tests", action: "code wins; update the doc and, if the contract changed, the manifest in the same commit"}
 

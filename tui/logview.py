@@ -1,7 +1,7 @@
 from .panes import fit, put, put_parts
 from .prompt import display, swidth, wrap
 from .rows import BLANK, DASH, SELECT, glyph, join_parts, log_parts, short_id
-from . import theme
+from . import indicator, theme
 
 
 def header(data, n, vis, scroll):
@@ -94,18 +94,25 @@ def log_block(scr, data, y, end, width, height, sel=0, scroll=0, follow=True):
     vis = max(0, room - 1)
     rows, first = measure(items, width)
     total = len(rows)
+    content_w = width
+    if room > 0 and width > 1 and indicator.overflow(total, vis):
+        content_w = width - 1
+        rows, first = measure(items, content_w)
+        total = len(rows)
     sel = max(0, min(int(sel or 0), max(0, len(items) - 1)))
     scroll = place(total, first, sel, int(scroll or 0), vis, follow)
+    bar = indicator.bar(total, vis, scroll) if content_w < width else None
     out = {"n": total, "entries": len(items), "vis": vis, "sel": sel,
            "scroll": scroll, "follow": follow}
     if room <= 0:
         return out
-    put(scr, y, 0, fit(header(data, total, vis, scroll), width), width, height,
-        theme.attr("muted"))
+    put(scr, y, 0, fit(header(data, total, vis, scroll), content_w), content_w,
+        height, theme.attr("muted"))
     for k in range(min(vis, total - scroll)):
         idx, head, parts = rows[scroll + k]
         marked = idx == sel and head
         mark = SELECT if marked else BLANK
         put_parts(scr, y + 1 + k, 0, [(mark, "strong" if marked else "muted")] + parts,
-                  width, height)
+                  content_w, height)
+    indicator.paint(scr, y + 1, width - 1, bar, width, height)
     return out
