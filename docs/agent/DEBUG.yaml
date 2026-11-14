@@ -28,19 +28,22 @@ symptoms:
   - {symptom: a second api seems to ignore my new task, inspect: "server status; queue.json", action: "a second api queues a front item and streams that run; it does not attach to the in-flight run; the tree lock makes it wait"}
   - {symptom: queue stuck on current, inspect: "server status; .logs/queue.json; .logs/workers/", action: "the supervisor promotes after a lost worker (about 6 s tolerance); do not hand-edit queue.json while the daemon runs"}
   - {symptom: worker died, inspect: "workers/<run_id>.json; record state", action: "the daemon reconciles an unlocked record to interrupted; then decide whether to resume"}
+  - {symptom: api exits 1, inspect: "record error event finish=harness_error; server logs", action: "an unhandled harness or model exception; read error.text and the worker log, fix the cause, then retry"}
   - {symptom: api exits 3, inspect: "record error event; LOOP_API_KEY/auth file", action: "missing credentials; fix LOOP_API_KEY or LOOP_AUTH_FILE; the failed run still has an inspectable record"}
-  - {symptom: api exits 4, inspect: "record error event; server logs", action: "HTTP/model error; read the recorded body and the model/env settings before retrying"}
+  - {symptom: api exits 4, inspect: "record error event; server logs", action: "HTTP error; read the recorded body and the model/env settings before retrying"}
   - {symptom: api exits 5, inspect: "server logs; server status", action: "control plane unavailable; fix the daemon, then retry; do not assume the task ran"}
+  - {symptom: api exits 130, inspect: "record interrupted event; server logs", action: "the run was cancelled or force-stopped; inspect the record, then decide whether to resume"}
   - {symptom: resume exits 5, inspect: "server status; lock holders; live worker", action: "a tree run or the record is held, or the run is live; wait; do not force"}
   - {symptom: resume exits 2, inspect: "view --list; record state", action: "the run is complete, corrupt or the id is wrong; nothing to resume"}
   - {symptom: record is corrupt, inspect: "view RUN_ID; raw lines", action: "never rewrite complete lines; preserve the file, find the first bad seq/field/JSON line and fix the producer/test"}
   - {symptom: "[torn] bytes=N in view", inspect: last line of record.jsonl, action: "a partial trailing line; the next writer truncates it; resume reports it; do not edit earlier lines"}
-  - {symptom: large observation is a summary, inspect: call.saved; obs/, action: "read the saved file in ranges; binary observations are a digest only and raw bytes are not recoverable"}
+  - {symptom: large observation is a summary, inspect: call.saved; obs/, action: "grep the saved file for the line you need or read a small range; the summary's note warns that a whole re-read is summarized again; binary observations are a digest only and raw bytes are not recoverable"}
   - {symptom: tests wrote real .logs/, inspect: test code and env, action: "use tests.support.sandbox(); it redirects LOOP_*; do not delete the repo .logs/ to clean up a test"}
   - {symptom: check lines fails, inspect: "python3 run.py check lines", action: "split the module or move behavior to a new module; do not raise the 200-line limit for a source file"}
   - {symptom: "check_manifest.py: unregistered source", inspect: manifest.files, action: "add the file with a kind and role; every .py under harness/, tui/, tests/, scripts/ is checked"}
   - {symptom: "check_manifest.py: bad scenario/check/record", inspect: the manifest row, action: "make argv/expect_exit/network, scenarios[] steps or record types match the tree"}
-  - {symptom: check tui fails, inspect: "tui/panes.py, tui/nav.py, tui/prompt.py, tui/render.py, tui/logview.py, tui/indicator.py", action: "fix fit/reflow/width/free-scroll/scroll-indicator math; do not weaken the audit"}
+  - {symptom: drag copy does nothing, inspect: "tui/mouse.py, tui/select.py, tui/clipboard.py, tui/frame.py; terminal OSC 52 support", action: "a click without motion copies nothing; OSC 52 or an installed wl-copy/xclip/xsel/pbcopy helper must accept the text; the reverse-video highlight is screen-only and clears on release"}
+  - {symptom: check tui fails, inspect: "tui/panes.py, tui/nav.py, tui/prompt.py, tui/render.py, tui/logview.py, tui/indicator.py, tui/frame.py, tui/highlight.py", action: "fix fit/reflow/width/free-scroll/scroll-indicator/highlight geometry; do not weaken the audit"}
   - {symptom: sim fails, inspect: ".logs/<sim>/<label>/log.json; obs/; scenario JSON", action: "check the sim field, fixture, step schema, exit behavior and mounted workspace"}
   - {symptom: docs look stale, inspect: "manifest.json, owning module, tests", action: "code wins; update the doc and, if the contract changed, the manifest in the same commit"}
 
@@ -51,9 +54,10 @@ safe_commands:
   - python3 run.py view RUN_ID [--json]
   - python3 run.py view --schema
   - python3 run.py server status
+  - python3 run.py server list [--json]
   - python3 run.py server runs [--json]
   - python3 run.py server logs -n 80
-  - python3 run.py probe [SNAPSHOT] [--size WxH]
+  - python3 run.py probe [SNAPSHOT] [--size WxH] [--focus task|queue|prompt|log] [--qsel N]
   - python3 run.py check lines
   - python3 run.py check tui
   - python3 scripts/check_manifest.py
@@ -63,15 +67,16 @@ safe_commands:
   - python3 run.py sim2 task2
 
 mutating_or_expensive:
-  - {cmd: "run.py api / run.py resume", effect: "network, tokens, record writes"}
+  - {cmd: "run.py api / run.py resume RUN_ID", effect: "network, tokens, record writes"}
   - {cmd: "server start|stop|restart|reload", effect: "process/queue/registry changes"}
   - {cmd: "server list --prune", effect: "removes dead registry entries"}
+  - {cmd: "server _stale", effect: "removes dead socket, pid and registry entries"}
   - {cmd: "sim1 / sim2", effect: "rewrite .logs/<sim>/<label>/"}
   - {cmd: make clean, effect: "removes bytecode/caches, never .logs"}
-  - {cmd: scripts/verify.py, effect: "its clean check deletes __pycache__; offline checks may spawn sims and write .logs/sim*"}
+  - {cmd: scripts/verify.py, effect: "its clean check deletes __pycache__; sims write .logs/sim*; without --skip-server it starts/stops the daemon"}
 
 never:
-  - run api or resume in offline verification
+  - run a real api call or resume RUN_ID in offline verification
   - delete .logs/ while a worker is live
   - hand-edit a complete record line
   - rewrite fixtures/, scenarios/ or records/ in place during a run

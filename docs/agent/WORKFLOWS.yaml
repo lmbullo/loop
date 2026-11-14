@@ -34,8 +34,8 @@ shortcuts:
 
 verify_selection:
   network: scripts/verify.py never selects network true checks
-  skip_server: "--skip-server skips any check whose argv contains a token exactly equal to server or api, including tokens inside sh -c strings; this covers server-start, server-status, server-runs and api-auth-guard"
-  offline_absent: api and resume are deliberately absent from the offline ladder; they need credentials, network and real tokens
+  skip_server: "--skip-server skips any check whose argv contains a token exactly equal to server or api, including tokens inside sh -c strings; this covers server-start, server-list, server-status, server-stop, server-runs and api-auth-guard"
+  offline_absent: a real api call and a real resume RUN_ID are absent from the offline ladder; they need credentials, network and real tokens; the safe resume-usage check only exercises the exit-2 usage path
 
 test_map:
   - {test: test_config.py, contract: root/run resolution, env parsing, display paths}
@@ -45,21 +45,21 @@ test_map:
   - {test: test_recwrite.py, contract: append/fsync, per-run and tree locks, seal, reconcile, torn-tail repair}
   - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
-  - {test: test_observe.py, contract: binary detection, three bounding rules, saved bytes, deduplicated head/tail}
+  - {test: test_observe.py, contract: binary detection, three bounding rules, the 8192-byte default bound, saved bytes, deduplicated head/tail}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
   - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}
   - {test: test_queue.py, contract: add/promote/update/finish/drop/move, corrupt reset}
   - {test: test_regstore.py, contract: atomic registry writes, locking, current-entry precedence}
   - {test: test_workers.py, contract: worker registry, pid+start liveness, reap, record state}
-  - {test: test_agent_context.py, contract: usage totals, derive, run-scoped prompt prefix, context fold, response parsing, dispatch, finish, terminal text}
+  - {test: test_agent_context.py, contract: usage totals, derive, constant prompt prefix independent of the inline bound, context fold, response parsing, dispatch, finish, terminal text}
   - {test: test_verify.py, contract: pending verify fold, sh -c exit/evidence/root, declaration and settle order, resume command, --verify argv, view lines}
   - {test: test_install.py, contract: "installer help, dry run, user default, prefix with spaces, idempotent install, uninstall, foreign-file refusal, checkout guard"}
   - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring, --skip-server token filtering}
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
   - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}
   - {test: test_tui_input.py, contract: arrow selection across running/queued/done, pane handoff, queued-row notice, shift+arrow reorder, delete drop, ctrl+x cancel, text prompt, SS3 arrows}
-  - {test: test_tui_keys.py, contract: "raw parser: SS3 arrows, CSI/shifted arrows, ctrl+x, SGR and X10 wheel"}
+  - {test: test_tui_keys.py, contract: "raw parser: SS3 arrows, CSI/shifted arrows, ctrl+x, SGR and X10 wheel, left-button mouse events"}
   - {test: test_srv_cancel.py, contract: cancel drops a waiting item, signals the matching live run, resolves promoted item id, id-as-run-id fallback, no change for unknown}
   - {test: test_tui_cancel.py, contract: ctrl+x on running/queued/done, queue-focus cancel, prompt focus ignored, queue clamp}
   - {test: test_tui_history.py, contract: flat task selection map, selection window, task-focus selection, done scroll/range header}
@@ -78,7 +78,7 @@ test_map:
 support:
   module: tests/support.py
   provides: [sandbox, fixed run ids, event builders, record writers, run_py]
-  sandbox: redirects LOOP_ROOT, LOOP_RUNS, LOOP_REGISTRY, LOOP_AUTH_FILE and clears other LOOP_* keys
+  sandbox: redirects LOOP_ROOT, LOOP_RUNS, LOOP_REGISTRY, LOOP_AUTH_FILE and clears the other known LOOP_* keys
   rule: tests must never write the real .logs/ or use the network
 
 recipes:
@@ -150,12 +150,13 @@ recipes:
     - exercise python3 run.py sim1 edge and python3 run.py sim2 edge2
   tui:
     - keep it a renderer over daemon snapshots; never add queue or run authority
-    - "define every color role in tui/theme.py: grey scale (muted, body, strong) plus muted state hues (accent, ok, warn, err); keep -1 background; no bold or reverse video; use the selection marker and key glyphs"
-    - update tui/rows.py, tui/panes.py, tui/theme.py, tui/input.py, tui/keys.py, tui/nav.py or tui/render.py and the matching tests
+    - "define every color role in tui/theme.py: grey scale (muted, body, strong) plus muted state hues (accent, ok, warn, err); keep -1 background; no bold; reverse video is reserved for the drag-copy highlight in tui/frame.py; use the selection marker and key glyphs"
+    - update tui/rows.py, tui/panes.py, tui/theme.py, tui/input.py, tui/keys.py, tui/nav.py, tui/render.py, tui/indicator.py, tui/logview.py or tui/frame.py and the matching tests; drag-copy owns tui/mouse.py, tui/select.py, tui/clipboard.py and tui/highlight.py
     - task focus carries one flat selection over running, queued and done; queue and done windows scroll to keep it visible; wheel or shift+arrows free-scroll the done viewport, or the queue viewport when the selection is in the queue, without moving the selection, and any selection key re-anchors; queue focus remains for reorder and drop
     - "ctrl+x cancels the selected row: queued drops, live signals through the daemon cancel command, finished is refused"
     - "log view is a projection of record bytes: add entries in harness/runlog.py, draw in tui/logview.py, keep state in tui/loginput.py; tool calls are one fitted line; the final summary keeps paragraphs and wraps; the window is the terminal body or the body above the prompt; wheel/shift scroll moves the viewport; a live log tail-follows until navigation and end resumes it"
     - "overflowing task queue/done sections and log rows share tui/indicator.py: compute the thumb from the existing window total/visible/scroll, reserve one content cell while it is visible, and draw no bar when everything fits; reuse the same offset for painting and input, clamp it on resize/content changes, and never add a second scroll state"
+    - "drag-copy: tui/mouse.py anchors, drags and releases screen cells; tui/select.py turns the range into text; tui/clipboard.py writes OSC 52 plus the first installed wl-copy/xclip/xsel/pbcopy helper; tui/frame.py paints merged reverse-video spans and exposes row text for the copy; shift-drag and non-left buttons are left to the terminal"
     - draw through tui/frame.py, never directly into the curses window from the paint path; resize and ctrl-l call invalidate
     - run python3 run.py check tui
     - server modules must not import tui/

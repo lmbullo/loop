@@ -11,13 +11,14 @@ facts:
   bootstrap: "python3 run.py --json -> one compact loop-index/1 line derived from manifest.json; no tree walk, no absolute paths"
   entry: "python3 run.py <command>; modules are import-only"
   root: dirname(run.py), overridable with LOOP_ROOT
-  state: "<repo>/.logs, overridable with LOOP_RUNS"
+  state: "<LOOP_ROOT>/.logs, overridable with LOOP_RUNS"
   record: ".logs/runs/<run_id>/record.jsonl; end is the only completion marker"
   tree_lock: ".logs/run.lock; one run per tree; a second api queues a front item and waits"
-  network: api and resume only; both cost real tokens
+  network: api and resume RUN_ID only; both cost real tokens
   tools: [exec, write, edit, done]
-  verify: "run.py api --verify CMD; declared before the first turn, run after done, recorded as verify events before end"
-  inline_limit: "LOOP_MAX_INLINE, default 32768 bytes; run_start.max_inline pins the bound for a run, so resume keeps the prompt prefix"
+  verify: "run.py api --verify CMD; declared before the first turn, run after the terminal turn, recorded as verify events before end; view derives ok=1 from exit 0 and ok=0 otherwise"
+  inline_limit: "LOOP_MAX_INLINE, default 8192 bytes; run_start.max_inline pins the observation bound for a run; the system header is constant"
+  prompt_prefix: "api.header() is byte-identical across runs; task and observation facts are appended later, so the system message is a reusable cache prefix"
   binary_obs: binary is a digest; raw bytes are not saved
   schemas: {record: loop-record/1, view: loop-view/1}
   install: "sh install.sh -> $HOME/.local/bin/loop; --system -> /usr/local/bin/loop; --uninstall removes the launcher"
@@ -59,12 +60,18 @@ commands:
     - [python3, run.py, check, lines]
     - [python3, run.py, check, tui]
     - [python3, run.py, view, --list]
+    - [python3, run.py, view, --list, --json]
     - [python3, run.py, view, RUN_ID]
+    - [python3, run.py, view, RUN_ID, --json]
+    - [python3, run.py, view, --schema]
+    - [python3, run.py, resume]
     - [python3, run.py, sim1, task]
     - [python3, run.py, sim2, task2]
     - [python3, run.py, probe]
     - [python3, run.py, server, status]
+    - [python3, run.py, server, list, --json]
     - [python3, run.py, server, runs, --json]
+    - [python3, run.py, server, logs, -n, 80]
     - [make, check]
     - [make, test]
     - [make, verify]
@@ -76,7 +83,8 @@ commands:
     - [python3, run.py, api, TASK]
     - [python3, run.py, api, --verify, CMD, TASK]
     - [python3, run.py, resume, RUN_ID]
-  never_in_offline_verification: [api, resume]
+  never_in_offline_verification: [api, "resume RUN_ID"]
+  offline_usage_check: "resume with no RUN_ID exits 2 after printing usage; the resume-usage manifest check covers it"
   skip_server_filter: any argv token exactly server or api, including tokens inside sh -c strings
 
 paths:
@@ -91,7 +99,7 @@ paths:
   docs: docs/agent/
   contract: manifest.json
   sandbox_root: dirname(run.py), overridable by LOOP_ROOT
-  runtime_state: "<repo>/.logs, overridable by LOOP_RUNS"
+  runtime_state: "<LOOP_ROOT>/.logs, overridable by LOOP_RUNS"
   records: .logs/runs/<run_id>/record.jsonl
   record_lock: .logs/runs/<run_id>/record.lock
   observations: .logs/runs/<run_id>/obs/
@@ -105,14 +113,14 @@ paths:
   local_registry: .logs/registry.json
   global_registry: "$LOOP_REGISTRY or $XDG_STATE_HOME/loop/registry.json or ~/.local/state/loop/registry.json"
   scenarios: scenarios/ (read-only input)
-  fixtures: fixtures/ (read-only input; copied per run)
+  fixtures: fixtures/ (read-only input; copied into .logs/<sim>/<label>/ws/ per sim run)
   frozen_records: records/ (read-only history)
 
 exit_codes:
-  api: {0: finished, 2: usage error, 3: no credentials, 4: api error, 5: server unavailable}
-  server: {0: ok, 1: "status down; runs corrupt record", 2: usage error, 5: start failure or guard refusal}
+  api: {0: finished, 1: harness error, 2: usage error, 3: no credentials, 4: api error, 5: server unavailable, 130: interrupted by cancel or server stop}
+  server: {0: ok, 1: "status down; runs corrupt record; logs follow error; restart --all target failure", 2: usage error, 5: start failure or guard refusal}
   view: {0: rendered, 2: no such run, corrupt record, or usage error}
-  resume: {0: finished, 2: refused or usage error, 3: no credentials, 4: api error, 5: tree/record busy or live worker}
+  resume: {0: finished, 1: harness error, 2: refused or usage error, 3: no credentials, 4: api error, 5: tree/record busy or live worker}
   check: {0: audit passed, 1: audit failed, 2: usage error}
   install.sh: {0: "installed, removed or already absent", 2: "usage error, foreign file, missing checkout or unwritable bindir"}
   sim1: {0: ran, 2: usage or unknown scenario}
@@ -150,7 +158,8 @@ traps:
   - a second api queues a front item and streams that run; it does not attach to the in-flight run
   - server restart is not a run restart; use resume
   - binary observations are digest-only; raw bytes are not saved
-  - run_start.max_inline pins the prompt header and observation bound; resume and soft reload reuse it
+  - run_start.max_inline pins the observation bound; resume and soft reload reuse it
+  - api.header() is constant; do not put run-specific values in the system prefix
   - LOOP_RUNS selects the daemon state dir; keep it stable per tree
   - do not delete .logs while a worker is live
   - do not rewrite complete record lines

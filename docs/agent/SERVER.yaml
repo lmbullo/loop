@@ -2,11 +2,11 @@ schema: loop-agent-doc/1
 id: server
 title: Server, queue and workers
 read_when: [operate the control plane, queue a task, diagnose a worker, change lifecycle]
-source: [harness/server.py, harness/srvcmd.py, harness/srvdaemon.py, harness/srvwork.py, harness/srvconn.py, harness/srvctl.py, harness/worker.py, harness/queue.py, harness/workers.py, manifest.server]
+source: [manifest.server, harness/server.py, harness/srvcmd.py, harness/srvdaemon.py, harness/srvwork.py, harness/srvconn.py, harness/srvclient.py, harness/srvrun.py, harness/srvsnap.py, harness/srvlist.py, harness/srvwire.py, harness/srvctl.py, harness/worker.py, harness/workers.py, harness/queue.py, harness/job.py, harness/registry.py, harness/regstore.py, harness/regprobe.py]
 verify: [python3 run.py server status, python3 run.py server runs --json, "python3 -m unittest tests.test_queue tests.test_workers tests.test_regstore"]
 
 process_model: |
-  one tree  = realpath of the checkout
+  one tree  = realpath of LOOP_ROOT (default: the checkout)
   one daemon per tree (control plane, never executes a model turn)
   one run per tree (tree lock)
   one detached worker per run (executes the loop, holds the run lock)
@@ -23,7 +23,7 @@ commands:
   list:
     - {cmd: start, usage: "", effect: "probe, clean stale, spawn one daemon, wait ready; idempotent", exit: "0 ok, 5 start failure"}
     - {cmd: stop, usage: "[--force]", effect: "stop this tree's daemon; refuse a live worker unless --force", exit: "0 ok, 2 usage, 5 guard/refusal"}
-    - {cmd: restart, usage: "[--all] [--force]", effect: "replace the daemon; detached workers survive; --all walks the machine registry", exit: "0 ok, 5 guard/refusal"}
+    - {cmd: restart, usage: "[--all] [--force]", effect: "replace the daemon; detached workers survive; --all walks the machine registry", exit: "0 ok, 1 restart --all target failure, 5 guard/refusal"}
     - {cmd: reload, usage: "", effect: "bump .logs/reload.json; workers apply at the next turn boundary", exit: "0"}
     - {cmd: status, usage: "", effect: "answer from .logs and the live daemon; print one flat line", exit: "0 running, 1 down"}
     - {cmd: list, usage: "[--json] [--prune]", effect: "probe every server in the machine registry; --prune removes dead rows", exit: "0"}
@@ -40,13 +40,13 @@ state_files:
     - {path: .logs/server.sock, owner: daemon, meaning: "Unix socket, mode 0600"}
     - {path: .logs/server.pid, owner: daemon, meaning: live daemon pid}
     - {path: .logs/server.log, owner: daemon/workers, meaning: append-only operational log}
-    - {path: .logs/server.lock, owner: srvctl, meaning: serializes start/stop}
-    - {path: .logs/registry.json, owner: daemon, meaning: tree-local registry mirror}
-    - {path: "$LOOP_REGISTRY", owner: daemon, meaning: machine-wide registry, keyed by realpath(tree)}
+    - {path: .logs/server.lock, owner: srvctl, meaning: serializes daemon starts}
+    - {path: .logs/registry.json, owner: daemon/srvctl, meaning: tree-local registry mirror}
+    - {path: "$LOOP_REGISTRY", owner: regstore, meaning: machine-wide registry, keyed by realpath(tree)}
     - {path: .logs/queue.json, owner: daemon, meaning: current item plus waiting items}
-    - {path: .logs/jobs/<run_id>.json, owner: daemon, meaning: task/root/env payload for one worker}
-    - {path: .logs/workers/<run_id>.json, owner: worker/daemon, meaning: pid, proc_start, state, seq, turns, cost}
-    - {path: .logs/reload.json, owner: server reload, meaning: soft-reload generation}
+    - {path: .logs/jobs/<run_id>.json, owner: daemon, meaning: task/root/env/verify payload for one worker}
+    - {path: .logs/workers/<run_id>.json, owner: worker/daemon, meaning: run_id, pid, proc_start, state, item_id, task, root, seq, turns, cost, exit}
+    - {path: .logs/reload.json, owner: "reload.bump (CLI or socket)", meaning: soft-reload generation}
     - {path: .logs/run.lock, owner: worker/resume, meaning: one run per tree}
     - {path: .logs/runs/<run_id>/record.lock, owner: worker/resume, meaning: one executor per record}
     - {path: .logs/runs/<run_id>/record.jsonl, owner: worker/resume, meaning: durable run record}
@@ -58,7 +58,7 @@ queue:
   path: .logs/queue.json
   schema: loop-queue/1
   empty: '{"schema":"loop-queue/1","seq":0,"current":null,"items":[]}'
-  item_fields: [id, run_id, task, root, env, state, created_at, created_ts, worker_pid, started_at, launched_ts, finished_at]
+  item_fields: [id, run_id, task, root, env, verify, state, created_at, created_ts, worker_pid, started_at, launched_ts, finished_at]
   item_id: q000001, monotonic
   ops:
     - queue.add() allocates the next id and a new run id
@@ -74,10 +74,10 @@ queue:
     - reap finished child processes
     - read live worker registry entries
     - if current exists and its worker is live, sync worker_pid and return
-    - if current has not launched, launch it
+    - if current is still queued and has no launched_ts, launch it
     - within 6 seconds of launch, tolerate missing or running record state
     - if the record is still missing, finish the item as failed
-    - if the record is not complete, reconcile it as worker_lost and finish as interrupted
+    - if the record is not complete, reconcile it as worker_lost and finish with the resulting complete/interrupted state
     - if no current, promote one waiting item and launch it
   launch: writes the job, marks the item running with launched_ts, spawns "run.py server _worker <run_id>" in a new session, records the child pid and updates worker_pid
   restart: reattaches from queue.json and workers/; no in-memory state is required
@@ -86,7 +86,7 @@ worker_lifecycle:
   steps:
     - load .logs/jobs/<run_id>.json; missing job exits 2
     - acquire .logs/run.lock; busy exits 5
-    - open recwrite.Writer(run_id); write workers/<run_id>.json with pid, /proc start fingerprint, state running, item, task, root, seq, turns
+    - open recwrite.Writer(run_id); write workers/<run_id>.json with pid, /proc start fingerprint, state running, item_id, task, root, seq, turns
     - install SIGTERM/SIGINT handlers; a stop request appends interrupted (reason=server_stop, by=server), marks the worker interrupted with exit 130, releases locks, removes the job and exits 130
     - apply only srvwire.ENV_KEYS from the job payload, then run agent.run_task()
     - on normal completion update the worker entry to done or interrupted, close the record, release the tree lock and remove the job
@@ -109,7 +109,7 @@ reconcile:
   never: delete records or infer end
 
 reload_restart:
-  reload: "increments reload.json.generation; at the top of each turn reload.maybe() re-imports harness.config, harness.api, harness.observe, harness.tools and harness.pricing; the header is regenerated at the next fold from run_start.max_inline, so the prompt prefix stays stable; no process restart and no interruption of the in-flight turn"
+  reload: "increments reload.json.generation; at the top of each turn reload.maybe() re-imports harness.config, harness.api, harness.observe, harness.tools and harness.pricing; the constant system header and the run_start observation bound keep the replay prefix stable; no process restart and no interruption of the in-flight turn"
   restart: "shuts down the daemon with the shutdown command and starts a new one; workers survive; the new daemon reads worker entries and reports the live run; clients reconnect with attach and from_seq"
   stop: "stops the daemon; without --force it refuses while a worker is live; restart --force only detaches the control plane, it does not kill the worker"
 
@@ -120,7 +120,7 @@ socket_protocol:
   attach: stream a known run_id from from_seq
   stop: refuses live workers unless force; with force interrupts them and stops the daemon
   shutdown: stops the daemon and leaves workers running
-  cancel: "drops a waiting id, else interrupts the live worker named by run_id (or id as a fallback); reply k=cancelled with kind=queued|running and changed=true|false"
+  cancel: "drops a waiting id, else interrupts the live worker named by run_id (or id as a fallback); reply k=cancelled with kind=queued|running|null, changed=true|false, and the resolved id/run_id/pid when known"
   tui_surface: enqueue, drop, move, cancel
   stream: "run/attach first send hello, then record events from disk; streaming stops at end or interrupted; the client reconnects after a daemon restart and resumes from the last seen seq"
   snapshot: "daemon, current, last, done, queue, costs, tree, waiting, workers_live, version, reconciled; done is a bounded newest-first list of terminal runs (current excluded)"

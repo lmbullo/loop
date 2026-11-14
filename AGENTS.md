@@ -26,7 +26,8 @@ as the only source of truth.
 - Detached execution: a per-tree control plane owns queue and worker registry; a
   detached worker owns the run; the daemon can restart without interrupting work.
 - Optional verification: `--verify CMD` is declared before the first turn, run
-  at the run root after `done`, and recorded before `end`; absence is not a pass.
+  at the run root after the terminal turn, and recorded before `end`; absence is
+  not a pass.
 
 ## Read order
 
@@ -47,7 +48,10 @@ as the only source of truth.
 - The message list is append-only; never edit, reorder or re-send old entries.
 - The record is append-only; one event per fsynced line; `end` is the only
   completion marker. A missing `end` is the interrupted marker.
-- Observations are verbatim except for the bounding rule in `harness/observe.py`.
+- Observations are verbatim except for the bounding rule in `harness/observe.py`;
+  text over the run's bound is summarized and its raw bytes are saved.
+- The system header is constant across runs; task and run-specific values enter
+  after it, so the prefix is cacheable.
 - Output is metered and reported, never gated.
 - `LOOP_ROOT` is the workspace identity: root, sandbox, daemon, socket, queue
   and registry all follow it; `LOOP_RUNS` selects the state directory.
@@ -56,14 +60,14 @@ as the only source of truth.
 - The control plane never executes a run; workers survive daemon restart.
 - The TUI never owns a run or authoritative state; server code never imports
   `tui/`.
-- Fixtures and `records/` are read-only. Every run mounts a fresh fixture copy
-  under `.logs/`.
+- Fixtures and `records/` are read-only. Each sim run mounts a fresh fixture
+  copy under `.logs/<sim>/<label>/ws/`.
 - No absolute paths in tracked files; roots come from `__file__` or env.
 - `exec` argv is literal: no shell, globs, pipes or redirects unless the caller
   passes `sh -c` explicitly.
 - Source modules stay under 200 lines. Split, do not grow.
-- A `verify` event is evidence, not a gate: exit 0 -> `ok=1`, any other exit ->
-  `ok=0`; no command -> no event.
+- A `verify` event is evidence, not a gate: it stores `exit`; view renders
+  `ok=1` when exit is 0 and `ok=0` otherwise; no command -> no event.
 
 ## Commands
 
@@ -77,10 +81,12 @@ python3 run.py check tui            # resize/truncation contract
 python3 run.py view --list          # read records without executing anything
 python3 run.py view RUN_ID          # compact text form
 python3 run.py view RUN_ID --json   # canonical loop-view/1
+python3 run.py view --schema        # record schema for renderers
 python3 run.py sim1 task            # offline exec-only sim
 python3 run.py sim2 task2           # offline shape-aware sim
 python3 run.py probe                # headless TUI render of a snapshot
 python3 run.py server status        # this tree's control plane
+python3 run.py server runs --json   # every record on disk, daemon if available
 python3 run.py api "task"           # real model call; costs money and network
 python3 run.py api --verify CMD "task"  # same, then record verify evidence
 make check                          # compile + line + tui checks
@@ -91,9 +97,10 @@ python3 scripts/doctor.py           # local environment health
 python3 scripts/repo_map.py         # file/entrypoint map for agents
 ```
 
-Never run `api` or `resume` in an offline verification. They require
-credentials and a network. `scripts/verify.py --skip-server` skips checks whose
-argv has an element exactly equal to `server` or `api`.
+Never run a real `api` call or `resume RUN_ID` in an offline verification. They
+require credentials and a network. `scripts/verify.py --skip-server` skips any
+argv token, including tokens inside `sh -c`, exactly equal to `server` or `api`;
+the `resume-usage` check exercises only the offline usage path.
 
 ## Layout
 
@@ -102,7 +109,7 @@ argv has an element exactly equal to `server` or `api`.
 - `harness/` - loop, record, control plane, sims, offline checks.
 - `tui/` - thin polling renderer over daemon snapshots.
 - `scenarios/` - offline sim transcripts.
-- `fixtures/` - read-only sandbox trees, copied per run.
+- `fixtures/` - read-only sandbox trees, copied per sim run.
 - `records/` - frozen historical artifacts; never written.
 - `tests/` - stdlib `unittest`; no third-party deps.
 - `scripts/` - agent verification and inventory tools.

@@ -12,8 +12,8 @@ dispatch:
   index: "--json prints one compact loop-index/1 line from manifest.agent_index; no module import, no tree walk, no absolute paths"
 
 entrypoints:
-  - {id: api, module: harness.agent, network: true, verify: "--verify CMD runs after done, before end", writes: [daemon queue, job, worker registry, record, lock, obs]}
-  - {id: server, module: harness.server, network: false, writes: [socket, pid, log, registry, queue, jobs, workers, reload]}
+  - {id: api, module: harness.agent, network: true, verify: "--verify CMD runs after the terminal turn, before end", writes: [daemon queue, job, worker registry, record, lock, obs]}
+  - {id: server, module: harness.server, network: false, writes: [socket, pid, log, registry, queue, jobs, workers, reload, records and record locks through reconcile]}
   - {id: view, module: harness.view, network: false, writes: []}
   - {id: resume, module: harness.resume, network: true, writes: [existing record, lock, obs]}
   - {id: sim1, module: harness.sim1, network: false, writes: [".logs/sim1/<label>/"]}
@@ -32,7 +32,8 @@ execution_model:
 runtime_flow: |
   run.py api TASK
     -> srvctl.start()                 one daemon per tree
-    -> srvconn "run"                  queue.add(front=True); supervisor launches
+    -> srvconn "run"                  srvrun.target -> queue.add(front=True)
+    -> srvwork.tick()                 promote current, then launch
     -> srvwork.launch()               job.write + detached worker
     -> worker.main(run_id)
          -> recwrite.acquire_tree()   .logs/run.lock
@@ -133,8 +134,10 @@ write_ownership:
   ".logs/queue.json": the daemon through queue.py
   ".logs/jobs/<run_id>.json": the daemon through srvwork.launch
   ".logs/workers/<run_id>.json": the worker, plus daemon reconcile updates
-  ".logs/reload.json": server reload or the daemon
-  ".logs/server.sock, .pid, .log, .lock": the daemon
+  ".logs/reload.json": reload.bump from server reload (CLI or socket)
+  ".logs/server.sock, .pid": the daemon
+  ".logs/server.log": the daemon and workers
+  ".logs/server.lock": srvctl.start
   "$LOOP_REGISTRY, .logs/registry.json": regstore under a file lock
   "scenarios/, fixtures/, records/": read-only; copy before using
 

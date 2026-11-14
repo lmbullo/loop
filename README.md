@@ -18,7 +18,10 @@ affected, `manifest.json` in the same commit. Do not add human-facing prose.
 - The message list is append-only: never edit, reorder or re-send an entry.
 - The record is append-only: one fsynced JSONL line per event, `end` is the only
   completion marker; a missing `end` is the interrupted marker.
-- Observations are verbatim except the bounding rule in `harness/observe.py`.
+- Observations are verbatim except the bounding rule in `harness/observe.py`;
+  text over the run's bound is summarized and its raw bytes are saved.
+- The system header is constant across runs; task and run-specific values enter
+  after it, so the prefix is cacheable.
 - Output is metered and reported, never gated.
 - `LOOP_ROOT` is the workspace identity (root, sandbox, daemon, queue,
   registry); `LOOP_RUNS` selects the state directory.
@@ -26,8 +29,8 @@ affected, `manifest.json` in the same commit. Do not add human-facing prose.
 - The control plane never executes a run; detached workers survive daemon
   restart.
 - TUI code is a renderer only; server code never imports `tui/`.
-- `fixtures/` and `records/` are read-only; every run mounts a fresh fixture
-  copy under `.logs/`.
+- `fixtures/` and `records/` are read-only; each sim run mounts a fresh fixture
+  copy under `.logs/<sim>/<label>/ws/`.
 - No absolute paths in tracked files; roots come from `__file__` or env.
 - Source modules stay under 200 lines.
 
@@ -45,10 +48,12 @@ Offline, deterministic, no credentials:
 | `python3 run.py view --list` | records on disk, no execution |
 | `python3 run.py view RUN_ID` | compact text form |
 | `python3 run.py view RUN_ID --json` | canonical `loop-view/1` |
+| `python3 run.py view --schema` | record schema for renderers |
 | `python3 run.py sim1 task` | offline exec-only sim |
 | `python3 run.py sim2 task2` | offline shape-aware sim |
 | `python3 run.py probe` | headless TUI render |
 | `python3 run.py server status` | this tree's control plane |
+| `python3 run.py server runs --json` | every record on disk, daemon if available |
 | `make check` | compile + line + tui audits |
 | `make test` | stdlib unittest suite |
 | `make verify` | manifest-driven offline checks |
@@ -64,9 +69,10 @@ Network and real tokens only:
 | `python3 run.py api --verify CMD TASK` | same, then run `CMD` at the run root and record `verify` before `end` |
 | `python3 run.py resume RUN_ID` | continue an interrupted record |
 
-`api` and `resume` are the only expensive, networked paths. Never select them
-in offline verification; `scripts/verify.py` skips any argv containing an
-element exactly equal to `server` or `api`.
+`api` and `resume RUN_ID` are the only expensive, networked paths. Never select
+them in offline verification; `scripts/verify.py` skips any argv token,
+including one inside `sh -c`, exactly equal to `server` or `api`. The
+`resume-usage` check exercises only the offline usage path.
 
 ## Routes
 
