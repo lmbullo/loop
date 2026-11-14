@@ -65,21 +65,27 @@ def put(scr, y, x, text, width, height, at=0):
         pass
 
 
+def one_line(value):
+    return display(value or "").strip()
+
+
 def task_rows(snap, width):
     cur = snap["current"]
     if cur is None:
         return [(fit("idle - type a task and press enter", width), "muted")]
-    info = (f"id={cur['id']} state={cur['state']} turns={cur['turns']} "
+    line = (f"id={cur['id']} state={cur['state']} turns={cur['turns']} "
             f"cost={money(cur['cost'])}")
+    extras = []
     if cur.get("finish"):
-        info += f" finish={cur['finish']}"
-    rows = [(fit(info, width), theme.state_role(cur["state"]))]
+        extras.append(f"finish={cur['finish']}")
     if cur.get("detail"):
-        rows.append((fit(display(cur["detail"]), width), "err"))
-    text = display(cur.get("text") or "")
+        extras.append(one_line(cur["detail"]))
+    text = one_line(cur.get("text"))
     if text:
-        rows.append((fit("  " + text, width), None))
-    return rows
+        extras.append(text)
+    if extras:
+        line += "  " + "  ".join(extras)
+    return [(fit(line, width), theme.state_role(cur["state"]))]
 
 
 def task_block(scr, snap, y, end, width, height, focus, sel, scroll):

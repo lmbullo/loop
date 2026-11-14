@@ -67,10 +67,13 @@ def check_tui():
                         "detail": "bad\nnews", "text": ("task line " * 80) + "\nmore"}}
     for width in (1, 7, 24, 80, 200):
         rows = task_rows(snap, width)
-        want(len(rows) == 3, f"task rows {width}: {len(rows)} != 3")
+        want(len(rows) == 1, f"task rows {width}: {len(rows)} != 1")
         for text, _ in rows:
             want(swidth(text) <= width, f"task row {width} overflow {text!r}")
             want("\n" not in text, f"task row {width} is multiline {text!r}")
+    wide = task_rows(snap, 200)[0][0]
+    for field in ("id=run", "state=running", "turns=3", "cost=$0.000000", "bad news"):
+        want(field in wide, f"task line {field!r} missing from {wide!r}")
 
     prompt = Prompt()
     prompt.set(" ".join(f"word{i}" for i in range(50)))

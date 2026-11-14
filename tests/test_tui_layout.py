@@ -23,10 +23,15 @@ class TuiLayoutTest(unittest.TestCase):
                             "detail": "bad\nnews", "text": ("task " * 40) + "\nmore"}}
         for width in (1, 7, 24, 80, 200):
             rows = task_rows(snap, width)
-            self.assertEqual(len(rows), 3)
-            for text, _ in rows:
-                self.assertNotIn("\n", text)
-                self.assertLessEqual(swidth(text), width)
+            self.assertEqual(len(rows), 1)
+            text, _ = rows[0]
+            self.assertNotIn("\n", text)
+            self.assertLessEqual(swidth(text), width)
+        wide = task_rows(snap, 200)[0][0]
+        for field in ("id=r", "state=running", "turns=3", "cost=$0.500000",
+                      "bad news", "task"):
+            self.assertIn(field, wide)
+        self.assertIn("bad news", task_rows(snap, 80)[0][0])
 
     def test_task_rows_idle(self):
         rows = task_rows({"current": None}, 80)
