@@ -109,9 +109,9 @@ run.py api TASK
 | `harness/checks.py` | `check lines` (200-line audit), `check tui` layout contract |
 | `tui/app.py` | curses shell and raw input loop |
 | `tui/client.py` | daemon snapshot/enqueue/drop/move client |
-| `tui/{input,keys,prompt}.py` | key parsing, editing, history, wrapping |
-| `tui/panes.py` | fitting/clipping, one-line task and queue rows, grey/gruvbox palette |
-| `tui/{model,render,worker}.py` | snapshot copy, painting, polling |
+| `tui/{input,keys,prompt}.py` | arrow key dispatch, editing, history, wrapping |
+| `tui/panes.py` | fitting/clipping, one-line task and queue rows, plain `>` selection markers |
+| `tui/{model,render,worker}.py` | snapshot copy, plain painting, polling |
 
 ### Support surface
 
@@ -161,6 +161,6 @@ run.py api TASK
 | Record event fields or state rules | `manifest.record`, `harness/recschema.py` | `tests/test_recschema.py`, `tests/test_recread.py` |
 | Daemon command or guard | `harness/srvcmd.py`, `harness/srvconn.py` | `tests/test_manifest.py`, `scripts/verify.py --skip-server` |
 | Queue or worker lifecycle | `harness/queue.py`, `harness/srvwork.py`, `harness/worker.py` | `tests/test_queue.py`, `tests/test_workers.py` |
-| TUI layout or palette | `tui/panes.py`, `tui/prompt.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py` |
+| TUI layout, keymap or plain-text rows | `tui/panes.py`, `tui/input.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py` |
 | Offline scenario | `scenarios/` + `manifest.scenarios[]` | `python3 run.py sim1 <id>` |
 | New doc | `docs/agent/` | `manifest.files[]` + `docs/agent/index.json` |

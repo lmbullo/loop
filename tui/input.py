@@ -19,6 +19,14 @@ def close_prompt(app, clear=True):
     app.dirty = True
 
 
+def toggle_focus(app):
+    if app.focus == "queue":
+        app.focus = "task"
+    elif queue_sel(app):
+        app.focus = "queue"
+    app.dirty = True
+
+
 def submit(app):
     text = app.prompt.text
     if not text.strip():
@@ -47,32 +55,20 @@ def drop(app):
         app.focus = "task"
 
 
-def queue_text(app, text):
-    queue = queue_sel(app)
-    if not queue or not set(text) <= set("jJkKxd"):
-        open_prompt(app, text)
-        return
-    for ch in text:
-        if ch in "kK":
-            if ch == "K":
-                app.worker.move(queue[app.qsel]["id"], -1)
-            app.qsel = max(0, app.qsel - 1)
-        elif ch in "jJ":
-            if ch == "J":
-                app.worker.move(queue[app.qsel]["id"], 1)
-            app.qsel = min(len(queue) - 1, app.qsel + 1)
-        elif ch in "xd":
-            drop(app)
-            return
-    app.dirty = True
-
-
 def queue_key(app, key):
     queue = queue_sel(app)
     if key in ("up", "hist_prev"):
         app.qsel = max(0, app.qsel - 1)
     elif key in ("down", "hist_next"):
         app.qsel = min(max(0, len(queue) - 1), app.qsel + 1)
+    elif key == "shift_up" and queue:
+        app.worker.move(queue[app.qsel]["id"], -1)
+        app.qsel = max(0, app.qsel - 1)
+    elif key == "shift_down" and queue:
+        app.worker.move(queue[app.qsel]["id"], 1)
+        app.qsel = min(len(queue) - 1, app.qsel + 1)
+    elif key in ("left", "right"):
+        toggle_focus(app)
     elif key == "home":
         app.qsel = 0
     elif key == "end":
@@ -120,10 +116,12 @@ def prompt_key(app, key):
 def task_key(app, key):
     n = max(1, app.tview.get("n") or 1)
     vis = max(1, app.tview.get("vis") or 1)
-    if key in ("up", "hist_prev"):
+    if key in ("up", "hist_prev", "shift_up"):
         app.tsel = max(0, app.tsel - 1)
-    elif key in ("down", "hist_next"):
+    elif key in ("down", "hist_next", "shift_down"):
         app.tsel = min(n - 1, app.tsel + 1)
+    elif key in ("left", "right"):
+        toggle_focus(app)
     elif key == "page_up":
         app.tsel = max(0, app.tsel - vis)
     elif key == "page_down":
@@ -143,10 +141,7 @@ def handle(app, ev):
         open_prompt(app, value)
         return
     if kind == "text":
-        if app.focus == "queue":
-            queue_text(app, value)
-        else:
-            open_prompt(app, value)
+        open_prompt(app, value)
         return
     if value == "ctrl_q":
         app.quit = True

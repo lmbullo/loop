@@ -7,7 +7,7 @@ import termios
 import time
 import tty
 
-from . import input, keys, model, panes, prompt, render, worker
+from . import input, keys, model, prompt, render, worker
 
 USAGE = "usage: python3 run.py tui\n\ninteractive terminal client for this tree's daemon"
 
@@ -65,7 +65,7 @@ class App:
             max_rows = max(1, self.h - 2)
             ph = 0
             if self.focus == "prompt":
-                ph = self.prompt.layout(self.content_width(), max_rows)["height"] + 2
+                ph = self.prompt.layout(self.content_width(), max_rows)["height"] + 1
             if self.prompt_h is not None and ph != self.prompt_h:
                 try:
                     self.scr.clear()
@@ -89,7 +89,6 @@ class App:
             curses.curs_set(1)
         except curses.error:
             pass
-        panes.init_colors()
         try:
             self.scr.keypad(True)
         except curses.error:

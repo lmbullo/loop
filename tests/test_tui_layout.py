@@ -1,6 +1,6 @@
 import unittest
 
-from tui.panes import fit, task_rows
+from tui.panes import fit, marked, task_rows
 from tui.prompt import Prompt, display, swidth, wrap
 from tui.render import status_line
 
@@ -72,17 +72,19 @@ class TuiLayoutTest(unittest.TestCase):
             self.assertEqual(swidth(status_line(snap, width, "prompt")), width)
 
 
-class TuiPaletteTest(unittest.TestCase):
-    def test_palette_tables_are_complete(self):
+    def test_selection_marker_fits(self):
+        self.assertEqual(marked("task", 6, "> "), "> task")
+        self.assertEqual(marked("task", 8), "task")
+        self.assertLessEqual(swidth(marked("long task", 5, "> ")), 5)
+        self.assertLessEqual(swidth(marked("long task", 3, "> ")), 3)
+
+
+class TuiMinimalTest(unittest.TestCase):
+    def test_no_color_or_bold_surface(self):
         from tui import panes
-        pairs = panes.PAIR
-        self.assertEqual(sorted(pairs.values()), list(range(1, len(pairs) + 1)))
-        self.assertEqual(set(pairs), set(panes.GRUVBOX))
-        self.assertEqual(set(pairs), set(panes.BASE))
-        for fg in panes.BASE.values():
-            self.assertTrue(0 <= fg < 8)
-        for fg in panes.GRUVBOX.values():
-            self.assertTrue(0 <= fg < 256)
+        self.assertFalse(hasattr(panes, "init_colors"))
+        self.assertFalse(hasattr(panes, "PAIR"))
+        self.assertFalse(hasattr(panes, "GRUVBOX"))
 
 
 if __name__ == "__main__":

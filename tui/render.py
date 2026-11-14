@@ -2,57 +2,46 @@ import curses
 import time
 
 from .prompt import swidth
-from .panes import attr, fit, put, queue_block, rule, task_block
+from .panes import fit, put, queue_block, task_block
 
 
 def status_line(snap, width, focus):
     if width <= 0:
         return ""
     daemon = snap["daemon"]
-    state = daemon["state"].upper()
+    state = daemon["state"].lower()
     detail = daemon.get("detail") or ""
-    left = f"agent tui focus={focus} daemon={state}"
-    if daemon.get("pid"):
-        left += f" pid={daemon['pid']}"
-    if state != "RUNNING" and detail:
+    left = f"daemon {state}"
+    if state != "running" and detail:
         left += f"  {detail}"
     notice = snap.get("notice") or ""
     if notice and time.time() - (snap.get("notice_at") or 0) < 3.0:
         right = notice
     elif focus == "task":
-        right = "up/down scroll  tab prompt  ctrl+q quit"
+        right = "enter type  ctrl+q quit"
     elif focus == "queue":
-        right = "up/down select  K/J reorder  del drop"
+        right = "shift+up/down reorder  del drop  enter type"
     else:
-        right = "esc cancel  enter submit  tab queue"
+        right = "esc cancel  enter submit"
     right = fit(right, max(1, width))
     left = fit(left, max(0, width - swidth(right) - 1))
     space = max(0, width - swidth(left) - swidth(right))
     return left + " " * space + right
 
 
-def prompt_block(scr, prompt, top, width, height, focus, content_w, max_rows):
+def prompt_block(scr, prompt, top, width, height, content_w, max_rows):
     lay = prompt.layout(content_w, max_rows)
     rows, scroll, n, h = lay["rows"], lay["scroll"], lay["n"], lay["height"]
-    up = f"\u2191 {scroll} " if scroll > 0 else ""
-    below = max(0, n - scroll - h)
-    if n <= h:
-        down = " 1/1 " if n <= 1 else f" 1-{n}/{n} "
-    else:
-        down = f" {scroll + 1}-{min(n, scroll + h)}/{n}"
-        if below:
-            down += f" \u2193 {below}"
-        down += " "
-    label = " prompt " if focus == "prompt" else " prompt (tab) "
-    at = attr("accent") if focus == "prompt" else attr("rule")
-    put(scr, top, 0, rule(width, label, up), width, height, at)
+    label = "prompt"
+    if n > h or scroll:
+        label += f" {scroll + 1}-{min(n, scroll + h)}/{n}"
+    put(scr, top, 0, fit(label, width), width, height)
     for k in range(h):
         idx = scroll + k
         text = rows[idx]["text"] if idx < len(rows) else ""
         text = fit(text, content_w, mark="")
-        put(scr, top + 1 + k, 0, text + " " * max(0, content_w - swidth(text)),
-            width, height)
-    put(scr, top + h + 1, 0, rule(width, "", down), width, height, attr("rule"))
+        put(scr, top + 1 + k, 0,
+            text + " " * max(0, content_w - swidth(text)), width, height)
     return lay
 
 
@@ -64,10 +53,9 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
     max_rows = max(1, height - 2)
     lay = prompt.layout(content_w, max_rows)
     open_prompt = focus == "prompt"
-    ph = lay["height"] + 2 if open_prompt else 0
+    ph = lay["height"] + 1 if open_prompt else 0
     ptop = max(0, height - ph)
-    put(scr, 0, 0, status_line(snap, width, focus), width, height,
-        attr("status") | curses.A_BOLD)
+    put(scr, 0, 0, status_line(snap, width, focus), width, height)
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
     tv = {"n": 0, "vis": 0, "sel": 0, "scroll": 0}
@@ -85,7 +73,7 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
         if task_end < body_end:
             queue_block(scr, snap, task_end, body_end, width, height, focus, qsel)
     if open_prompt:
-        lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)
+        lay = prompt_block(scr, prompt, ptop, width, height, content_w, max_rows)
         row = ptop + 1 + lay["cursor_row"] - lay["scroll"]
         col = min(width - 1, max(0, lay["cursor_col"]))
         if 0 <= row < height:

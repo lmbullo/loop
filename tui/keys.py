@@ -17,7 +17,7 @@ CSI = {
     b"\x1b[4~": "end", b"\x1b[5~": "page_up", b"\x1b[6~": "page_down",
     b"\x1b[7~": "home", b"\x1b[8~": "end", b"\x1b[Z": "backtab",
     b"\x1bOH": "home", b"\x1bOF": "end",
-    b"\x1b[1;2A": "up", b"\x1b[1;2B": "down",
+    b"\x1b[1;2A": "shift_up", b"\x1b[1;2B": "shift_down",
     b"\x1b[1;2C": "right", b"\x1b[1;2D": "left",
     b"\x1b[1;3A": "hist_prev", b"\x1b[1;3B": "hist_next",
     b"\x1b[1;3C": "word_right", b"\x1b[1;3D": "word_left",
