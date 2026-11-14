@@ -37,7 +37,7 @@ def _running():
 
 def down(detail="no daemon"):
     return {"daemon": {"state": "down", "detail": detail, "pid": 0},
-            "current": None, "last": None, "queue": [], "costs": {}, "version": 0}
+            "current": None, "last": None, "done": [], "queue": [], "costs": {}, "version": 0}
 
 
 def snapshot():

@@ -2,7 +2,7 @@ import curses
 import time
 
 from .prompt import swidth
-from .panes import fit, put, queue_block, rule, task_block
+from .panes import done_block, fit, put, queue_block, rule, task_block
 from . import theme
 
 
@@ -12,18 +12,24 @@ def status_line(snap, width, focus):
     daemon = snap["daemon"]
     state = daemon["state"].lower()
     detail = daemon.get("detail") or ""
-    left = f"daemon {state}"
+    dot = "\u25cf" if state == "running" else "\u2715"
+    if state in ("starting", "attaching"):
+        dot = "\u25cb"
+    left = f"{dot} daemon {state}"
     if state != "running" and detail:
-        left += f"  {detail}"
+        left += f" \u00b7 {detail}"
     notice = snap.get("notice") or ""
     if notice and time.time() - (snap.get("notice_at") or 0) < 3.0:
         right = notice
     elif focus == "task":
-        right = "enter type  ctrl+q quit"
+        right = "\u21b5 type \u00b7 ^Q quit"
+        if snap.get("queue"):
+            right = "\u2192 queue \u00b7 " + right
     elif focus == "queue":
-        right = "shift+up/down reorder  del drop  enter type"
+        right = ("\u2190 task \u00b7 \u2191\u2193 select \u00b7 "
+                 "\u21e7\u2191\u2193 move \u00b7 del drop \u00b7 \u21b5 type")
     else:
-        right = "esc cancel  enter submit"
+        right = "esc cancel \u00b7 \u21b5 submit"
     right = fit(right, max(1, width))
     left = fit(left, max(0, width - swidth(right) - 1))
     space = max(0, width - swidth(left) - swidth(right))
@@ -38,7 +44,8 @@ def prompt_block(scr, prompt, top, width, height, focus, content_w, max_rows):
         label += f"{scroll + 1}-{min(n, scroll + h)}/{n} "
     role = theme.PROMPT_FOCUS if focus == "prompt" else theme.PROMPT_IDLE
     at = theme.attr(role)
-    put(scr, top, 0, rule(width, label), width, height, at)
+    hint = " \u21b5 " if focus == "prompt" else ""
+    put(scr, top, 0, rule(width, label, hint), width, height, at)
     for k in range(h):
         idx = scroll + k
         text = rows[idx]["text"] if idx < len(rows) else ""
@@ -47,6 +54,23 @@ def prompt_block(scr, prompt, top, width, height, focus, content_w, max_rows):
             text + " " * max(0, content_w - swidth(text)), width, height, at)
     put(scr, top + h + 1, 0, rule(width), width, height, at)
     return lay
+
+
+def body_spans(snap, top, end):
+    """Rows for running/queued; queued keeps its own rows above done."""
+    span = max(0, end - top)
+    running = min(2, span)
+    rest = span - running
+    queued = snap["queue"]
+    done = snap.get("done") or []
+    queue_h = 0
+    if queued and rest > 0:
+        if done:
+            queue_h = min(len(queued) + 1, max(2, rest // 2))
+            queue_h = min(queue_h, max(0, rest - 2))
+        else:
+            queue_h = rest
+    return running, queue_h
 
 
 def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
@@ -65,18 +89,13 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
     body_end = ptop
     tv = {"n": 0, "vis": 0, "sel": 0, "scroll": 0}
     if body_end > body_start:
-        queue = snap["queue"]
-        reserve = 0
-        if queue:
-            span = body_end - body_start
-            reserve = min(len(queue) + 2, max(3, span // 2))
-            if focus == "task":
-                reserve = min(reserve, max(2, span // 3))
-        task_end = max(body_start + 1, body_end - reserve)
+        run_h, queue_h = body_spans(snap, body_start, body_end)
+        task_end = body_start + run_h
         tv = task_block(scr, snap, body_start, task_end, width, height,
                         focus, tsel, tscroll)
-        if task_end < body_end:
-            queue_block(scr, snap, task_end, body_end, width, height, focus, qsel)
+        done_start = queue_block(scr, snap, task_end, task_end + queue_h,
+                                 width, height, focus, qsel)
+        done_block(scr, snap, done_start, body_end, width, height)
     if open_prompt:
         lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)
         row = ptop + 1 + lay["cursor_row"] - lay["scroll"]

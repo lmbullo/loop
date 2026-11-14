@@ -88,7 +88,7 @@ run.py api TASK
 | `harness/srvconn.py` | socket command handlers; force-stop interruption |
 | `harness/srvclient.py` | client attach/stream/reconnect; `api` entry |
 | `harness/srvrun.py` | run targeting and record tailing to a client |
-| `harness/srvsnap.py` | snapshot/status views used by TUI and `server status` |
+| `harness/srvsnap.py` | snapshot/status views used by TUI and `server status`; snapshot carries current, queue and a bounded done list |
 | `harness/srvlist.py` | registry views, prune, `restart --all` |
 | `harness/srvwire.py` | newline JSON framing, timeouts, per-run env key list |
 | `harness/worker.py` | detached executor: tree lock, writer, signals, job cleanup |
@@ -110,9 +110,10 @@ run.py api TASK
 | `tui/app.py` | curses shell and raw input loop |
 | `tui/client.py` | daemon snapshot/enqueue/drop/move client |
 | `tui/{input,keys,prompt}.py` | arrow key dispatch, editing, history, wrapping |
-| `tui/panes.py` | fitting/clipping, horizontal rules, one-line task and queue rows, muted chrome with a `>` selection marker |
+| `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows, muted chrome with a `›` selection marker; row content lives in `tui/rows.py` |
+| `tui/rows.py` | row content: state glyphs, short run ids, middle-dot metadata separators, selected-row roles, section count headers |
 | `tui/theme.py` | one palette: grey chrome roles, muted state hues, grey prompt roles, `init_colors` |
-| `tui/{model,render,worker}.py` | snapshot copy, themed painting with prompt box edge rules, polling |
+| `tui/{model,render,worker}.py` | snapshot copy, themed painting of running/queued/done sections with prompt box edge rules, polling |
 
 ### Support surface
 

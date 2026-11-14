@@ -72,8 +72,10 @@ def check_tui():
             want(swidth(text) <= width, f"task row {width} overflow {text!r}")
             want("\n" not in text, f"task row {width} is multiline {text!r}")
     wide = task_rows(snap, 200)[0][0]
-    for field in ("id=run", "state=running", "turns=3", "cost=$0.000000", "bad news"):
+    for field in ("id=run", "running", "turns=3", "cost=$0.000000", "bad news"):
         want(field in wide, f"task line {field!r} missing from {wide!r}")
+    for mark in ("\u25cf", "\u00b7"):
+        want(mark in wide, f"task line lost {mark!r} from {wide!r}")
 
     prompt = Prompt()
     prompt.set(" ".join(f"word{i}" for i in range(50)))
@@ -87,8 +89,10 @@ def check_tui():
     snap = {"daemon": {"state": "running", "detail": "", "pid": 7},
             "notice": "", "notice_at": 0}
     for width in (1, 5, 20, 80):
-        want(swidth(status_line(snap, width, "prompt")) == width,
-             f"status width {width}")
+        left = status_line(snap, width, "prompt")
+        want(swidth(left) == width, f"status width {width}")
+    want("\u21b5" in status_line(snap, 80, "prompt"),
+         "status line lost the enter glyph")
 
     for msg in bad:
         print("err tui " + msg, file=sys.stderr)

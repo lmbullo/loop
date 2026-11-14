@@ -28,7 +28,7 @@ class TuiLayoutTest(unittest.TestCase):
             self.assertNotIn("\n", text)
             self.assertLessEqual(swidth(text), width)
         wide = task_rows(snap, 200)[0][0]
-        for field in ("id=r", "state=running", "turns=3", "cost=$0.500000",
+        for field in ("id=r", "running", "turns=3", "cost=$0.500000",
                       "bad news", "task"):
             self.assertIn(field, wide)
         self.assertIn("bad news", task_rows(snap, 80)[0][0])
@@ -98,10 +98,20 @@ class TuiLayoutTest(unittest.TestCase):
 
 
     def test_selection_marker_fits(self):
-        self.assertEqual(marked("task", 6, "> "), "> task")
+        from tui.panes import SELECT
+        self.assertEqual(marked("task", 6, SELECT), SELECT + "task")
         self.assertEqual(marked("task", 8), "task")
-        self.assertLessEqual(swidth(marked("long task", 5, "> ")), 5)
-        self.assertLessEqual(swidth(marked("long task", 3, "> ")), 3)
+        self.assertLessEqual(swidth(marked("long task", 5, SELECT)), 5)
+        self.assertLessEqual(swidth(marked("long task", 3, SELECT)), 3)
+
+    def test_rows_use_state_glyphs_and_short_ids(self):
+        snap = {"current": {"id": "20261114T164143916Z-cc746cc7", "state": "running",
+                            "turns": 3, "cost": 0.5, "text": "now"}}
+        text = task_rows(snap, 200)[0][0]
+        self.assertIn("\u25cf", text)
+        self.assertIn("\u00b7", text)
+        self.assertIn("id=\u2026cc746cc7", text)
+        self.assertIn("\u21b5", task_rows({"current": None}, 80)[0][0])
 
 
 class TuiThemeTest(unittest.TestCase):

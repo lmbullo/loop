@@ -211,6 +211,10 @@ line, then record events from disk. Streaming stops at `end` or `interrupted`.
 The client reconnects after a daemon restart and resumes from the last seen
 `seq`.
 
+`snapshot` returns `daemon`, `current`, `last`, `done`, `queue` and `costs`.
+`done` is a bounded newest-first list of terminal runs (the current run is
+excluded); the TUI renders it below the queue.
+
 ## Environment handed to a worker
 
 Only these keys cross the per-run boundary:

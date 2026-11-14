@@ -2,6 +2,8 @@ import time
 
 from . import queue, record, recread, registry
 
+DONE_LIMIT = 50
+
 
 def summary(run_id):
     try:
@@ -31,6 +33,21 @@ def summary(run_id):
             "finish": None, "detail": detail, "seq": rec["seq"]}
 
 
+def recent_done(rows, skip=None):
+    """Terminal runs newest first; the current run is not listed as done."""
+    out = []
+    for row in reversed(rows):
+        if skip and row["run_id"] == skip:
+            continue
+        out.append({"id": row["run_id"], "task": row.get("task"),
+                    "state": row["state"], "turns": row.get("turns") or 0,
+                    "cost": row.get("cost"), "finish": row.get("finish"),
+                    "detail": row.get("detail") or ""})
+        if len(out) >= DONE_LIMIT:
+            break
+    return out
+
+
 def snapshot(snap, live, reconciled):
     by_run = {w.get("run_id"): w for w in live}
     current = snap.get("current")
@@ -47,20 +64,15 @@ def snapshot(snap, live, reconciled):
         run["pid"] = w.get("pid")
         run["state"] = "running"
     rows = recread.scan()
-    last = None
-    for row in reversed(rows):
-        if run and row["run_id"] == run["id"]:
-            continue
-        last = {"id": row["run_id"], "task": row.get("task"), "state": row["state"],
-                "turns": row.get("turns") or 0, "cost": row.get("cost"),
-                "finish": row.get("finish"), "detail": row.get("detail") or ""}
-        break
+    done = recent_done(rows, run["id"] if run else None)
+    last = done[0] if done else None
     total = sum(float(r.get("cost") or 0.0) for r in rows)
     waiting = [{"id": it["id"], "run_id": it.get("run_id"), "text": it.get("task"),
                 "state": "queued", "created_at": it.get("created_at")}
                for it in snap["items"]]
     return {"k": "snapshot", "tree": registry.tree(), "daemon": {"state": "running"},
-            "current": run, "last": last, "queue": waiting, "waiting": len(waiting),
+            "current": run, "last": last, "done": done, "queue": waiting,
+            "waiting": len(waiting),
             "costs": {"current": None if run is None else run.get("cost"),
                       "total": round(total, 6)},
             "workers_live": len(live), "version": int(time.time() * 10) + snap["seq"],

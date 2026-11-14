@@ -25,7 +25,7 @@ class Model:
     def __init__(self):
         self.lock = threading.RLock()
         self.cv = threading.Condition(self.lock)
-        self.snap = {"current": None, "last": None, "queue": [],
+        self.snap = {"current": None, "last": None, "done": [], "queue": [],
                      "daemon": {"state": "starting", "detail": "attaching", "pid": 0},
                      "notice": "", "notice_at": 0.0, "version": 0}
         self.notice = ""
@@ -44,6 +44,7 @@ class Model:
         with self.lock:
             self.snap["current"] = view(raw.get("current"))
             self.snap["last"] = view(raw.get("last"))
+            self.snap["done"] = [view(item) for item in raw.get("done") or []]
             self.snap["queue"] = [view(item) for item in raw.get("queue") or []]
             self.snap["daemon"] = dict(raw.get("daemon") or
                                        {"state": "running", "detail": "ok", "pid": 0})
@@ -64,6 +65,7 @@ class Model:
     def snapshot(self):
         with self.lock:
             return {"current": self.snap["current"], "last": self.snap["last"],
+                    "done": list(self.snap["done"]),
                     "queue": list(self.snap["queue"]), "daemon": dict(self.snap["daemon"]),
                     "costs": dict(self.snap.get("costs") or {}),
                     "notice": self.notice, "notice_at": self.notice_at,

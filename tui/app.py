@@ -60,6 +60,9 @@ class App:
 
     def paint(self):
         snap = self.snapshot()
+        if self.focus == "queue" and not snap["queue"]:
+            self.focus = "task"
+            self.dirty = True
         now = time.time()
         if snap["version"] != self.last_version or self.dirty or now - self.last_draw > 0.5:
             max_rows = max(1, self.h - 2)

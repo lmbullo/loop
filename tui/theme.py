@@ -2,12 +2,14 @@ import curses
 
 # One pair per role. Every pair keeps the terminal background (-1), so the
 # terminal background is never repainted.
-PAIR = {"muted": 1, "strong": 2, "accent": 3, "ok": 4, "warn": 5, "err": 6}
+PAIR = {"muted": 1, "strong": 2, "accent": 3, "ok": 4, "warn": 5,
+        "err": 6, "body": 7}
 
 # Restrained 256-color scale: neutral greys for chrome, muted hues only for
 # state. The prompt box is deliberately grey in both focus states.
 SCHEME = {
     "muted": 244,   # #808080 - labels, hints, idle, unfocused prompt
+    "body": 250,    # #bcbcbc - unselected rows and finished task text
     "strong": 252,  # #d0d0d0 - status, focus, selection
     "accent": 67,   # #5f87af - running
     "ok": 108,      # #87af87 - complete
@@ -16,6 +18,7 @@ SCHEME = {
 }
 BASE = {  # eight-color terminals: the same roles from the basic palette
     "muted": curses.COLOR_WHITE,
+    "body": curses.COLOR_WHITE,
     "strong": curses.COLOR_WHITE,
     "accent": curses.COLOR_BLUE,
     "ok": curses.COLOR_GREEN,
@@ -25,7 +28,8 @@ BASE = {  # eight-color terminals: the same roles from the basic palette
 
 PROMPT_IDLE = "muted"
 PROMPT_FOCUS = "strong"
-STATE = {"running": "accent", "complete": "ok", "corrupt": "err"}
+STATE = {"running": "accent", "complete": "ok", "done": "ok",
+         "interrupted": "warn", "error": "err", "corrupt": "err"}
 
 
 def init_colors():
@@ -57,4 +61,6 @@ def state_role(state):
 
 def status_role(snap):
     state = ((snap or {}).get("daemon") or {}).get("state", "").lower()
-    return "err" if state and state != "running" else "muted"
+    if state in ("", "running", "starting", "attaching"):
+        return "muted"
+    return "err"

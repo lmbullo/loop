@@ -1,11 +1,9 @@
 import curses
 
 from .prompt import cw, display, swidth
-from .model import money
+from .rows import (BLANK, SELECT, done_parts, field_header, join_parts,
+                   queue_parts, task_parts, task_role)
 from . import theme
-
-SELECT = "> "
-BLANK = "  "
 
 
 def clip(text, cells):
@@ -65,35 +63,54 @@ def put(scr, y, x, text, width, height, at=0):
         pass
 
 
+def fit_parts(parts, cells):
+    cells = max(0, cells)
+    if sum(swidth(text) for text, _ in parts) <= cells:
+        return parts
+    room = max(0, cells - 1)
+    out, used = [], 0
+    for text, role in parts:
+        if used >= room:
+            break
+        piece = clip(text, room - used)
+        if piece:
+            out.append((piece, role))
+            used += swidth(piece)
+    if cells:
+        out.append(("\u2026", "muted"))
+    return out
+
+
+def put_parts(scr, y, x, parts, width, height):
+    if y < 0 or y >= height or x < 0 or x >= width:
+        return
+    room = width - x
+    if y == height - 1:
+        room -= 1
+    if room <= 0:
+        return
+    for text, role in fit_parts(parts, room):
+        try:
+            scr.addstr(y, x, text, theme.attr(role))
+        except curses.error:
+            return
+        x += swidth(text)
+
+
 def one_line(value):
     return display(value or "").strip()
 
 
 def task_rows(snap, width):
-    cur = snap["current"]
-    if cur is None:
-        return [(fit("idle - type a task and press enter", width), "muted")]
-    line = (f"id={cur['id']} state={cur['state']} turns={cur['turns']} "
-            f"cost={money(cur['cost'])}")
-    extras = []
-    if cur.get("finish"):
-        extras.append(f"finish={cur['finish']}")
-    if cur.get("detail"):
-        extras.append(one_line(cur["detail"]))
-    text = one_line(cur.get("text"))
-    if text:
-        extras.append(text)
-    if extras:
-        line += "  " + "  ".join(extras)
-    return [(fit(line, width), theme.state_role(cur["state"]))]
+    return [(fit(join_parts(task_parts(snap)), width), task_role(snap))]
 
 
 def task_block(scr, snap, y, end, width, height, focus, sel, scroll):
     total = max(0, end - y)
     if total <= 0:
         return {"n": 0, "vis": 0, "sel": 0, "scroll": 0}
-    rows = task_rows(snap, width)
-    n = len(rows)
+    tasks = [task_parts(snap)]
+    n = len(tasks)
     vis = max(0, total - 1)
     sel = max(0, min(sel, n - 1))
     scroll = max(0, min(scroll, max(0, n - vis)))
@@ -102,41 +119,72 @@ def task_block(scr, snap, y, end, width, height, focus, sel, scroll):
             scroll = sel
         if sel >= scroll + vis:
             scroll = sel - vis + 1
-    label = "task"
-    if n > vis:
-        label += f" {scroll + 1}-{min(n, scroll + vis)}/{n}"
+    label = "running:"
+    if snap["current"] is not None:
+        label = field_header(label, n)
+    if vis and n > vis:
+        label = field_header("running:", n, scroll, min(n, scroll + vis))
     put(scr, y, 0, fit(label, width), width, height, theme.attr("muted"))
     for k in range(vis):
         idx = scroll + k
         if idx >= n:
             break
-        text, role = rows[idx]
-        if focus == "task" and idx == sel:
-            role = "strong"
-        mark = SELECT if focus == "task" and idx == sel else BLANK
-        put(scr, y + 1 + k, 0, marked(text, width, mark), width, height,
-            theme.attr(role))
+        selected = focus == "task" and idx == sel and snap["current"] is not None
+        mark = SELECT if selected else BLANK
+        parts = [(mark, "strong" if selected else "muted")] + tasks[idx]
+        put_parts(scr, y + 1 + k, 0, parts, width, height)
     return {"n": n, "vis": vis, "sel": sel, "scroll": scroll}
 
 
 def queue_block(scr, snap, y, end, width, height, focus, qsel):
+    """Draw queued tasks; the section disappears when the queue is empty."""
     queue = snap["queue"]
-    put(scr, y, 0, fit(f"queue {len(queue)}" if queue else "queue", width),
-        width, height, theme.attr("muted"))
-    y += 1
-    if y >= end:
+    if not queue or y >= end:
         return y
-    room = max(0, end - y)
-    if not queue:
-        return y
-    offset = max(0, qsel - room + 1) if focus else 0
+    room = max(0, end - y - 1)
+    offset = 0
+    if room:
+        if focus == "queue":
+            qsel = max(0, min(qsel, len(queue) - 1))
+            offset = max(0, qsel - room + 1)
+        else:
+            offset = max(0, len(queue) - room)
+    if room:
+        shown = min(len(queue), offset + room)
+        label = field_header("queued:", len(queue), offset, shown)
+    else:
+        label = "queued:"
+    put(scr, y, 0, fit(label, width), width, height, theme.attr("muted"))
+    idw = min(12, max(7, max(len(str(it.get("id") or "")) for it in queue)))
     for idx in range(offset, min(len(queue), offset + room)):
         item = queue[idx]
-        first = (item.get("text") or "").replace("\n", " ").replace("\r", " ")
-        selected = focus and idx == qsel
+        selected = focus == "queue" and idx == qsel
         mark = SELECT if selected else BLANK
-        line = f"{item['id']:<8} {item['state']:<8} {first}"
-        put(scr, y, 0, marked(line, width, mark), width, height,
-            theme.attr("strong" if selected else "muted"))
-        y += 1
-    return y
+        parts = [(mark, "strong" if selected else "muted")]
+        parts += queue_parts(item, idw, selected)
+        put_parts(scr, y + 1 + idx - offset, 0, parts, width, height)
+    return min(end, y + 1 + min(len(queue) - offset, room))
+
+
+def done_rows(snap, width):
+    rows = []
+    for item in snap.get("done") or []:
+        rows.append((fit(join_parts(done_parts(item)), width),
+                     theme.state_role(item.get("state"))))
+    return rows
+
+
+def done_block(scr, snap, y, end, width, height):
+    """Draw finished runs newest first; the header stays when the list is empty."""
+    total = max(0, end - y)
+    if total <= 0:
+        return y
+    items = snap.get("done") or []
+    vis = max(0, total - 1)
+    label = field_header("done:", len(items))
+    if vis and len(items) > vis:
+        label = field_header("done:", len(items), 0, vis)
+    put(scr, y, 0, fit(label, width), width, height, theme.attr("muted"))
+    for k in range(min(vis, len(items))):
+        put_parts(scr, y + 1 + k, 0, done_parts(items[k]), width, height)
+    return min(end, y + 1 + min(len(items), vis))
