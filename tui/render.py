@@ -23,6 +23,8 @@ def status_line(snap, width, focus):
         right = notice
     elif focus == "task":
         right = "\u21b5 type \u00b7 ^Q quit"
+        if snap.get("done"):
+            right = "\u2191\u2193 done \u00b7 " + right
         if snap.get("queue"):
             right = "\u2192 queue \u00b7 " + right
     elif focus == "queue":
@@ -87,15 +89,20 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
         theme.attr(theme.status_role(snap)))
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
-    tv = {"n": 0, "vis": 0, "sel": 0, "scroll": 0}
+    tv = {"n": 1, "vis": 0}
+    dv = {"n": len(snap.get("done") or []), "vis": 0, "sel": None, "scroll": tscroll}
     if body_end > body_start:
         run_h, queue_h = body_spans(snap, body_start, body_end)
         task_end = body_start + run_h
         tv = task_block(scr, snap, body_start, task_end, width, height,
-                        focus, tsel, tscroll)
+                        focus == "task" and tsel == 0)
         done_start = queue_block(scr, snap, task_end, task_end + queue_h,
                                  width, height, focus, qsel)
-        done_block(scr, snap, done_start, body_end, width, height)
+        dsel = tsel - 1 if focus == "task" and tsel > 0 else None
+        dv = done_block(scr, snap, done_start, body_end, width, height, dsel, tscroll)
+    n = 1 + dv["n"]
+    tv = {"n": n, "vis": max(1, tv.get("vis", 0) + dv["vis"]),
+          "sel": max(0, min(tsel, n - 1)), "scroll": dv["scroll"]}
     if open_prompt:
         lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)
         row = ptop + 1 + lay["cursor_row"] - lay["scroll"]

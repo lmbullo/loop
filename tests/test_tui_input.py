@@ -66,6 +66,31 @@ class ArrowFocusTest(unittest.TestCase):
         self.assertEqual(app.qsel, 0)
 
 
+class TaskHistoryTest(unittest.TestCase):
+    def test_task_arrows_walk_from_running_into_done_rows(self):
+        app = FakeApp([])
+        app.tview = {"n": 4, "vis": 3, "sel": 0, "scroll": 0}
+        for want in (1, 2, 3):
+            input.handle(app, ("key", "down"))
+            self.assertEqual(app.tsel, want)
+        input.handle(app, ("key", "down"))
+        self.assertEqual(app.tsel, 3)
+        input.handle(app, ("key", "up"))
+        self.assertEqual(app.tsel, 2)
+        input.handle(app, ("key", "home"))
+        self.assertEqual(app.tsel, 0)
+        input.handle(app, ("key", "end"))
+        self.assertEqual(app.tsel, 3)
+
+    def test_task_paging_uses_the_visible_row_count(self):
+        app = FakeApp([])
+        app.tview = {"n": 9, "vis": 3, "sel": 0, "scroll": 0}
+        input.handle(app, ("key", "page_down"))
+        self.assertEqual(app.tsel, 3)
+        input.handle(app, ("key", "page_up"))
+        self.assertEqual(app.tsel, 0)
+
+
 class QueueArrowTest(unittest.TestCase):
     def test_shift_arrows_reorder_the_selected_item(self):
         app = FakeApp([item("a"), item("b")])

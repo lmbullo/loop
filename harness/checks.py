@@ -47,6 +47,7 @@ def check_tui():
     from tui.panes import fit, task_rows
     from tui.prompt import Prompt, swidth
     from tui.render import status_line
+    from tui.rows import window
 
     bad = []
 
@@ -94,6 +95,10 @@ def check_tui():
         want(swidth(left) == width, f"status width {width}")
     want("\u21b5" in status_line(snap, 80, "prompt"),
          "status line lost the enter glyph")
+
+    want(window(6, 4, 5, 0) == (6, 4, 5, 2), "selection window does not follow sel")
+    want(window(6, 4, None, 2) == (6, 4, None, 2), "selection window moved without sel")
+    want(window(0, 4, 3, 9) == (0, 4, None, 0), "empty window kept a selection")
 
     for msg in bad:
         print("err tui " + msg, file=sys.stderr)

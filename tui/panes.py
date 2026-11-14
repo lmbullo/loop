@@ -2,7 +2,7 @@ import curses
 
 from .prompt import cw, display, swidth
 from .rows import (BLANK, SELECT, done_parts, field_header, join_parts,
-                   queue_parts, task_parts, task_role)
+                   queue_parts, task_parts, task_role, window)
 from . import theme
 
 
@@ -105,35 +105,21 @@ def task_rows(snap, width):
     return [(fit(join_parts(task_parts(snap)), width), task_role(snap))]
 
 
-def task_block(scr, snap, y, end, width, height, focus, sel, scroll):
+def task_block(scr, snap, y, end, width, height, selected):
     total = max(0, end - y)
     if total <= 0:
-        return {"n": 0, "vis": 0, "sel": 0, "scroll": 0}
-    tasks = [task_parts(snap)]
-    n = len(tasks)
+        return {"n": 0, "vis": 0}
     vis = max(0, total - 1)
-    sel = max(0, min(sel, n - 1))
-    scroll = max(0, min(scroll, max(0, n - vis)))
-    if vis:
-        if sel < scroll:
-            scroll = sel
-        if sel >= scroll + vis:
-            scroll = sel - vis + 1
     label = "running:"
     if snap["current"] is not None:
-        label = field_header(label, n)
-    if vis and n > vis:
-        label = field_header("running:", n, scroll, min(n, scroll + vis))
+        label = field_header(label, 1)
     put(scr, y, 0, fit(label, width), width, height, theme.attr("muted"))
-    for k in range(vis):
-        idx = scroll + k
-        if idx >= n:
-            break
-        selected = focus == "task" and idx == sel and snap["current"] is not None
-        mark = SELECT if selected else BLANK
-        parts = [(mark, "strong" if selected else "muted")] + tasks[idx]
-        put_parts(scr, y + 1 + k, 0, parts, width, height)
-    return {"n": n, "vis": vis, "sel": sel, "scroll": scroll}
+    if vis:
+        marked = selected and snap["current"] is not None
+        mark = SELECT if marked else BLANK
+        parts = [(mark, "strong" if marked else "muted")] + task_parts(snap)
+        put_parts(scr, y + 1, 0, parts, width, height)
+    return {"n": 1, "vis": vis}
 
 
 def queue_block(scr, snap, y, end, width, height, focus, qsel):
@@ -174,17 +160,21 @@ def done_rows(snap, width):
     return rows
 
 
-def done_block(scr, snap, y, end, width, height):
+def done_block(scr, snap, y, end, width, height, sel=None, scroll=0):
     """Draw finished runs newest first; the header stays when the list is empty."""
-    total = max(0, end - y)
-    if total <= 0:
-        return y
     items = snap.get("done") or []
-    vis = max(0, total - 1)
-    label = field_header("done:", len(items))
-    if vis and len(items) > vis:
-        label = field_header("done:", len(items), 0, vis)
+    total = max(0, end - y)
+    n, vis, sel, scroll = window(len(items), max(0, total - 1), sel, scroll)
+    if total <= 0:
+        return {"n": n, "vis": vis, "sel": sel, "scroll": scroll}
+    label = field_header("done:", n)
+    if vis and n > vis:
+        label = field_header("done:", n, scroll, min(n, scroll + vis))
     put(scr, y, 0, fit(label, width), width, height, theme.attr("muted"))
-    for k in range(min(vis, len(items))):
-        put_parts(scr, y + 1 + k, 0, done_parts(items[k]), width, height)
-    return min(end, y + 1 + min(len(items), vis))
+    for k in range(min(vis, n - scroll)):
+        idx = scroll + k
+        marked = sel is not None and idx == sel
+        mark = SELECT if marked else BLANK
+        parts = [(mark, "strong" if marked else "muted")] + done_parts(items[idx])
+        put_parts(scr, y + 1 + k, 0, parts, width, height)
+    return {"n": n, "vis": vis, "sel": sel, "scroll": scroll}

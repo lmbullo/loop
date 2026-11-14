@@ -27,11 +27,12 @@ def snap(**over):
     return base
 
 
-def drawn(snapshot, width=70, height=24):
+def drawn(snapshot, width=70, height=24, focus="task", tsel=0, tscroll=0):
     screen = Screen()
     with mock.patch.object(render.curses, "doupdate", lambda: None), \
          mock.patch.object(render.curses, "curs_set", lambda n: None):
-        render.draw(screen, snapshot, Prompt(), width, height, "task", 0)
+        render.draw(screen, snapshot, Prompt(), width, height, focus, 0,
+                    tsel, tscroll)
     return screen.rows
 
 

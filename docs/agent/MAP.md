@@ -109,11 +109,11 @@ run.py api TASK
 | `harness/checks.py` | `check lines` (200-line audit), `check tui` layout contract |
 | `tui/app.py` | curses shell and raw input loop |
 | `tui/client.py` | daemon snapshot/enqueue/drop/move client; derives done history from record bytes when the daemon is down or old |
-| `tui/{input,keys,prompt}.py` | arrow key dispatch, editing, history, wrapping |
-| `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows, muted chrome with a `›` selection marker; row content lives in `tui/rows.py` |
-| `tui/rows.py` | row content: state glyphs, short run ids, middle-dot metadata separators, selected-row roles, section count headers |
+| `tui/{input,keys,prompt}.py` | arrow key dispatch (task focus walks running and done rows, queue focus selects/reorders), editing, history, wrapping |
+| `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows with a scrolling done window, muted chrome with a `›` selection marker; row content lives in `tui/rows.py` |
+| `tui/rows.py` | row content: state glyphs, short run ids, middle-dot metadata separators, selected-row roles, section count headers, the shared selection window helper |
 | `tui/theme.py` | one palette: grey chrome roles, muted state hues, grey prompt roles, `init_colors` |
-| `tui/{model,render,worker}.py` | snapshot copy, themed painting of running/queued/done sections with prompt box edge rules, polling |
+| `tui/{model,render,worker}.py` | snapshot copy, themed painting of running/queued/done sections with prompt box edge rules, combined running+done selection, polling |
 
 ### Support surface
 
@@ -163,6 +163,6 @@ run.py api TASK
 | Record event fields or state rules | `manifest.record`, `harness/recschema.py` | `tests/test_recschema.py`, `tests/test_recread.py` |
 | Daemon command or guard | `harness/srvcmd.py`, `harness/srvconn.py` | `tests/test_manifest.py`, `scripts/verify.py --skip-server` |
 | Queue or worker lifecycle | `harness/queue.py`, `harness/srvwork.py`, `harness/worker.py` | `tests/test_queue.py`, `tests/test_workers.py` |
-| TUI layout, keymap or palette roles | `tui/panes.py`, `tui/theme.py`, `tui/input.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py` |
+| TUI layout, keymap or palette roles | `tui/panes.py`, `tui/theme.py`, `tui/input.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py`, `tests/test_tui_history.py` |
 | Offline scenario | `scenarios/` + `manifest.scenarios[]` | `python3 run.py sim1 <id>` |
 | New doc | `docs/agent/` | `manifest.files[]` + `docs/agent/index.json` |

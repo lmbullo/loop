@@ -37,10 +37,26 @@ def join_parts(parts):
     return "".join(text for text, _ in parts)
 
 
+def window(n, vis, sel=None, scroll=0):
+    """Clamp a list window and move it so `sel` stays visible; None means no selection."""
+    n = max(0, n)
+    vis = max(0, vis)
+    scroll = max(0, min(scroll, max(0, n - vis)))
+    if not n or sel is None:
+        return n, vis, None, scroll
+    sel = max(0, min(sel, n - 1))
+    if vis:
+        if sel < scroll:
+            scroll = sel
+        elif sel >= scroll + vis:
+            scroll = sel - vis + 1
+    return n, vis, sel, scroll
+
+
 def field_header(label, total=None, start=0, end=None):
     if total is None or total == 0:
         return label
-    if end is not None and end < total:
+    if end is not None and (start > 0 or end < total):
         return f"{label} {start + 1}\u2013{end}/{total}"
     return f"{label} {total}"
 
