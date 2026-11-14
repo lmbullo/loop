@@ -22,6 +22,7 @@ python3 run.py                         # usage + manifest entry points
 python3 run.py sim1 task               # offline, no model
 python3 run.py sim2 task2              # offline, shape-aware wire
 python3 run.py view --list             # every record on disk
+python3 run.py probe                   # headless TUI render of a snapshot
 python3 run.py server status           # this tree's control plane
 make test                              # stdlib unittest suite
 make verify                            # manifest-driven offline checks
@@ -39,19 +40,19 @@ offline and deterministic.
 
 ## Agent docs
 
-`AGENTS.md` is the operating contract. `docs/agent/` is the task-oriented
-reference; `docs/agent/index.json` is the machine-readable route list.
+`AGENTS.md` is the operating contract. `docs/agent/` is the task-oriented YAML
+reference; `docs/agent/index.yaml` is the machine-readable route list.
 
 | Need | Read |
 | --- | --- |
 | Rules, commit protocol, definition of done | `AGENTS.md` |
-| Fast facts and doc routing | `docs/agent/README.md` |
-| Owning module, entry points, write ownership | `docs/agent/MAP.md` |
-| Record events, view, resume | `docs/agent/RECORD.md` |
-| Tools, observations, cost | `docs/agent/WIRE.md` |
-| Daemon, queue, workers | `docs/agent/SERVER.md` |
-| Change/test/verify/commit recipes | `docs/agent/WORKFLOWS.md` |
-| Symptom matrix and recovery | `docs/agent/DEBUG.md` |
+| Fast facts, routes, doc map, exit codes | `docs/agent/index.yaml` |
+| Owning module, entry points, write ownership | `docs/agent/MAP.yaml` |
+| Record events, view, resume | `docs/agent/RECORD.yaml` |
+| Tools, observations, cost | `docs/agent/WIRE.yaml` |
+| Daemon, queue, workers | `docs/agent/SERVER.yaml` |
+| Change/test/verify/commit recipes | `docs/agent/WORKFLOWS.yaml` |
+| Symptom matrix and recovery | `docs/agent/DEBUG.yaml` |
 
 ## Contract
 

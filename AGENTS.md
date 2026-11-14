@@ -2,7 +2,7 @@
 
 Read this file before changing the tree. It is the operating contract for
 agents. `manifest.json` is the machine-readable contract; `docs/agent/` is the
-task-oriented reference. If code and docs disagree, code wins: fix the doc and,
+task-oriented YAML reference. If code and docs disagree, code wins: fix the doc and,
 when the contract is affected, `manifest.json` in the same commit.
 
 ## What this tree is
@@ -27,14 +27,13 @@ as the only source of truth.
 | Need | Read |
 | --- | --- |
 | Rules and protocol | this file |
-| Route by task and fast facts | `docs/agent/README.md` |
-| Machine-readable routes | `docs/agent/index.json` |
-| Find the owning module | `docs/agent/MAP.md` |
-| Inspect, resume, change records | `docs/agent/RECORD.md` |
-| Tools, observations, cost | `docs/agent/WIRE.md` |
-| Daemon, queue, workers | `docs/agent/SERVER.md` |
-| Change/test/verify/commit | `docs/agent/WORKFLOWS.md` |
-| Diagnose a failure | `docs/agent/DEBUG.md` |
+| Route by task, fast facts, machine routes | `docs/agent/index.yaml` |
+| Find the owning module | `docs/agent/MAP.yaml` |
+| Inspect, resume, change records | `docs/agent/RECORD.yaml` |
+| Tools, observations, cost | `docs/agent/WIRE.yaml` |
+| Daemon, queue, workers | `docs/agent/SERVER.yaml` |
+| Change/test/verify/commit | `docs/agent/WORKFLOWS.yaml` |
+| Diagnose a failure | `docs/agent/DEBUG.yaml` |
 
 ## Non-negotiable invariants
 
@@ -50,7 +49,8 @@ as the only source of truth.
 - The control plane never executes a run; workers survive daemon restart.
 - The TUI never owns a run or authoritative state; server code never imports
   `tui/`.
-- One run per tree, enforced by the tree lock; a second `api` attaches.
+- One run per tree, enforced by the tree lock; a second `api` queues a front
+  item and waits for the live run.
 - `exec` argv is literal: no shell, globs, pipes or redirects unless the caller
   passes `sh -c` explicitly.
 - Source modules stay under 200 lines. Split, do not grow.
@@ -66,6 +66,7 @@ python3 run.py view RUN_ID          # compact text form
 python3 run.py view RUN_ID --json   # canonical loop-view/1
 python3 run.py sim1 task            # offline exec-only sim
 python3 run.py sim2 task2           # offline shape-aware sim
+python3 run.py probe                # headless TUI render of a snapshot
 python3 run.py server status        # this tree's control plane
 python3 run.py api "task"           # real model call; costs money and network
 make check                          # compile + line + tui checks
@@ -90,7 +91,7 @@ argv has an element exactly equal to `server` or `api`.
 - `records/` - frozen historical artifacts; never written.
 - `tests/` - stdlib `unittest`; no third-party deps.
 - `scripts/` - agent verification and inventory tools.
-- `docs/agent/` - agent-optimized docs; this file is the rules entry.
+- `docs/agent/` - agent-optimized YAML docs; this file is the rules entry.
 - `.logs/` - generated runtime state; git-ignored and never committed.
 
 ## Change protocol
@@ -105,7 +106,7 @@ argv has an element exactly equal to `server` or `api`.
    `role`. Audited kinds are `module`, `entry`, `test`, `tool`.
 6. Update `manifest.checks[]` if you add a verification command, and
    `manifest.scenarios[]` if you add a scenario.
-7. Update `docs/agent/` and `docs/agent/index.json` when public behavior,
+7. Update `docs/agent/*.yaml` and `docs/agent/index.yaml` when public behavior,
    commands, paths or the contract changes.
 8. Run `make verify` (or `scripts/verify.py --skip-server`) before committing.
 
@@ -148,9 +149,10 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 - `record.jsonl` is a durable log, not a cache. Never rewrite complete lines.
 - `view` must not read the clock, cwd, network or server.
 - `server restart` replaces the control plane only. Do not assume workers die.
-- A second `api` attaches to the in-flight run; it does not enqueue a new task.
+- A second `api` queues a front item and streams that run; it does not attach to
+  the in-flight run. The tree lock makes it wait.
 - `write` replaces a file by default; pass `append: true` to append.
 - `edit` requires exactly one match; fix the caller, not the matcher.
 - Binary observations are a digest only; raw bytes are not saved. Large text
   bytes are saved under the run's `obs/`.
-- See `docs/agent/DEBUG.md` for the full symptom matrix and recovery order.
+- See `docs/agent/DEBUG.yaml` for the full symptom matrix and recovery order.

@@ -102,7 +102,7 @@ def check_tui():
     want(window(6, 4, 0, 2, False) == (6, 4, 0, 2),
          "free-scroll window moved back to the selection")
 
-    from tui.logview import log_block
+    from tui.logview import entry_rows, log_block
     from tui.rows import join_parts, log_parts
 
     class LogScreen:
@@ -116,8 +116,18 @@ def check_tui():
         {"kind": "call", "turn": 1, "name": "exec", "args": "x" * 400,
          "obs": "ok " * 200, "failed": False},
         {"kind": "result", "result": "y" * 400, "finish": "done"}]}
-    for entry in log_data["entries"]:
-        want("\n" not in join_parts(log_parts(entry)), "log row is multiline")
+    want("\n" not in join_parts(log_parts(log_data["entries"][0])),
+         "log call row is multiline")
+    long = {"kind": "result", "finish": "done",
+            "result": ("summary " * 60) + "\n\n" + "LAST-PARAGRAPH"}
+    for width in (24, 80):
+        rows = entry_rows(long, width)
+        want(len(rows) > 1, f"summary did not wrap at {width}")
+        body = " ".join(join_parts(parts) for parts in rows)
+        want("LAST-PARAGRAPH" in body, f"summary lost its tail at {width}")
+        for parts in rows:
+            want(swidth(join_parts(parts)) <= width,
+                 f"summary row {width} overflow {join_parts(parts)!r}")
     for width in (1, 7, 24, 80):
         screen = LogScreen()
         info = log_block(screen, log_data, 0, 12, width, 13)

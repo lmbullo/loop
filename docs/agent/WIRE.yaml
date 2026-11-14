@@ -1,0 +1,119 @@
+schema: loop-agent-doc/1
+id: wire
+title: "Agent wire: tools, observations, cost"
+read_when: [change a tool, change observation bounding, change the stop condition, reason about cost]
+source: [harness/api.py, harness/agent.py, harness/tools.py, harness/observe.py, harness/spawn.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
+verify: ["python3 -m unittest tests.test_agent_context tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
+
+messages:
+  order: |
+    system   api.header()            rebuilt at each fold from current config
+    user     run_start.task
+    for each turn event:
+      assistant  turn.message         content is null; tool_calls carry the calls
+      tool       one per call         keyed by call.id, content is call.observation
+  rules:
+    - reasoning is never re-sent; turn.usage.reasoning_c counts characters of reasoning_content, not tokens
+    - assistant text is not stored in the message and is never re-sent; a terminal reply is kept only as end.result
+    - "empty terminal reply -> finish=no_tool_call; non-empty terminal reply -> finish=done with result=content.strip()"
+    - done ends the run; it is recorded in turn.done and end, not as a tool observation
+    - the whole list is re-sent each turn; only the appended suffix is a cache miss
+    - there is no text channel in the message list
+
+tools:
+  source: harness/api.py TOOLS; run_start.tools records the four names in order
+  exec:
+    signature: "exec(argv: [str], cwd?: str, stdin?: str, timeout_ms?: int)"
+    behavior: spawn argv literally; return exit, duration, stdout, stderr
+    details:
+      - no shell, globs, pipes, redirects or expansion; use ["sh","-c","..."] only when a shell is required
+      - cwd resolves against the sandbox root (LOOP_ROOT) when relative; default cwd is .
+      - default timeout is 120000 ms in production; sims default to 10000 ms
+      - a timeout kills the process group and reports code=TIMEOUT
+      - a spawn failure reports code=127 and TypeName: message on stderr
+      - stdin is encoded UTF-8; the runner starts a new session so the timeout can kill the group
+      - bad or empty argv returns err bad_args exec requires argv:list[str], got <type>
+      - output is always exit=<code> ms=<dur> followed by the bounded payload
+  write:
+    signature: "write(path: str, data: str, append?: bool)"
+    behavior: write UTF-8 at path; replace unless append is exactly true; create parents
+    details:
+      - data must be str; content is accepted as an alias for data and adds note=content taken as data
+      - missing or non-str data returns "err bad_args write requires data:str (content accepted), got <Type>"
+      - missing or empty path returns err bad_args write requires path:str
+      - success is "ok wrote <n>B <path>" plus " replaced=<prior>B" or " appended_to=<prior>B" when the file existed
+      - append is true only when the JSON value is exactly true; any other value replaces
+  edit:
+    signature: "edit(path: str, old: str, new: str)"
+    behavior: replace exactly one byte occurrence; return a 40-byte context window
+    details:
+      - missing or empty path returns err bad_args edit requires path:str
+      - old and new must be str; otherwise "err bad_args edit requires old:str and new:str; <key> incorrect"
+      - exactly one match is required; zero or multiple returns err match=<n> expected=1 and does not change the file
+      - success is "ok -<old bytes> +<new bytes> <path>" and a window from 40 bytes before to 40 bytes after the replacement
+  done:
+    signature: "done(result: str)"
+    behavior: end the run; result goes to turn.done.result and end.result
+    dispatch: not dispatched; agent.run_calls() sets turn.done and breaks the call list; any other tool name falls through to edit and normally fails with err bad_args edit ...
+
+observation:
+  production_input: 'stdout + "\n--stderr--\n" + stderr when stderr is non-empty'
+  cases:
+    - {when: binary sample, output: "kind=binary bytes=<n> sha256=<16 hex> head_hex=<24 bytes>"}
+    - {when: "len(raw) <= LOOP_MAX_INLINE", output: raw UTF-8 text, verbatim}
+    - {when: larger text, output: "kind=text bytes=<n> lines=<n> saved=<run-relative path> then first15: and last5:"}
+    - {when: no output, output: empty string}
+  bounding:
+    - binary means more than 20% of the first 4096 bytes are non-printable (<9, 14..31, or >126)
+    - binary output is not saved; the digest is the only recoverable description
+    - large text is saved at .logs/runs/<run_id>/obs/obs-<k>.txt; k counts dispatched tool observations over the run; done and malformed-argument calls do not consume a name
+    - saved paths in the wire are run-relative (obs/obs-<k>.txt) so a record renders the same from any cwd
+    - first15 and last5 show at most 15 and 5 source lines, each cut to 160 characters; full bytes are in the saved file
+    - read saved files in ranges; do not dump them back into the message list
+    - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set only when a large text file was saved
+
+failures:
+  rule: tool errors are observations, not harness crashes; the model decides whether to retry
+  table:
+    - {trigger: arguments is not valid JSON or not an object, observation: "err malformed_arguments <detail>"}
+    - {trigger: write missing or non-str data, observation: "err bad_args write requires data:str (content accepted), got <Type>"}
+    - {trigger: "write missing or empty path", observation: "err bad_args write requires path:str"}
+    - {trigger: "edit missing or empty path", observation: "err bad_args edit requires path:str"}
+    - {trigger: "edit missing or non-str old or new", observation: "err bad_args edit requires old:str and new:str; <key> incorrect"}
+    - {trigger: edit match count is not 1, observation: "err match=<n> expected=1"}
+    - {trigger: tool body raises, observation: "err harness <TypeName>: <detail>; exec argv, write path+data, edit path+old+new"}
+    - {trigger: file open or write fails, observation: "err <TypeName>: <detail>"}
+  malformed_rule: malformed arguments and harness errors are appended as call observations; the turn continues
+
+cost:
+  rates: manifest.cost_model.pricing_per_1M, re-read when the manifest mtime/size changes
+  formula: (hit * cache_hit + miss * cache_miss + out * completion) / 1e6
+  defaults: {cache_hit: 0.006, cache_miss: 0.30, completion: 1.20}
+  inputs:
+    hit: prompt_cache_hit_tokens
+    miss: prompt_cache_miss_tokens
+    out: completion_tokens
+    reasoning_c: len(reasoning_content); informational, not in the formula
+  accounting:
+    - each turn.usage.cost is rounded to 6 decimals
+    - end sums hit, miss, out, reasoning_c and computes the run cost once
+    - the unchanged prefix is a cache hit; only the appended suffix is a miss; output bills highest
+    - the sim projection uses bytes/4 as tokens
+
+header:
+  function: api.header()
+  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, no text channel, the inline limit, and the four tool signatures
+  refresh: current config at each fold; refreshed again at a soft reload boundary
+
+sims:
+  note: experiments, not the production wire
+  sim1:
+    inline: payload <=1000B inline; else head 600B + tail 400B + saved file
+    saved_name: "<label>-<n>.txt"
+    notes: exec only; no binary detection; output shape "$ code=<code> out=<n>B dur=<ms>ms"
+  sim2:
+    inline: ANSI stripped; empty -> ""; binary -> sha256+head_hex; >2000B -> shape + saved file
+    saved_name: o<n>.txt
+    notes: exec plus structured edit; blank runs collapsed; output shape "$ code=<code> out=<n>B <body>"
+    detail: saves the full payload when it exceeds 2000 bytes and inlines the first 2000 bytes only when the payload has at most 40 newlines; the binary digest has no bytes= or saved file
+  scenarios: see docs/agent/WORKFLOWS.yaml for scenario commands and the fixture contract

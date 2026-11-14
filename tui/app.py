@@ -102,6 +102,7 @@ class App:
                     self.log["sel"] = lv["sel"] if lv["sel"] is not None else 0
                     self.log["scroll"] = lv["scroll"]
                     self.log["vis"] = max(1, lv["vis"])
+                    self.log["rows"] = max(0, lv.get("n") or 0)
                     self.log["follow"] = lv.get("follow", True)
 
     def run(self):

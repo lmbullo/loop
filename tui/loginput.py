@@ -78,9 +78,10 @@ def log_key(app, key):
         app.dirty = True
         return
     n = len((log.get("data") or {}).get("entries") or [])
+    rows = max(n, int(log.get("rows") or n))
     vis = max(1, int(log.get("vis") or 1))
     sel = max(0, min(int(log.get("sel") or 0), max(0, n - 1)))
-    scroll = max(0, int(log.get("scroll") or 0))
+    scroll = max(0, min(int(log.get("scroll") or 0), max(0, rows - vis)))
     follow = bool(log.get("follow", True))
     tail = bool(log.get("tail", False))
     if key in ("up", "hist_prev"):
@@ -99,7 +100,7 @@ def log_key(app, key):
         scroll = max(0, scroll - 1)
         follow, tail = False, False
     elif key in ("scroll_down", "wheel_down", "shift_down"):
-        scroll = min(max(0, n - vis), scroll + 1)
+        scroll = min(max(0, rows - vis), scroll + 1)
         follow, tail = False, False
     elif key in ("tab", "backtab"):
         from .input import open_prompt

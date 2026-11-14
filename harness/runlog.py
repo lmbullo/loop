@@ -21,6 +21,13 @@ def one(value, limit):
     return " ".join(text.split())[:limit]
 
 
+def block(value):
+    """Full prose for the final summary: keep paragraphs, no length cutoff."""
+    text = "" if value is None else str(value)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return "\n".join(line.rstrip() for line in text.split("\n")).strip("\n")
+
+
 def _args(message, call_id):
     for call in (message or {}).get("tool_calls") or []:
         if call.get("id") != call_id:
@@ -57,7 +64,7 @@ def tail(events, state, torn=0):
             end = ev
     if end is not None:
         data = end["data"]
-        return [{"kind": "result", "result": one(data.get("result"), TEXT_LIMIT),
+        return [{"kind": "result", "result": block(data.get("result")),
                  "finish": one(data.get("finish"), 80)}]
     last = events[-1] if events else None
     if last is not None and last["type"] == "interrupted":

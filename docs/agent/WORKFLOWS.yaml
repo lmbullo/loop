@@ -1,0 +1,193 @@
+schema: loop-agent-doc/1
+id: workflows
+title: Change, test and verification workflows
+read_when: [change code, add a test, add a scenario, add a check, add a doc, commit]
+source: [AGENTS.md, manifest.files, manifest.checks, Makefile, .github/workflows/ci.yml]
+verify: [make verify, python3 scripts/check_manifest.py, "python3 scripts/commit_check.py --range HEAD~1..HEAD"]
+
+ladder:
+  rule: run from the tree root; stop at the first failure
+  steps:
+    - {n: 1, cmd: "python3 -m compileall -q harness tui run.py", catches: syntax/import block}
+    - {n: 2, cmd: "python3 run.py check lines", catches: "code source over 200 lines or missing"}
+    - {n: 3, cmd: "python3 run.py check tui", catches: "fit, one-line call rows, wrapped final summary, log window height, free-scroll clamping, prompt reflow, status width"}
+    - {n: 4, cmd: "python3 -m unittest discover -s tests -t .", catches: logic and CLI contracts}
+    - {n: 5, cmd: "python3 scripts/check_manifest.py", catches: unregistered files, bad entries/record/checks/scenarios}
+    - {n: 6, cmd: "python3 scripts/verify.py --skip-server", catches: all offline manifest checks}
+    - {n: 7, cmd: "python3 run.py server status", catches: only when a control plane is expected}
+    - {n: 8, cmd: "git status --short", catches: unintended files}
+
+shortcuts:
+  - {cmd: make check, effect: "compile + line + tui"}
+  - {cmd: make test, effect: "stdlib unittest, verbose"}
+  - {cmd: make lint, effect: "ruff E4/E9/F when installed; skips otherwise"}
+  - {cmd: make verify, effect: "scripts/verify.py --skip-server"}
+  - {cmd: make sim, effect: "sim1 task + sim2 task2"}
+  - {cmd: make clean, effect: "bytecode and tool caches; never .logs"}
+  - {cmd: "python3 scripts/verify.py --list", effect: list selected checks}
+  - {cmd: "python3 scripts/verify.py --only sim1-task", effect: one check}
+  - {cmd: "python3 scripts/verify.py --json", effect: machine summary}
+
+verify_selection:
+  network: scripts/verify.py never selects network true checks
+  skip_server: "--skip-server also skips any check whose argv has an element exactly equal to server or api, including server-start, server-status, server-runs and api-auth-guard"
+  offline_absent: api and resume are deliberately absent from the offline ladder; they need credentials, network and real tokens
+
+test_map:
+  - {test: test_config.py, contract: root/run resolution, env parsing, display paths}
+  - {test: test_record.py, contract: run id format/order, canonical JSON, discovery, resolve errors}
+  - {test: test_recschema.py, contract: envelope strictness, payload fields, declared types}
+  - {test: test_recread.py, contract: parse, torn tail, derived state, scan rows, corruption, live listing state}
+  - {test: test_recwrite.py, contract: append/fsync, per-run and tree locks, seal, reconcile, torn-tail repair}
+  - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
+  - {test: test_pricing.py, contract: manifest rates and the cost formula}
+  - {test: test_observe.py, contract: binary detection, three bounding rules, saved bytes}
+  - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
+  - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
+  - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}
+  - {test: test_queue.py, contract: add/promote/update/finish/drop/move, corrupt reset}
+  - {test: test_regstore.py, contract: atomic registry writes, locking, current-entry precedence}
+  - {test: test_workers.py, contract: worker registry, pid+start liveness, reap, record state}
+  - {test: test_agent_context.py, contract: usage totals, derive, context fold, response parsing, dispatch, finish, terminal text}
+  - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring}
+  - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
+  - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}
+  - {test: test_tui_input.py, contract: arrow selection across running/queued/done, pane handoff, queued-row notice, shift+arrow reorder, delete drop, ctrl+x cancel, text prompt, SS3 arrows}
+  - {test: test_tui_keys.py, contract: "raw parser: SS3 arrows, CSI/shifted arrows, ctrl+x, SGR and X10 wheel"}
+  - {test: test_srv_cancel.py, contract: cancel drops a waiting item, signals the matching live run, resolves promoted item id, id-as-run-id fallback, no change for unknown}
+  - {test: test_tui_cancel.py, contract: ctrl+x on running/queued/done, queue-focus cancel, prompt focus ignored, queue clamp}
+  - {test: test_tui_history.py, contract: flat task selection map, selection window, task-focus selection, done scroll/range header}
+  - {test: test_tui_logs.py, contract: "log projection (calls + full final summary), one-line call rows, height-sized log window"}
+  - {test: test_tui_summary.py, contract: wrapped final summary paragraphs, fitted rows, first-row anchoring, free-scroll to the last row}
+  - {test: test_tui_loginput.py, contract: enter opens/closes the log, selection/free-scroll keys, refresh policy, prompt over the log, return focus}
+  - {test: test_tui_live.py, contract: live tail on open/refresh, navigation pauses, end resumes, wheel pauses, finished logs open at top, unchanged refresh stays clean}
+  - {test: test_tui_frame.py, contract: first paint, silent identical frame, row-only repaint, stale-cell clearing, resize/invalidate, cursor visibility, bottom-right safety}
+  - {test: test_tui_sections.py, contract: running/queued/done order, queued label, newest-first done rows, glyphs, fitted rows, disk fallback}
+  - {test: test_tui_prompt.py, contract: prompt overlay over an open log, task body without a log, log window shrinking above the prompt}
+
+support:
+  module: tests/support.py
+  provides: [sandbox, fixed run ids, event builders, record writers, run_py]
+  sandbox: redirects LOOP_ROOT, LOOP_RUNS, LOOP_REGISTRY, LOOP_AUTH_FILE and clears other LOOP_* keys
+  rule: tests must never write the real .logs/ or use the network
+
+recipes:
+  existing_behavior:
+    - find the path in manifest.files and read its role
+    - read the owning module and the nearest test
+    - make the smallest change that preserves AGENTS.md invariants
+    - add or update a focused test
+    - keep the module under 200 lines; split instead of appending
+    - run the verification ladder
+    - update docs only if public behavior, commands, paths or the contract changed
+  new_module:
+    - create harness/<name>.py (or tui/, scripts/, tests/) under 200 lines
+    - "register manifest.files[] with a kind and a role: module, entry, test, tool, doc, etc."
+    - import it from the owner; do not add a second top-level entry point
+    - add a focused test if it contains logic
+    - run python3 scripts/check_manifest.py and python3 run.py check lines
+  entrypoint:
+    - implement main(argv) in a module
+    - "add an entrypoints[] row: id, module, function, network, args_usage, role and the exit codes/writes/reads that apply"
+    - run.py uses the row for dispatch and usage; do not hardcode a command
+    - tests/test_manifest.py imports every entry point; keep it importable
+    - if offline and deterministic, add it to checks[]
+    - if networked or expensive, set network true and keep it out of the offline ladder
+  test:
+    - create tests/test_<area>.py
+    - use tests.support.sandbox() and fixed ids; never touch the real .logs/
+    - "name the behavior: test_newest_run_wins, not test_resolve_2"
+    - prefer pure functions; use run_py() for CLI coverage
+    - keep it under 200 lines and register it with kind test
+    - run the single test during development, then the full suite
+  scenario:
+    - choose or add a fixture under fixtures/
+    - "write scenarios/<id>.json with id, sim, label, fixture, purpose, expected, steps"
+    - sim is sim1 or sim2; loading under the wrong sim fails
+    - label defaults to id and names .logs/<sim>/<label>/
+    - fixture defaults to ws1; it is copied, never mounted in place
+    - "exec fields: argv required; cwd, stdin, timeout_ms optional (default cwd is the run workspace, timeout 10000 ms)"
+    - "edit is sim2 only: path, old, new; exactly one match is required"
+    - run python3 run.py sim1 <id> or sim2 <id> and inspect .logs/<sim>/<label>/log.json and obs/
+    - register the file in manifest.files[] with kind data
+    - add {id, sim, fixture, steps, purpose, expected} to manifest.scenarios[]; steps must match the JSON length
+    - add a checks[] row when it is a regression guard, with network false
+    - keep scenarios small; they are executable documentation
+  manifest_check:
+    - make the command deterministic, offline and runnable from the tree root
+    - 'add to manifest.checks[]: {"id","argv","expect_exit","network":false,"note"}'
+    - use an exact exit code; verify.py treats a mismatch as failure
+    - prefer commands that fail loudly and print one line of diagnosis
+    - run python3 scripts/verify.py --only <id> and then make verify
+    - if the command needs the daemon, keep server/api in argv so --skip-server can exclude it
+  record_schema:
+    - records are frozen artifacts; recschema validates exactly the fields in manifest.record and rejects unknown fields
+    - prefer a new event type or an explicit version bump plus a reader path
+    - update manifest.record.events and manifest.record.types
+    - update tests/test_recschema.py, tests/test_recread.py, tests/test_recwrite.py, tests/test_view.py and fixtures
+    - keep end the only completion marker and seq contiguous
+    - run the full ladder and python3 run.py view --schema
+  tool_or_observation:
+    - update harness/tools.py, harness/observe.py or harness/spawn.py
+    - update tests/test_tools.py, tests/test_observe.py or tests/test_spawn.py
+    - update manifest.wire shape/threshold text
+    - update docs/agent/WIRE.yaml
+    - exercise python3 run.py sim1 edge and python3 run.py sim2 edge2
+  tui:
+    - keep it a renderer over daemon snapshots; never add queue or run authority
+    - "define every color role in tui/theme.py: grey scale (muted, body, strong) plus muted state hues (accent, ok, warn, err); keep -1 background; no bold or reverse video; use the selection marker and key glyphs"
+    - update tui/rows.py, tui/panes.py, tui/theme.py, tui/input.py, tui/keys.py, tui/nav.py or tui/render.py and the matching tests
+    - task focus carries one flat selection over running, queued and done; queue and done windows scroll to keep it visible; queue focus remains for reorder and drop
+    - "ctrl+x cancels the selected row: queued drops, live signals through the daemon cancel command, finished is refused"
+    - "log view is a projection of record bytes: add entries in harness/runlog.py, draw in tui/logview.py, keep state in tui/loginput.py; tool calls are one fitted line; the final summary keeps paragraphs and wraps; the window is the terminal body or the body above the prompt; wheel/shift scroll moves the viewport; a live log tail-follows until navigation and end resumes it"
+    - draw through tui/frame.py, never directly into the curses window from the paint path; resize and ctrl-l call invalidate
+    - run python3 run.py check tui
+    - server modules must not import tui/
+  docs:
+    - create docs/agent/NAME.yaml with schema, id, title, read_when, source, verify
+    - keep it dense: facts, tables and commands, not prose; prefer manifest references
+    - add the file to the docs list and routes in docs/agent/index.yaml
+    - register it in manifest.files[] with kind doc and a role
+    - cross-link the owning doc; fix stale links in the same commit
+    - run make verify
+
+manifest_registration:
+  - manifest.json is the contract of record; every file in files[] must exist, be relative, have a kind from the allowed set and a non-empty role
+  - every .py under harness/, tui/, tests/ or scripts/ must be registered or scripts/check_manifest.py fails
+  - audited kinds for the 200-line limit are module, entry, test and tool, only .py files; docs, data, fixtures, records, configs and CI are not audited
+  - a new scenario needs both a data file entry and a scenarios[] row
+  - a new check needs argv, an integer expect_exit and a network bool
+  - a new entry point needs a callable module.function and a network bool
+  - no absolute paths in tracked files; use __file__, LOOP_ROOT, LOOP_RUNS or LOOP_REGISTRY
+
+commit:
+  audience: agents
+  subject: "type(scope): imperative summary"
+  body: "why: the invariant or failure this changes; check: the exact command that proves it; agent: the rule a future agent must follow"
+  subject_rules: "feat|fix|refactor|test|docs|chore|perf|build|ci|revert, optional (scope), colon, 3..100 chars"
+  enforced: scripts/commit_check.py enforces the subject and the why and check lines; agent is required by AGENTS.md
+  rules:
+    - one logical change per commit
+    - do not mix a refactor, a feature and a manifest update
+    - never commit .logs/, __pycache__/, credentials, generated blobs or .ruff_cache/
+  after_commit:
+    - python3 scripts/commit_check.py --range HEAD~1..HEAD
+    - git status --short
+
+definition_of_done:
+  - python3 -m compileall -q harness tui run.py exits 0
+  - python3 run.py check lines exits 0 with over=0
+  - python3 run.py check tui exits 0
+  - python3 -m unittest discover -s tests -t . exits 0
+  - python3 scripts/check_manifest.py exits 0
+  - python3 scripts/verify.py --skip-server exits 0
+  - git status --short is clean except intended files
+  - commit subject and body pass scripts/commit_check.py
+  - any changed public behavior is reflected in manifest.json and docs/agent/ in the same commit
+
+ci:
+  file: .github/workflows/ci.yml
+  trigger: [push, pull_request, workflow_dispatch]
+  python: "3.12 on Ubuntu; 15-minute timeout"
+  steps: [compile, line and tui audits, check_manifest, unittest, verify --skip-server, git status --porcelain]
+  rule: keep the tree clean; CI fails on untracked or modified files left by a check

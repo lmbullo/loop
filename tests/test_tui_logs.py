@@ -60,6 +60,13 @@ class RunLogTest(unittest.TestCase):
         self.assertEqual(rows[-1]["result"], "ok")
         self.assertEqual(rows[-1]["finish"], "done")
 
+    def test_final_summary_keeps_full_text_and_paragraphs(self):
+        events = stream(1)
+        text = ("first " * 100).rstrip() + "\n\nLAST LINE"
+        events[-1]["data"]["result"] = text
+        rows = runlog.entries(events)
+        self.assertEqual(rows[-1]["result"], text)
+
     def test_failed_observation_is_flagged(self):
         events = stream(1)
         events[1]["data"]["calls"][0]["observation"] = "err boom"

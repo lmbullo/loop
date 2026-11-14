@@ -6,7 +6,7 @@ UNIT := $(PYTHON) -m unittest discover -s tests -t . -v
 help:
 	@echo "check   compile + 200-line + tui layout audits"
 	@echo "test    stdlib unittest suite"
-	@echo "lint    ruff E4/E7/E9/F when installed"
+	@echo "lint    ruff E4/E9/F when installed"
 	@echo "verify  manifest-driven offline checks"
 	@echo "sim     run both offline sims"
 	@echo "clean   remove bytecode and test caches (never .logs)"
