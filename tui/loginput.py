@@ -1,14 +1,18 @@
 import time
 
+from .rows import task_sel
+
 
 def selected_run(snap, sel):
-    """Map the task-list selection to a run id: row 0 is the current run."""
+    """Map the flat task selection to a run id; queued rows have no log yet."""
     snap = snap or {}
-    current = snap.get("current")
-    if sel <= 0:
+    section, idx = task_sel(snap, sel)
+    if section == "running":
+        current = snap.get("current")
         return current.get("id") if current else None
+    if section == "queue":
+        return None
     done = snap.get("done") or []
-    idx = sel - 1
     return done[idx].get("id") if 0 <= idx < len(done) else None
 
 

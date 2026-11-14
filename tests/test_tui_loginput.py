@@ -17,9 +17,10 @@ class FakeWorker:
 
 
 class FakeApp:
-    def __init__(self, current=None, done=()):
+    def __init__(self, current=None, done=(), queue=()):
         self.current = current
         self.done = list(done)
+        self.queue = list(queue)
         self.prompt = Prompt()
         self.worker = FakeWorker()
         self.focus = "task"
@@ -31,7 +32,7 @@ class FakeApp:
         self.said = []
 
     def snapshot(self):
-        return {"current": self.current, "done": self.done, "queue": []}
+        return {"current": self.current, "done": self.done, "queue": self.queue}
 
     def say(self, text):
         self.said.append(text)
@@ -51,6 +52,13 @@ class LogInputTest(unittest.TestCase):
     def test_enter_on_a_done_row_opens_that_run(self):
         app = FakeApp(done=[{"id": "old"}, {"id": "older"}])
         app.tsel = 2
+        input.handle(app, ("key", "enter"))
+        self.assertEqual(app.log["id"], "older")
+
+    def test_enter_accounts_for_queued_rows_before_done(self):
+        app = FakeApp(done=[{"id": "old"}, {"id": "older"}],
+                      queue=[{"id": "q1"}])
+        app.tsel = 3
         input.handle(app, ("key", "enter"))
         self.assertEqual(app.log["id"], "older")
 

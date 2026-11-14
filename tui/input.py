@@ -1,11 +1,6 @@
 from .loginput import close_log, log_key, open_log
-
-
-def queue_sel(app):
-    queue = app.snapshot()["queue"]
-    if queue:
-        app.qsel = min(app.qsel, len(queue) - 1)
-    return queue
+from .nav import queue_sel, sync_queue_sel, toggle_focus
+from .rows import task_sel
 
 
 def open_prompt(app, text=""):
@@ -20,14 +15,6 @@ def close_prompt(app, clear=True):
     if clear:
         app.prompt.clear()
     app.focus = "task"
-    app.dirty = True
-
-
-def toggle_focus(app):
-    if app.focus == "queue":
-        app.focus = "task"
-    elif queue_sel(app):
-        app.focus = "queue"
     app.dirty = True
 
 
@@ -137,8 +124,12 @@ def task_key(app, key):
     elif key in ("tab", "backtab"):
         open_prompt(app)
     elif key in ("enter", "newline"):
-        if not open_log(app):
+        section, _ = task_sel(app.snapshot(), app.tsel)
+        if section == "queue":
+            app.say("queued task has no log yet")
+        elif not open_log(app):
             open_prompt(app)
+    sync_queue_sel(app)
     app.dirty = True
 
 

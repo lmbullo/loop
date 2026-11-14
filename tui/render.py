@@ -4,6 +4,7 @@ import time
 from .prompt import swidth
 from .logview import log_block
 from .panes import done_block, fit, put, queue_block, rule, task_block
+from .rows import task_sel
 from . import theme
 
 
@@ -25,8 +26,8 @@ def status_line(snap, width, focus):
     elif focus == "task":
         action = "logs" if snap.get("current") or snap.get("done") else "type"
         right = f"\u21b5 {action} \u00b7 ^Q quit"
-        if snap.get("done"):
-            right = "\u2191\u2193 done \u00b7 " + right
+        if snap.get("current") or snap.get("queue") or snap.get("done"):
+            right = "\u2191\u2193 tasks \u00b7 " + right
         if snap.get("queue"):
             right = "\u2192 queue \u00b7 " + right
     elif focus == "queue":
@@ -108,19 +109,24 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
                 "prompt_top": 0}
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
+    nq = len(snap.get("queue") or [])
+    section, idx = task_sel(snap, tsel) if focus == "task" else (None, None)
+    qsel = idx if section == "queue" else (qsel if focus == "queue" else None)
     tv = {"n": 1, "vis": 0}
+    qvis = 0
     dv = {"n": len(snap.get("done") or []), "vis": 0, "sel": None, "scroll": tscroll}
     if body_end > body_start:
         run_h, queue_h = body_spans(snap, body_start, body_end)
         task_end = body_start + run_h
         tv = task_block(scr, snap, body_start, task_end, width, height,
                         focus == "task" and tsel == 0)
-        done_start = queue_block(scr, snap, task_end, task_end + queue_h,
-                                 width, height, focus, qsel)
-        dsel = tsel - 1 if focus == "task" and tsel > 0 else None
-        dv = done_block(scr, snap, done_start, body_end, width, height, dsel, tscroll)
-    n = 1 + dv["n"]
-    tv = {"n": n, "vis": max(1, tv.get("vis", 0) + dv["vis"]),
+        queue_end = queue_block(scr, snap, task_end, task_end + queue_h,
+                                width, height, qsel)
+        qvis = max(0, queue_end - task_end - 1) if nq else 0
+        dsel = idx if section == "done" else None
+        dv = done_block(scr, snap, queue_end, body_end, width, height, dsel, tscroll)
+    n = 1 + nq + dv["n"]
+    tv = {"n": n, "vis": max(1, tv.get("vis", 0) + qvis + dv["vis"]),
           "sel": max(0, min(tsel, n - 1)), "scroll": dv["scroll"]}
     if open_prompt:
         lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)

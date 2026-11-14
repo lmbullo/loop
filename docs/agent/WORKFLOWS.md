@@ -67,8 +67,8 @@ credentials and a network, and they cost real tokens.
 | `test_manifest.py` | contract integrity, entry imports, record/scenario checks, CLI wiring |
 | `test_checks.py` | audited kinds, line-limit failure, TUI contract |
 | `test_tui_layout.py` | fit, `›` selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette and grey prompt roles |
-| `test_tui_input.py` | arrow focus/selection, shift+arrow reorder, delete drop, text opens prompt |
-| `test_tui_history.py` | selection window, task-focus selection across running and done, done scroll/range header, scroll kept when focus leaves |
+| `test_tui_input.py` | arrow selection across running, queued and done, pane selection handoff, queued-row enter notice, shift+arrow reorder, delete drop, text opens prompt |
+| `test_tui_history.py` | flat task selection map, selection window, task-focus selection across running, queued and done, done scroll/range header, scroll kept when focus leaves |
 | `test_tui_logs.py` | log projection (calls + final summary), one-line rows, height-sized log window |
 | `test_tui_loginput.py` | enter opens/closes the log, log selection keys, refresh policy, typing returns to the prompt |
 
@@ -196,10 +196,11 @@ set without a version strategy makes old records corrupt.
    (`-1`); do not add bold or reverse video. Keep state hues for state and use
    the grey roles for hierarchy. Use the `›` marker for selection and the
    `↵`, `↑↓`, `⇧↑↓`, `←→` glyphs in key hints.
-3. Update `tui/rows.py`, `tui/panes.py`, `tui/theme.py`, `tui/input.py`, or
-   `tui/render.py` and the matching tests. Task focus carries one selection over
-   the running row and the done list; the done window scrolls to keep it visible
-   while queue focus remains separate for reorder and drop.
+3. Update `tui/rows.py`, `tui/panes.py`, `tui/theme.py`, `tui/input.py`,
+   `tui/nav.py`, or `tui/render.py` and the matching tests. Task focus carries
+   one flat selection over the running row, queued items and the done list;
+   both the queue and done windows scroll to keep it visible, and queue focus
+   remains available for reorder and drop.
 4. The log view is a projection of record bytes, not daemon state: add entries
    in `harness/runlog.py`, draw them in `tui/logview.py`, and keep open/close,
    refresh and selection in `tui/loginput.py`. Every entry is one fitted line

@@ -17,8 +17,10 @@ class FakeWorker:
 
 
 class FakeApp:
-    def __init__(self, queue):
+    def __init__(self, queue, done=(), current=None):
         self.queue = queue
+        self.done = list(done)
+        self.current = current
         self.prompt = Prompt()
         self.worker = FakeWorker()
         self.focus = "task"
@@ -29,15 +31,16 @@ class FakeApp:
         self.layout = {"height": 10}
         self.quit = False
         self.dirty = False
+        self.said = []
 
     def snapshot(self):
-        return {"queue": self.queue, "current": None}
+        return {"queue": self.queue, "current": self.current, "done": self.done}
 
     def content_width(self):
         return 80
 
     def say(self, text):
-        pass
+        self.said.append(text)
 
 
 def item(item_id, state="queued", text="task"):
@@ -89,6 +92,33 @@ class TaskHistoryTest(unittest.TestCase):
         self.assertEqual(app.tsel, 3)
         input.handle(app, ("key", "page_up"))
         self.assertEqual(app.tsel, 0)
+
+    def test_task_arrows_cross_running_queued_and_done(self):
+        app = FakeApp([item("q1"), item("q2")], done=[{"id": "d1"}],
+                      current={"id": "r1"})
+        app.tview = {"n": 4, "vis": 4, "sel": 0, "scroll": 0}
+        for want, qsel in ((1, 0), (2, 1), (3, 1)):
+            input.handle(app, ("key", "down"))
+            self.assertEqual(app.tsel, want)
+            self.assertEqual(app.qsel, qsel)
+        input.handle(app, ("key", "up"))
+        self.assertEqual((app.tsel, app.qsel), (2, 1))
+
+    def test_toggle_carries_the_queue_selection_between_panes(self):
+        app = FakeApp([item("q1"), item("q2")], done=[{"id": "d1"}])
+        app.tview = {"n": 4, "vis": 4, "sel": 0, "scroll": 0}
+        app.tsel = 2
+        input.handle(app, ("key", "right"))
+        self.assertEqual((app.focus, app.qsel), ("queue", 1))
+        input.handle(app, ("key", "left"))
+        self.assertEqual((app.focus, app.tsel), ("task", 2))
+
+    def test_enter_on_a_queued_row_does_not_open_the_prompt(self):
+        app = FakeApp([item("q1")])
+        app.tsel = 1
+        input.handle(app, ("key", "enter"))
+        self.assertEqual(app.focus, "task")
+        self.assertIn("no log", app.said[0])
 
 
 class QueueArrowTest(unittest.TestCase):

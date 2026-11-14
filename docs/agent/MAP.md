@@ -110,12 +110,13 @@ run.py api TASK
 | `harness/runlog.py` | pure log projection: record events -> one entry per tool call plus the final result/interruption/error/pending tail |
 | `tui/app.py` | curses shell and raw input loop; paints the snapshot or the selected run's log |
 | `tui/client.py` | daemon snapshot/enqueue/drop/move client; derives done history and a run log from record bytes |
-| `tui/{input,keys,prompt}.py` | arrow key dispatch (task focus walks running and done rows, enter opens the selected run's log, queue focus selects/reorders), editing, history, wrapping |
-| `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows with a scrolling done window, muted chrome with a `›` selection marker; row content lives in `tui/rows.py` |
-| `tui/{loginput,logview}.py` | log view state (open/close/refresh/selection) and rendering: one fitted line per call, header with count/range, window sized to the terminal body; no padding |
-| `tui/rows.py` | row content: state glyphs, short run ids, middle-dot metadata separators, selected-row roles, section count headers, log entry rows, the shared selection window helper |
+| `tui/{input,keys,prompt}.py` | arrow key dispatch (task focus walks one flat list: running, queued and done rows; enter opens a run log and notices a queued row; queue focus selects/reorders), editing, history, wrapping |
+| `tui/nav.py` | queue cursor clamping, mirroring the flat task selection into the queue, and carrying the selection across the task/queue pane toggle |
+| `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows; queued and done windows scroll to keep the selection visible, muted chrome with a `›` marker; row content lives in `tui/rows.py` |
+| `tui/{loginput,logview}.py` | log view state (flat selection to run id, open/close/refresh/selection) and rendering: one fitted line per call, header with count/range, window sized to the terminal body; no padding |
+| `tui/rows.py` | row content: state glyphs, short run ids, middle-dot metadata separators, selected-row roles, section count headers, log entry rows, flat task-selection mapping, the shared selection window helper |
 | `tui/theme.py` | one palette: grey chrome roles, muted state hues, grey prompt roles, `init_colors` |
-| `tui/{model,render,worker}.py` | snapshot copy, themed painting of running/queued/done sections or the full-body log view, prompt box edge rules, combined running+done selection, polling and log loads |
+| `tui/{model,render,worker}.py` | snapshot copy, themed painting of running/queued/done sections or the full-body log view, prompt box edge rules, combined running+queued+done selection, polling and log loads |
 
 ### Support surface
 
@@ -165,7 +166,7 @@ run.py api TASK
 | Record event fields or state rules | `manifest.record`, `harness/recschema.py` | `tests/test_recschema.py`, `tests/test_recread.py` |
 | Daemon command or guard | `harness/srvcmd.py`, `harness/srvconn.py` | `tests/test_manifest.py`, `scripts/verify.py --skip-server` |
 | Queue or worker lifecycle | `harness/queue.py`, `harness/srvwork.py`, `harness/worker.py` | `tests/test_queue.py`, `tests/test_workers.py` |
-| TUI layout, keymap or palette roles | `tui/panes.py`, `tui/theme.py`, `tui/input.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py`, `tests/test_tui_history.py` |
+| TUI layout, keymap or palette roles | `tui/panes.py`, `tui/rows.py`, `tui/theme.py`, `tui/input.py`, `tui/nav.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py`, `tests/test_tui_history.py` |
 | TUI log view (tool calls and final summary) | `harness/runlog.py`, `tui/logview.py`, `tui/loginput.py`, `tui/rows.py` | `python3 run.py check tui`, `tests/test_tui_logs.py`, `tests/test_tui_loginput.py` |
 | Offline scenario | `scenarios/` + `manifest.scenarios[]` | `python3 run.py sim1 <id>` |
 | New doc | `docs/agent/` | `manifest.files[]` + `docs/agent/index.json` |

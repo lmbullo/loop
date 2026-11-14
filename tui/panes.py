@@ -122,7 +122,7 @@ def task_block(scr, snap, y, end, width, height, selected):
     return {"n": 1, "vis": vis}
 
 
-def queue_block(scr, snap, y, end, width, height, focus, qsel):
+def queue_block(scr, snap, y, end, width, height, qsel=None):
     """Draw queued tasks; the section disappears when the queue is empty."""
     queue = snap["queue"]
     if not queue or y >= end:
@@ -130,7 +130,7 @@ def queue_block(scr, snap, y, end, width, height, focus, qsel):
     room = max(0, end - y - 1)
     offset = 0
     if room:
-        if focus == "queue":
+        if qsel is not None:
             qsel = max(0, min(qsel, len(queue) - 1))
             offset = max(0, qsel - room + 1)
         else:
@@ -144,7 +144,7 @@ def queue_block(scr, snap, y, end, width, height, focus, qsel):
     idw = min(12, max(7, max(len(str(it.get("id") or "")) for it in queue)))
     for idx in range(offset, min(len(queue), offset + room)):
         item = queue[idx]
-        selected = focus == "queue" and idx == qsel
+        selected = qsel is not None and idx == qsel
         mark = SELECT if selected else BLANK
         parts = [(mark, "strong" if selected else "muted")]
         parts += queue_parts(item, idw, selected)

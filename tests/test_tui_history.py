@@ -54,6 +54,20 @@ class WindowTest(unittest.TestCase):
         self.assertEqual(window(0, 4, 3, 9), (0, 4, None, 0))
 
 
+class TaskSelectionTest(unittest.TestCase):
+    def test_flat_selection_maps_running_queue_then_done(self):
+        from tui.rows import task_count, task_sel
+        snap = {"current": {"id": "r"}, "queue": [{"id": "q1"}, {"id": "q2"}],
+                "done": [{"id": "d1"}, {"id": "d2"}]}
+        self.assertEqual(task_count(snap), 5)
+        self.assertEqual(task_sel(snap, 0), ("running", 0))
+        self.assertEqual(task_sel(snap, 1), ("queue", 0))
+        self.assertEqual(task_sel(snap, 2), ("queue", 1))
+        self.assertEqual(task_sel(snap, 3), ("done", 0))
+        self.assertEqual(task_sel(snap, 99), ("done", 1))
+        self.assertEqual(task_sel({"current": None}, 9), ("running", 0))
+
+
 class TaskHistoryLayoutTest(unittest.TestCase):
     def test_task_focus_marks_a_done_row(self):
         rows, lay = drawn(snap(), tsel=2)
@@ -64,6 +78,32 @@ class TaskHistoryLayoutTest(unittest.TestCase):
         self.assertEqual(lay["task"]["sel"], 2)
         running = next(line for line in body(rows) if "id=run" in line)
         self.assertFalse(running.startswith(SELECT))
+
+    def test_task_focus_marks_a_queued_row(self):
+        rows, lay = drawn(snap(queue=("q1", "q2")), tsel=2)
+        marked = [line for line in body(rows) if line.startswith(SELECT)]
+        self.assertEqual(len(marked), 1)
+        self.assertIn("q2", marked[0])
+        self.assertEqual(lay["task"]["n"], 9)
+        self.assertEqual(lay["task"]["sel"], 2)
+
+    def test_queue_rows_shift_the_done_selection_index(self):
+        rows, lay = drawn(snap(queue=("q1",), done=2), tsel=2)
+        marked = [line for line in body(rows) if line.startswith(SELECT)]
+        self.assertEqual(len(marked), 1)
+        self.assertIn("task 0", marked[0])
+        self.assertEqual(lay["task"]["n"], 4)
+        self.assertEqual(lay["task"]["sel"], 2)
+
+    def test_queue_selection_scrolls_into_view(self):
+        rows, lay = drawn(snap(queue=("q1", "q2", "q3", "q4", "q5", "q6"),
+                               done=0), height=8, tsel=6)
+        marked = [line for line in body(rows) if line.startswith(SELECT)]
+        self.assertEqual(len(marked), 1)
+        self.assertIn("q6", marked[0])
+        self.assertIn("queued: 3\u20136/6", body(rows))
+        self.assertEqual(lay["task"]["n"], 7)
+        self.assertEqual(lay["task"]["sel"], 6)
 
     def test_done_selection_scrolls_into_view(self):
         rows, lay = drawn(snap(), height=8, tsel=6)

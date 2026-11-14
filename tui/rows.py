@@ -53,6 +53,25 @@ def window(n, vis, sel=None, scroll=0):
     return n, vis, sel, scroll
 
 
+def task_count(snap):
+    """One flat list: the running row, then every queued item, then every done run."""
+    snap = snap or {}
+    return 1 + len(snap.get("queue") or []) + len(snap.get("done") or [])
+
+
+def task_sel(snap, sel):
+    """Map a flat task selection to (section, index); the running row is always 0."""
+    snap = snap or {}
+    queue = snap.get("queue") or []
+    n = task_count(snap)
+    sel = max(0, min(int(sel or 0), n - 1))
+    if sel == 0:
+        return "running", 0
+    if sel <= len(queue):
+        return "queue", sel - 1
+    return "done", sel - 1 - len(queue)
+
+
 def field_header(label, total=None, start=0, end=None):
     if total is None or total == 0:
         return label
