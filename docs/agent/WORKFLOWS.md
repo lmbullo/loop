@@ -15,7 +15,7 @@ Run from the tree root. Stop at the first failure.
 | --- | --- | --- |
 | 1 | `python3 -m compileall -q harness tui run.py` | syntax/import block |
 | 2 | `python3 run.py check lines` | code source over 200 lines or missing |
-| 3 | `python3 run.py check tui` | fit, one-line task rows, prompt reflow, status width |
+| 3 | `python3 run.py check tui` | fit, one-line task/log rows, log window height, prompt reflow, status width |
 | 4 | `python3 -m unittest discover -s tests -t .` | logic and CLI contracts |
 | 5 | `python3 scripts/check_manifest.py` | unregistered files, bad entries/record/checks/scenarios |
 | 6 | `python3 scripts/verify.py --skip-server` | all offline manifest checks |
@@ -69,6 +69,8 @@ credentials and a network, and they cost real tokens.
 | `test_tui_layout.py` | fit, `›` selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette and grey prompt roles |
 | `test_tui_input.py` | arrow focus/selection, shift+arrow reorder, delete drop, text opens prompt |
 | `test_tui_history.py` | selection window, task-focus selection across running and done, done scroll/range header, scroll kept when focus leaves |
+| `test_tui_logs.py` | log projection (calls + final summary), one-line rows, height-sized log window |
+| `test_tui_loginput.py` | enter opens/closes the log, log selection keys, refresh policy, typing returns to the prompt |
 
 `tests/support.py` provides `sandbox()`, fixed run ids, event builders, record
 writers and `run_py()`. `sandbox()` redirects `LOOP_ROOT`, `LOOP_RUNS`,
@@ -198,9 +200,13 @@ set without a version strategy makes old records corrupt.
    `tui/render.py` and the matching tests. Task focus carries one selection over
    the running row and the done list; the done window scrolls to keep it visible
    while queue focus remains separate for reorder and drop.
-4. Run `python3 run.py check tui`; it pins fit, one-line rows, the selection
-   window, prompt reflow and exact status width.
-5. Server modules must not import `tui/`.
+4. The log view is a projection of record bytes, not daemon state: add entries
+   in `harness/runlog.py`, draw them in `tui/logview.py`, and keep open/close,
+   refresh and selection in `tui/loginput.py`. Every entry is one fitted line
+   and the visible window is exactly the terminal body height.
+5. Run `python3 run.py check tui`; it pins fit, one-line rows, the log window,
+   the selection window, prompt reflow and exact status width.
+6. Server modules must not import `tui/`.
 
 ### Add or change docs
 

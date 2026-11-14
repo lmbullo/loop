@@ -7,7 +7,7 @@ import termios
 import time
 import tty
 
-from . import input, keys, model, prompt, render, theme, worker
+from . import input, keys, loginput, model, prompt, render, theme, worker
 
 USAGE = "usage: python3 run.py tui\n\ninteractive terminal client for this tree's daemon"
 
@@ -25,6 +25,7 @@ class App:
         self.tscroll = 0
         self.tview = {"n": 1, "vis": 1, "sel": 0, "scroll": 0}
         self.quit = False
+        self.log = None
         self.h, self.w = scr.getmaxyx()
         self.dirty = True
         self.last_version = -1
@@ -64,6 +65,7 @@ class App:
             self.focus = "task"
             self.dirty = True
         now = time.time()
+        loginput.refresh_log(self, now)
         if snap["version"] != self.last_version or self.dirty or now - self.last_draw > 0.5:
             max_rows = max(1, self.h - 2)
             ph = 0
@@ -79,13 +81,19 @@ class App:
             self.last_draw = now
             self.dirty = False
             self.layout = render.draw(self.scr, snap, self.prompt, self.w, self.h,
-                                      self.focus, self.qsel, self.tsel, self.tscroll)
+                                      self.focus, self.qsel, self.tsel, self.tscroll,
+                                      self.log)
             if self.layout:
                 tv = self.layout.get("task")
                 if tv:
                     self.tview = tv
                     self.tsel = tv["sel"]
                     self.tscroll = tv["scroll"]
+                lv = self.layout.get("log")
+                if lv and self.log is not None:
+                    self.log["sel"] = lv["sel"] if lv["sel"] is not None else 0
+                    self.log["scroll"] = lv["scroll"]
+                    self.log["vis"] = max(1, lv["vis"])
 
     def run(self):
         try:

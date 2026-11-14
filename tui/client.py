@@ -2,7 +2,8 @@ import json
 import os
 import socket
 
-from harness import config, regprobe, regstore, srvsnap, srvctl, srvwire, workers
+from harness import (config, regprobe, regstore, runlog, srvsnap, srvctl,
+                     srvwire, workers)
 
 
 def _path(address):
@@ -63,6 +64,11 @@ def snapshot():
         if not reply.get("last") and reply["done"]:
             reply["last"] = reply["done"][0]
     return reply
+
+
+def log(run_id):
+    """Tool calls plus the final summary for one run, from record bytes."""
+    return runlog.load(run_id)
 
 
 def ensure():

@@ -2,6 +2,7 @@ import curses
 import time
 
 from .prompt import swidth
+from .logview import log_block
 from .panes import done_block, fit, put, queue_block, rule, task_block
 from . import theme
 
@@ -22,7 +23,8 @@ def status_line(snap, width, focus):
     if notice and time.time() - (snap.get("notice_at") or 0) < 3.0:
         right = notice
     elif focus == "task":
-        right = "\u21b5 type \u00b7 ^Q quit"
+        action = "logs" if snap.get("current") or snap.get("done") else "type"
+        right = f"\u21b5 {action} \u00b7 ^Q quit"
         if snap.get("done"):
             right = "\u2191\u2193 done \u00b7 " + right
         if snap.get("queue"):
@@ -30,6 +32,8 @@ def status_line(snap, width, focus):
     elif focus == "queue":
         right = ("\u2190 task \u00b7 \u2191\u2193 select \u00b7 "
                  "\u21e7\u2191\u2193 move \u00b7 del drop \u00b7 \u21b5 type")
+    elif focus == "log":
+        right = "esc back \u00b7 \u2191\u2193 calls \u00b7 \u21b5 close"
     else:
         right = "esc cancel \u00b7 \u21b5 submit"
     right = fit(right, max(1, width))
@@ -75,7 +79,8 @@ def body_spans(snap, top, end):
     return running, queue_h
 
 
-def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
+def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
+         log=None):
     if width < 2 or height < 3:
         return None
     scr.erase()
@@ -87,6 +92,20 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
     ptop = max(0, height - ph)
     put(scr, 0, 0, status_line(snap, width, focus), width, height,
         theme.attr(theme.status_role(snap)))
+    if log is not None and focus == "log":
+        info = log_block(scr, log.get("data"), 1, height, width, height,
+                         log.get("sel", 0), log.get("scroll", 0))
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            pass
+        try:
+            scr.noutrefresh()
+            curses.doupdate()
+        except curses.error:
+            pass
+        return {"log": info, "prompt_open": False, "height": height,
+                "prompt_top": 0}
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
     tv = {"n": 1, "vis": 0}

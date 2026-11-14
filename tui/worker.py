@@ -40,6 +40,14 @@ class Worker(threading.Thread):
             return None
         return True
 
+    def log(self, run_id):
+        try:
+            return client.log(run_id)
+        except Exception as e:
+            return {"id": run_id, "state": "error", "terminal": True,
+                    "entries": [{"kind": "error",
+                                 "text": f"{type(e).__name__}: {e}"}]}
+
     def run(self):
         try:
             client.ensure()

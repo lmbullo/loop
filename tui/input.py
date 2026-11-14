@@ -1,3 +1,6 @@
+from .loginput import close_log, log_key, open_log
+
+
 def queue_sel(app):
     queue = app.snapshot()["queue"]
     if queue:
@@ -6,6 +9,7 @@ def queue_sel(app):
 
 
 def open_prompt(app, text=""):
+    close_log(app)
     app.focus = "prompt"
     if text:
         app.prompt.insert(text)
@@ -132,6 +136,9 @@ def task_key(app, key):
         app.tsel = n - 1
     elif key in ("tab", "backtab"):
         open_prompt(app)
+    elif key in ("enter", "newline"):
+        if not open_log(app):
+            open_prompt(app)
     app.dirty = True
 
 
@@ -157,6 +164,8 @@ def handle(app, ev):
     elif value == "esc":
         if app.focus == "prompt":
             close_prompt(app)
+        elif app.focus == "log":
+            close_log(app)
         else:
             app.focus = "task"
             app.dirty = True
@@ -170,5 +179,7 @@ def handle(app, ev):
         queue_key(app, value)
     elif app.focus == "prompt":
         prompt_key(app, value)
+    elif app.focus == "log":
+        log_key(app, value)
     else:
         task_key(app, value)

@@ -53,6 +53,7 @@
     {"task": "inspect a run without executing", "read": ["docs/agent/RECORD.md"], "run": ["python3", "run.py", "view", "RUN_ID"]},
     {"task": "change a tool or observation rule", "read": ["docs/agent/WIRE.md", "docs/agent/WORKFLOWS.md"], "run": ["python3", "run.py", "sim1", "edge"]},
     {"task": "operate or debug the control plane", "read": ["docs/agent/SERVER.md", "docs/agent/DEBUG.md"], "run": ["python3", "run.py", "server", "status"]},
+    {"task": "see a run's tool calls in the tui", "read": ["docs/agent/MAP.md"], "run": ["python3", "run.py", "tui"]},
     {"task": "add a test or scenario", "read": ["docs/agent/WORKFLOWS.md"], "run": ["make", "test"]},
     {"task": "verify before commit", "read": ["docs/agent/WORKFLOWS.md"], "run": ["make", "verify"]},
     {"task": "commit a change", "read": ["AGENTS.md", "docs/agent/WORKFLOWS.md"], "run": ["python3", "scripts/commit_check.py", "--range", "HEAD~1..HEAD"]}

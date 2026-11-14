@@ -94,6 +94,36 @@ def queue_parts(item, idw=7, selected=False):
             ("  " + text, "strong" if selected else "body")]
 
 
+def log_parts(entry):
+    """One fitted line per log entry: a tool call, then the final summary."""
+    entry = entry or {}
+    kind = entry.get("kind")
+    if kind == "call":
+        parts = [("\u25b8 ", "muted"), (f"t{entry.get('turn') or 0} ", "muted"),
+                 (one_line(entry.get("name")) or "?", "strong")]
+        args = one_line(entry.get("args"))
+        if args:
+            parts.append((DASH + args, "body"))
+        obs = one_line(entry.get("obs"))
+        if obs:
+            parts.append((" \u2192 " + obs, "err" if entry.get("failed") else "muted"))
+        return parts
+    if kind == "result":
+        role = theme.state_role("complete")
+        text = one_line(entry.get("result")) or f"finish={one_line(entry.get('finish'))}"
+        return [(glyph("complete") + " ", role), ("result", role), (DASH + text, "body")]
+    if kind == "interrupted":
+        return [(glyph("interrupted") + " ", "warn"), ("interrupted", "warn"),
+                (DASH + (one_line(entry.get("reason")) or "no terminal event"), "body")]
+    if kind == "error":
+        text = one_line(entry.get("text")) or f"finish={one_line(entry.get('finish'))}"
+        return [(glyph("error") + " ", "err"), ("error", "err"), (DASH + text, "body")]
+    if kind == "torn":
+        return [(glyph("interrupted") + " ", "warn"), (one_line(entry.get("text")), "warn")]
+    return [(glyph("queued") + " ", "muted"),
+            (one_line(entry.get("text")) or "pending", "muted")]
+
+
 def done_parts(item):
     state = (item.get("state") or "complete").lower()
     role = theme.state_role(state)

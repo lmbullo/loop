@@ -100,6 +100,38 @@ def check_tui():
     want(window(6, 4, None, 2) == (6, 4, None, 2), "selection window moved without sel")
     want(window(0, 4, 3, 9) == (0, 4, None, 0), "empty window kept a selection")
 
+    from tui.logview import log_block
+    from tui.rows import join_parts, log_parts
+
+    class LogScreen:
+        def __init__(self):
+            self.rows = {}
+
+        def addstr(self, y, x, text, at=0):
+            self.rows[y] = self.rows.get(y, "") + text
+
+    log_data = {"id": "run", "state": "complete", "entries": [
+        {"kind": "call", "turn": 1, "name": "exec", "args": "x" * 400,
+         "obs": "ok " * 200, "failed": False},
+        {"kind": "result", "result": "y" * 400, "finish": "done"}]}
+    for entry in log_data["entries"]:
+        want("\n" not in join_parts(log_parts(entry)), "log row is multiline")
+    for width in (1, 7, 24, 80):
+        screen = LogScreen()
+        info = log_block(screen, log_data, 0, 12, width, 13)
+        want(info["vis"] == 11, f"log window {width}: vis {info['vis']} != 11")
+        for row in screen.rows.values():
+            want(swidth(row) <= width, f"log row {width} overflow {row!r}")
+    entries = [{"kind": "call", "turn": 1, "name": "exec", "args": "a",
+                "obs": "", "failed": False} for _ in range(20)]
+    entries.append({"kind": "result", "result": "ok", "finish": "done"})
+    log_data = {"id": "run", "state": "complete", "entries": entries}
+    short, tall = LogScreen(), LogScreen()
+    log_block(short, log_data, 0, 6, 40, 7)
+    log_block(tall, log_data, 0, 40, 40, 41)
+    want(len(short.rows) == 6, f"short log drew {len(short.rows)} rows")
+    want(len(tall.rows) == 22, f"tall log drew {len(tall.rows)} rows")
+
     for msg in bad:
         print("err tui " + msg, file=sys.stderr)
     return 1 if bad else 0
