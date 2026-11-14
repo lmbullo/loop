@@ -157,32 +157,19 @@ class QueueArrowTest(unittest.TestCase):
         self.assertEqual(app.worker.moves, [])
 
 
-class ShiftArrowParserTest(unittest.TestCase):
-    def test_ctrl_x_parses_as_its_own_key(self):
+class ApplicationCursorTest(unittest.TestCase):
+    def test_ss3_arrows_move_the_task_selection(self):
+        app = FakeApp([])
+        app.tview = {"n": 3, "vis": 3, "sel": 0, "scroll": 0}
         parser = keys.Parser()
-        parser.feed(b"\x18")
-        self.assertEqual(parser.events(), [("key", "ctrl_x")])
-
-    def test_shift_arrows_are_distinct_from_plain_arrows(self):
-        parser = keys.Parser()
-        parser.feed(b"\x1b[1;2A\x1b[1;2B\x1b[A\x1b[B")
-        self.assertEqual(parser.events(), [("key", "shift_up"),
-                                           ("key", "shift_down"),
-                                           ("key", "up"), ("key", "down")])
-
-    def test_wheel_events_are_scroll_up_and_scroll_down(self):
-        parser = keys.Parser()
-        parser.feed(b"\x1b[<64;10;5M\x1b[<65;10;5M")
-        self.assertEqual(parser.events(), [("key", "scroll_up"),
-                                           ("key", "scroll_down")])
-        parser.feed(b"\x1b[M" + bytes([64 + 32, 10 + 32, 5 + 32]))
-        self.assertEqual(parser.events(), [("key", "scroll_up")])
-
-    def test_wheel_modifiers_keep_the_direction(self):
-        parser = keys.Parser()
-        parser.feed(b"\x1b[<68;10;5M\x1b[<69;10;5M")
-        self.assertEqual(parser.events(), [("key", "scroll_up"),
-                                           ("key", "scroll_down")])
+        parser.feed(b"\x1bOB\x1bOB")
+        for event in parser.events():
+            input.handle(app, event)
+        self.assertEqual(app.tsel, 2)
+        parser.feed(b"\x1bOA")
+        for event in parser.events():
+            input.handle(app, event)
+        self.assertEqual(app.tsel, 1)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@ CSI = {
     b"\x1b[1~": "home", b"\x1b[2~": "insert", b"\x1b[3~": "delete",
     b"\x1b[4~": "end", b"\x1b[5~": "page_up", b"\x1b[6~": "page_down",
     b"\x1b[7~": "home", b"\x1b[8~": "end", b"\x1b[Z": "backtab",
+    # Application cursor mode (DECCKM): keypad(True) sends smkx, so xterm and
+    # friends report the arrows as SS3. Accept them as well as CSI arrows.
+    b"\x1bOA": "up", b"\x1bOB": "down", b"\x1bOC": "right", b"\x1bOD": "left",
     b"\x1bOH": "home", b"\x1bOF": "end",
     b"\x1b[1;2A": "shift_up", b"\x1b[1;2B": "shift_down",
     b"\x1b[1;2C": "right", b"\x1b[1;2D": "left",

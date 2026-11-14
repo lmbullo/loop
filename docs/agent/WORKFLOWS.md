@@ -67,7 +67,8 @@ credentials and a network, and they cost real tokens.
 | `test_manifest.py` | contract integrity, entry imports, record/scenario checks, CLI wiring |
 | `test_checks.py` | audited kinds, line-limit failure, TUI contract |
 | `test_tui_layout.py` | fit, `›` selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette and grey prompt roles |
-| `test_tui_input.py` | arrow selection across running, queued and done, pane selection handoff, queued-row enter notice, shift+arrow reorder, delete drop, ctrl+x cancel, text opens prompt, wheel parser |
+| `test_tui_input.py` | arrow selection across running, queued and done, pane selection handoff, queued-row enter notice, shift+arrow reorder, delete drop, ctrl+x cancel, text opens prompt, SS3 arrows move the task selection |
+| `test_tui_keys.py` | raw parser: SS3 application-cursor arrows, CSI/shifted arrows, ctrl+x, SGR and X10 mouse wheel |
 | `test_srv_cancel.py` | cancel drops a waiting item, signals the matching live run, resolves a promoted item id to its run, falls back from id to run_id, reports no change for an unknown task |
 | `test_tui_cancel.py` | ctrl+x on the selected running/queued/done row, queue-focus cancel, prompt focus ignored, queue selection clamp |
 | `test_tui_history.py` | flat task selection map, selection window, task-focus selection across running, queued and done, done scroll/range header, scroll kept when focus leaves |

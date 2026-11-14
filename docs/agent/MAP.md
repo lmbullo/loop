@@ -111,7 +111,7 @@ run.py api TASK
 | `tui/app.py` | curses shell and raw input loop; enables mouse/wheel reporting, draws through one frame buffer per paint, and invalidates on resize or ctrl-l |
 | `tui/client.py` | daemon snapshot/enqueue/drop/move/cancel client; derives done history and a run log from record bytes |
 | `tui/frame.py` | row-diffed frame buffer: replays only rows that changed since the last flush, clears stale cells, keeps cursor visibility, and wraps `doupdate` in synchronized output for tear-free live updates |
-| `tui/{input,keys,prompt}.py` | arrow key dispatch (task focus walks one flat list: running, queued and done rows; enter opens a run log and notices a queued row; ctrl+x cancels the selected task; queue focus selects/reorders/drops), tab/text prompt from any focus, wheel parsing, editing, history, wrapping |
+| `tui/{input,keys,prompt}.py` | arrow key dispatch over both CSI and application-cursor (SS3) sequences (task focus walks one flat list: running, queued and done rows; enter opens a run log and notices a queued row; ctrl+x cancels the selected task; queue focus selects/reorders/drops), tab/text prompt from any focus, wheel parsing, editing, history, wrapping |
 | `tui/nav.py` | queue cursor clamping, mirroring the flat task selection into the queue, and carrying the selection across the task/queue pane toggle |
 | `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows; queued and done windows scroll to keep the selection visible, muted chrome with a `›` marker; row content lives in `tui/rows.py` |
 | `tui/{loginput,logview}.py` | log view state (flat selection to run id, open/close/refresh/selection/free-scroll/live tail) and rendering: one fitted line per call, header with count/range, window sized to the terminal body; a live log follows the newest entry until the user navigates, and `end` resumes it; no padding |
@@ -167,7 +167,7 @@ run.py api TASK
 | Record event fields or state rules | `manifest.record`, `harness/recschema.py` | `tests/test_recschema.py`, `tests/test_recread.py` |
 | Daemon command or guard | `harness/srvcmd.py`, `harness/srvconn.py` | `tests/test_manifest.py`, `scripts/verify.py --skip-server` |
 | Queue or worker lifecycle | `harness/queue.py`, `harness/srvwork.py`, `harness/worker.py` | `tests/test_queue.py`, `tests/test_workers.py` |
-| TUI layout, keymap or palette roles | `tui/panes.py`, `tui/rows.py`, `tui/theme.py`, `tui/input.py`, `tui/keys.py`, `tui/nav.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py`, `tests/test_tui_history.py` |
+| TUI layout, keymap or palette roles | `tui/panes.py`, `tui/rows.py`, `tui/theme.py`, `tui/input.py`, `tui/keys.py`, `tui/nav.py`, `tui/render.py` | `python3 run.py check tui`, `tests/test_tui_layout.py`, `tests/test_tui_input.py`, `tests/test_tui_keys.py`, `tests/test_tui_history.py` |
 | TUI task cancel (drop a queued row, signal a live run) | `harness/srvconn.py`, `tui/{cancel,input,client,worker}.py` | `tests/test_srv_cancel.py`, `tests/test_tui_cancel.py` |
 | TUI log view (tool calls, final summary, scrolling) | `harness/runlog.py`, `tui/logview.py`, `tui/loginput.py`, `tui/rows.py`, `tui/keys.py` | `python3 run.py check tui`, `tests/test_tui_logs.py`, `tests/test_tui_loginput.py` |
 | TUI redraw or live-log tailing | `tui/frame.py`, `tui/app.py`, `tui/render.py`, `tui/loginput.py` | `python3 run.py check tui`, `tests/test_tui_frame.py`, `tests/test_tui_live.py` |
