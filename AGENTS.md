@@ -1,19 +1,40 @@
 # AGENTS.md
 
 Read this file before changing the tree. It is the operating contract for
-agents. `manifest.json` is the machine-readable contract; if the two disagree,
-change both in the same commit.
+agents. `manifest.json` is the machine-readable contract; `docs/agent/` is the
+task-oriented reference. If code and docs disagree, code wins: fix the doc and,
+when the contract is affected, `manifest.json` in the same commit.
 
 ## What this tree is
 
-A research harness for a tool-calling agent loop. The loop is append-only:
-each turn appends one assistant message and one tool message per call. The
-durable output is one JSONL record per run. `view` and `resume` are pure
-functions over those bytes.
+A research harness for a tool-calling agent loop. It compares tool and
+observation designs by token cost and correctness, using an append-only record
+as the only source of truth.
 
-There is no text channel. Assistant text is not recorded and not re-sent.
-Only tool calls and their observations survive. A turn with no tool call ends
-the run with `finish=no_tool_call`.
+- One exec waist: `exec`, `write`, `edit`, `done`.
+- Bounded observations: inline while small, shape summary plus saved bytes
+  when large; binary output is a digest.
+- Cache-aware accounting: the unchanged prefix is a cache hit, only the
+  appended suffix is a miss.
+- Durable runs: one JSONL record per run; `view` is a pure function over the
+  bytes, and `resume` rebuilds state from the same bytes and continues.
+- Detached execution: a per-tree control plane owns the queue and worker
+  registry; a detached worker owns the run; the daemon can restart without
+  interrupting work.
+
+## Read order
+
+| Need | Read |
+| --- | --- |
+| Rules and protocol | this file |
+| Route by task and fast facts | `docs/agent/README.md` |
+| Machine-readable routes | `docs/agent/index.json` |
+| Find the owning module | `docs/agent/MAP.md` |
+| Inspect, resume, change records | `docs/agent/RECORD.md` |
+| Tools, observations, cost | `docs/agent/WIRE.md` |
+| Daemon, queue, workers | `docs/agent/SERVER.md` |
+| Change/test/verify/commit | `docs/agent/WORKFLOWS.md` |
+| Diagnose a failure | `docs/agent/DEBUG.md` |
 
 ## Non-negotiable invariants
 
@@ -56,8 +77,8 @@ python3 scripts/repo_map.py         # file/entrypoint map for agents
 ```
 
 Never run `api` or `resume` in an offline verification. They require
-credentials and a network. Use `scripts/verify.py --skip-server` when the
-control plane is unavailable.
+credentials and a network. `scripts/verify.py --skip-server` skips checks whose
+argv has an element exactly equal to `server` or `api`.
 
 ## Layout
 
@@ -69,21 +90,24 @@ control plane is unavailable.
 - `records/` - frozen historical artifacts; never written.
 - `tests/` - stdlib `unittest`; no third-party deps.
 - `scripts/` - agent verification and inventory tools.
-- `docs/` - design and runbook references.
-- `.logs/` - generated runtime state; git-ignored.
+- `docs/agent/` - agent-optimized docs; this file is the rules entry.
+- `.logs/` - generated runtime state; git-ignored and never committed.
 
 ## Change protocol
 
 1. Find the affected file in `manifest.files[]` and read its `role`.
 2. Make the smallest change that preserves the invariants above.
-3. Keep every module under 200 lines. New behavior goes in a new module if
-   needed, not as an append to a near-limit file.
+3. Keep every source module under 200 lines. New behavior goes in a new module
+   if needed, not as an append to a near-limit file.
 4. Add a focused test under `tests/` for any logic change. Pure functions are
    preferred; tests must not use the network or the real `.logs/`.
 5. Register every new tracked file in `manifest.files[]` with a `kind` and a
    `role`. Audited kinds are `module`, `entry`, `test`, `tool`.
-6. Update `manifest.checks[]` if you add a new verification command.
-7. Run `make verify` (or `scripts/verify.py --skip-server`) before committing.
+6. Update `manifest.checks[]` if you add a verification command, and
+   `manifest.scenarios[]` if you add a scenario.
+7. Update `docs/agent/` and `docs/agent/index.json` when public behavior,
+   commands, paths or the contract changes.
+8. Run `make verify` (or `scripts/verify.py --skip-server`) before committing.
 
 ## Commit protocol
 
@@ -100,16 +124,21 @@ agent: the rule a future agent must follow
 
 One logical change per commit. Do not mix a refactor, a feature and a manifest
 update. `scripts/commit_check.py` enforces the subject and the `why:`/`check:`
-lines. Never commit `.logs/`, `__pycache__/`, credentials, or generated blobs.
+lines; `agent:` is required by this file. Never commit `.logs/`,
+`__pycache__/`, credentials, or generated blobs.
 
 ## Definition of done
 
 - `python3 -m compileall -q harness tui run.py` exits 0.
-- `python3 run.py check lines` and `check tui` exit 0.
+- `python3 run.py check lines` exits 0 with `over=0`.
+- `python3 run.py check tui` exits 0.
 - `python3 -m unittest discover -s tests -t .` exits 0.
 - `python3 scripts/check_manifest.py` exits 0.
+- `python3 scripts/verify.py --skip-server` exits 0.
 - `git status --short` is empty except for intended files.
-- The relevant `manifest.checks[]` command passes offline.
+- The commit subject/body pass `scripts/commit_check.py`.
+- Any changed public behavior is reflected in `manifest.json` and `docs/agent/`
+  in the same commit.
 
 ## Traps
 
@@ -119,5 +148,9 @@ lines. Never commit `.logs/`, `__pycache__/`, credentials, or generated blobs.
 - `record.jsonl` is a durable log, not a cache. Never rewrite complete lines.
 - `view` must not read the clock, cwd, network or server.
 - `server restart` replaces the control plane only. Do not assume workers die.
-- `write` replaces a file by default; pass `append=true` to append.
+- A second `api` attaches to the in-flight run; it does not enqueue a new task.
+- `write` replaces a file by default; pass `append: true` to append.
 - `edit` requires exactly one match; fix the caller, not the matcher.
+- Binary observations are a digest only; raw bytes are not saved. Large text
+  bytes are saved under the run's `obs/`.
+- See `docs/agent/DEBUG.md` for the full symptom matrix and recovery order.

@@ -1,0 +1,153 @@
+{
+  "schema": "loop-agent-docs/1",
+  "version": 1,
+  "entry": "docs/agent/README.md",
+  "contract": "manifest.json",
+  "rule": "code is truth; manifest.json is the machine contract; fix docs and manifest in the same commit",
+  "docs": [
+    {
+      "path": "docs/agent/README.md",
+      "title": "Agent docs router",
+      "read_when": ["new to the tree", "need a safe command", "need the doc map"],
+      "topics": ["routing", "fast facts", "doc conventions"]
+    },
+    {
+      "path": "docs/agent/MAP.md",
+      "title": "Tree map",
+      "read_when": ["find the owning module", "find an entry point", "find who writes state"],
+      "topics": ["entrypoints", "subsystems", "runtime flow", "write ownership", "imports"]
+    },
+    {
+      "path": "docs/agent/RECORD.md",
+      "title": "Record and view",
+      "read_when": ["inspect a run", "change event fields", "resume a run", "debug corruption"],
+      "topics": ["loop-record/1", "events", "state", "fold", "writer", "reconcile", "view", "resume"]
+    },
+    {
+      "path": "docs/agent/WIRE.md",
+      "title": "Agent wire",
+      "read_when": ["change a tool", "change observation bounding", "reason about cost"],
+      "topics": ["tools", "observations", "errors", "cost", "sim wires", "header"]
+    },
+    {
+      "path": "docs/agent/SERVER.md",
+      "title": "Server, queue and workers",
+      "read_when": ["operate the daemon", "queue a task", "diagnose a worker", "change lifecycle"],
+      "topics": ["daemon", "worker", "queue", "locks", "reconcile", "reload", "restart", "socket"]
+    },
+    {
+      "path": "docs/agent/WORKFLOWS.md",
+      "title": "Change, test and verification workflows",
+      "read_when": ["change code", "add a test", "add a scenario", "add a check", "commit"],
+      "topics": ["verification ladder", "test map", "recipes", "manifest registration", "commit protocol"]
+    },
+    {
+      "path": "docs/agent/DEBUG.md",
+      "title": "Debugging and recovery",
+      "read_when": ["a command is blocked", "a run is stuck", "a record is corrupt", "verification fails"],
+      "topics": ["probes", "symptom matrix", "safe commands", "recovery order"]
+    }
+  ],
+  "routes": [
+    {"task": "find the owner of a behavior", "read": ["docs/agent/MAP.md"], "run": ["python3", "scripts/repo_map.py"]},
+    {"task": "inspect a run without executing", "read": ["docs/agent/RECORD.md"], "run": ["python3", "run.py", "view", "RUN_ID"]},
+    {"task": "change a tool or observation rule", "read": ["docs/agent/WIRE.md", "docs/agent/WORKFLOWS.md"], "run": ["python3", "run.py", "sim1", "edge"]},
+    {"task": "operate or debug the control plane", "read": ["docs/agent/SERVER.md", "docs/agent/DEBUG.md"], "run": ["python3", "run.py", "server", "status"]},
+    {"task": "add a test or scenario", "read": ["docs/agent/WORKFLOWS.md"], "run": ["make", "test"]},
+    {"task": "verify before commit", "read": ["docs/agent/WORKFLOWS.md"], "run": ["make", "verify"]},
+    {"task": "commit a change", "read": ["AGENTS.md", "docs/agent/WORKFLOWS.md"], "run": ["python3", "scripts/commit_check.py", "--range", "HEAD~1..HEAD"]}
+  ],
+  "commands": {
+    "offline": [
+      ["python3", "run.py"],
+      ["python3", "run.py", "check", "lines"],
+      ["python3", "run.py", "check", "tui"],
+      ["python3", "run.py", "view", "--list"],
+      ["python3", "run.py", "view", "RUN_ID"],
+      ["python3", "run.py", "sim1", "task"],
+      ["python3", "run.py", "sim2", "task2"],
+      ["python3", "run.py", "server", "status"],
+      ["python3", "run.py", "server", "runs", "--json"],
+      ["make", "check"],
+      ["make", "test"],
+      ["make", "verify"],
+      ["python3", "scripts/check_manifest.py"],
+      ["python3", "scripts/doctor.py"],
+      ["python3", "scripts/repo_map.py"],
+      ["python3", "scripts/verify.py", "--list"]
+    ],
+    "network_and_cost": [
+      ["python3", "run.py", "api", "TASK"],
+      ["python3", "run.py", "resume", "RUN_ID"]
+    ],
+    "never_in_offline_verification": ["api", "resume"],
+    "skip_server_filter": "argv has an element exactly equal to 'server' or 'api'"
+  },
+  "paths": {
+    "entrypoint": "run.py",
+    "source": "harness/",
+    "tui": "tui/",
+    "tests": "tests/",
+    "scripts": "scripts/",
+    "docs": "docs/agent/",
+    "contract": "manifest.json",
+    "sandbox_root": "dirname(run.py), overridable by LOOP_ROOT",
+    "runtime_state": "<repo>/.logs, overridable by LOOP_RUNS",
+    "records": ".logs/runs/<run_id>/record.jsonl",
+    "record_lock": ".logs/runs/<run_id>/record.lock",
+    "observations": ".logs/runs/<run_id>/obs/",
+    "tree_lock": ".logs/run.lock",
+    "queue": ".logs/queue.json",
+    "jobs": ".logs/jobs/<run_id>.json",
+    "workers": ".logs/workers/<run_id>.json",
+    "reload": ".logs/reload.json",
+    "socket": ".logs/server.sock, or $TMPDIR/loop-<sha256(state_dir)[:16]>.sock when >100 bytes",
+    "server_log": ".logs/server.log",
+    "local_registry": ".logs/registry.json",
+    "global_registry": "$LOOP_REGISTRY or $XDG_STATE_HOME/loop/registry.json or ~/.local/state/loop/registry.json",
+    "scenarios": "scenarios/ (read-only input)",
+    "fixtures": "fixtures/ (read-only input; copied per run)",
+    "frozen_records": "records/ (read-only history)"
+  },
+  "exit_codes": {
+    "api": {"0": "finished", "2": "usage error", "3": "no credentials", "4": "api error", "5": "server unavailable"},
+    "server": {"0": "ok", "1": "status down or corrupt record", "2": "usage error", "5": "start failure or guard refusal"},
+    "view": {"0": "rendered", "2": "no such run, corrupt record, or usage error"},
+    "resume": {"0": "finished", "2": "refused or usage error", "3": "no credentials", "4": "api error", "5": "tree/record busy"},
+    "check": {"0": "audit passed", "1": "audit failed", "2": "usage error"},
+    "sim1": {"0": "ran", "2": "usage or unknown scenario"},
+    "sim2": {"0": "ran", "2": "usage or unknown scenario"},
+    "tui": {"0": "quit", "2": "usage error or no tty"}
+  },
+  "record": {
+    "schema": "loop-record/1",
+    "view_schema": "loop-view/1",
+    "id_pattern": "^[0-9]{8}T[0-9]{6}[0-9]{3}Z-[0-9a-f]{8}$",
+    "events": ["run_start", "turn", "resume", "error", "interrupted", "end"],
+    "terminal_marker": "end",
+    "state": {"empty": "no events", "complete": "last event is end", "interrupted": "last event is not end"}
+  },
+  "invariants": [
+    "message list append-only",
+    "record append-only; one fsynced line per event",
+    "end is the only completion marker",
+    "observations verbatim except the bounding rule",
+    "output metered, never gated",
+    "fixtures and records are read-only",
+    "no absolute paths in tracked files",
+    "run.py is the only entry point",
+    "one run per tree via .logs/run.lock",
+    "the daemon never executes a run; workers survive daemon restart",
+    "server code never imports tui/"
+  ],
+  "traps": [
+    "a second api attaches to the in-flight run; it does not enqueue",
+    "server restart is not a run restart; use resume",
+    "binary observations are digest-only; raw bytes are not saved",
+    "run_start.max_inline is recorded metadata; the fold uses the current header",
+    "LOOP_RUNS selects the daemon state dir; keep it stable per tree",
+    "do not delete .logs while a worker is live",
+    "do not rewrite complete record lines",
+    "docs are not size-audited, but every doc must be registered in manifest.files"
+  ]
+}
