@@ -34,10 +34,13 @@ def summary(run_id):
 
 
 def recent_done(rows, skip=None):
-    """Terminal runs newest first; the current run is not listed as done."""
+    """Terminal runs newest first; skip is one run id or an iterable of them."""
+    if isinstance(skip, str):
+        skip = (skip,)
+    skip = set(skip or ())
     out = []
     for row in reversed(rows):
-        if skip and row["run_id"] == skip:
+        if row["run_id"] in skip:
             continue
         out.append({"id": row["run_id"], "task": row.get("task"),
                     "state": row["state"], "turns": row.get("turns") or 0,
@@ -46,6 +49,14 @@ def recent_done(rows, skip=None):
         if len(out) >= DONE_LIMIT:
             break
     return out
+
+
+def local_done(skip=None):
+    """Done rows from record bytes; usable when the daemon is down or old."""
+    try:
+        return recent_done(recread.scan(), skip=skip)
+    except (OSError, ValueError):
+        return []
 
 
 def snapshot(snap, live, reconciled):

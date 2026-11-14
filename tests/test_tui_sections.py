@@ -123,6 +123,60 @@ class DoneSnapshotTest(unittest.TestCase):
             out = srvsnap.recent_done(rows)
         self.assertEqual([row["id"] for row in out], ["4", "3", "2"])
 
+    def test_recent_done_skips_many_live_runs(self):
+        from harness import srvsnap
+        rows = [{"run_id": "a", "task": "A", "state": "complete", "turns": 1},
+                {"run_id": "b", "task": "B", "state": "complete", "turns": 1},
+                {"run_id": "c", "task": "C", "state": "complete", "turns": 1}]
+        out = srvsnap.recent_done(rows, skip={"a", "b"})
+        self.assertEqual([row["id"] for row in out], ["c"])
+
+
+class ClientDoneFallbackTest(unittest.TestCase):
+    def test_down_snapshot_keeps_done_history(self):
+        from tui import client
+        done = [{"id": "r1", "state": "complete", "turns": 1, "cost": 0.1,
+                 "text": "finished"}]
+        with mock.patch.object(client.workers, "live_entries", return_value=[]), \
+             mock.patch.object(client.srvsnap, "local_done",
+                               return_value=done) as local:
+            snap = client.down()
+        local.assert_called_once_with(skip=[])
+        self.assertEqual(snap["done"], done)
+        self.assertEqual(snap["last"], done[0])
+
+    def test_down_snapshot_skips_a_live_worker_run(self):
+        from tui import client
+        with mock.patch.object(client.workers, "live_entries",
+                               return_value=[{"run_id": "live"}]), \
+             mock.patch.object(client.srvsnap, "local_done",
+                               return_value=[]) as local:
+            client.down()
+        local.assert_called_once_with(skip=["live"])
+
+    def test_snapshot_fills_done_for_an_old_daemon(self):
+        from tui import client
+        done = [{"id": "r1", "state": "complete", "turns": 1, "cost": 0.1}]
+        reply = {"k": "snapshot", "current": {"run_id": "live"}, "last": None}
+        with mock.patch.object(client, "_running", return_value={"pid": 1}), \
+             mock.patch.object(client, "_call", return_value=reply), \
+             mock.patch.object(client.srvsnap, "local_done",
+                               return_value=done) as local:
+            snap = client.snapshot()
+        local.assert_called_once_with(skip="live")
+        self.assertEqual(snap["done"], done)
+        self.assertEqual(snap["last"], done[0])
+
+    def test_snapshot_keeps_daemon_done_when_present(self):
+        from tui import client
+        reply = {"k": "snapshot", "done": [{"id": "r1"}]}
+        with mock.patch.object(client, "_running", return_value={"pid": 1}), \
+             mock.patch.object(client, "_call", return_value=reply), \
+             mock.patch.object(client.srvsnap, "local_done") as local:
+            snap = client.snapshot()
+        local.assert_not_called()
+        self.assertEqual(snap["done"], [{"id": "r1"}])
+
 
 if __name__ == "__main__":
     unittest.main()

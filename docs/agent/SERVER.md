@@ -213,7 +213,11 @@ The client reconnects after a daemon restart and resumes from the last seen
 
 `snapshot` returns `daemon`, `current`, `last`, `done`, `queue` and `costs`.
 `done` is a bounded newest-first list of terminal runs (the current run is
-excluded); the TUI renders it below the queue.
+excluded); the TUI renders it below the queue. When the daemon is down, or an
+older daemon omits `done`, the TUI calls `srvsnap.local_done()` to derive the
+same list from record bytes, skipping any run still held by a live worker.
+Done history therefore survives worker exit and does not require restarting
+the control plane.
 
 ## Environment handed to a worker
 

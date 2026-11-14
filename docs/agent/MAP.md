@@ -108,7 +108,7 @@ run.py api TASK
 | `harness/assets.py` | scenario load/defaults and fresh fixture mount |
 | `harness/checks.py` | `check lines` (200-line audit), `check tui` layout contract |
 | `tui/app.py` | curses shell and raw input loop |
-| `tui/client.py` | daemon snapshot/enqueue/drop/move client |
+| `tui/client.py` | daemon snapshot/enqueue/drop/move client; derives done history from record bytes when the daemon is down or old |
 | `tui/{input,keys,prompt}.py` | arrow key dispatch, editing, history, wrapping |
 | `tui/panes.py` | fitting/clipping, horizontal rules, one-line running/queued/done rows, muted chrome with a `›` selection marker; row content lives in `tui/rows.py` |
 | `tui/rows.py` | row content: state glyphs, short run ids, middle-dot metadata separators, selected-row roles, section count headers |

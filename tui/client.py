@@ -2,7 +2,7 @@ import json
 import os
 import socket
 
-from harness import config, regprobe, regstore, srvctl, srvwire
+from harness import config, regprobe, regstore, srvsnap, srvctl, srvwire, workers
 
 
 def _path(address):
@@ -36,8 +36,11 @@ def _running():
 
 
 def down(detail="no daemon"):
+    live = [w.get("run_id") for w in workers.live_entries() if w.get("run_id")]
+    done = srvsnap.local_done(skip=live)
     return {"daemon": {"state": "down", "detail": detail, "pid": 0},
-            "current": None, "last": None, "done": [], "queue": [], "costs": {}, "version": 0}
+            "current": None, "last": done[0] if done else None, "done": done,
+            "queue": [], "costs": {}, "version": 0}
 
 
 def snapshot():
@@ -53,6 +56,12 @@ def snapshot():
     reply.setdefault("daemon", {})
     reply["daemon"].update({"state": "running", "detail": "ok",
                             "pid": reply.get("pid") or entry.get("pid")})
+    if reply.get("done") is None:
+        current = reply.get("current") or {}
+        skip = current.get("id") or current.get("run_id")
+        reply["done"] = srvsnap.local_done(skip=skip)
+        if not reply.get("last") and reply["done"]:
+            reply["last"] = reply["done"][0]
     return reply
 
 
