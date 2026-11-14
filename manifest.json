@@ -6,6 +6,7 @@
   {"argv":["python3","run.py","check","lines"],"expect_exit":0,"id":"line-limit","network":false,"note":"fails when any module/entry/test/tool source in files[] exceeds 200 lines"},
   {"argv":["python3","run.py","check","tui"],"expect_exit":0,"id":"tui-layout","network":false,"note":"truncation fits its cells; the task row carries state/id/turns/cost and stays one line; rows use state glyphs and middle-dot separators; tool calls are one fitted line each, the final summary wraps across fitted rows and keeps its last paragraph, and the log window tracks the body height; free-scroll keeps its offset when the selected call is off screen; prompt reflows and does not start rows with a gap; status width is exact; the selection window follows the selected row"},
   {"argv":["python3","-m","compileall","-q","harness","run.py"],"expect_exit":0,"id":"compile","network":false},
+  {"argv":["sh","-n","install.sh"],"expect_exit":0,"id":"install-syntax","network":false,"note":"POSIX shell syntax for the user/global installer"},
   {"argv":["python3","scripts/check_manifest.py"],"expect_exit":0,"id":"manifest-contract","network":false,"note":"registered files, importable entries, record types, checks and scenarios"},
   {"argv":["python3","-m","unittest","discover","-s","tests","-t","."],"expect_exit":0,"id":"unit-tests","network":false,"note":"stdlib suite; no network and no real .logs"},
   {"argv":["python3","run.py","view","--schema"],"expect_exit":0,"id":"view-schema","network":false},
@@ -171,7 +172,9 @@
   {"kind":"test","path":"tests/test_tui_live.py","role":"live log tail: opens on the newest entry, refresh follows appended calls, navigation pauses the tail, end resumes it, wheel pauses it, finished logs open at the top, unchanged refresh does not dirty the frame"},
   {"kind":"module","path":"tui/probe.py","entrypoint":"probe","role":"headless renderer: takes a daemon snapshot json and prints exactly the lines the curses client would draw, so tui behavior is asserted by text compare instead of a pty+pyte harness"},
   {"kind":"module","path":"harness/fold.py","role":"pure fold over record events: totals, derived run state, pending verify command, and the message list rebuilt from turns; the only place that turns events into a request"},
-  {"kind":"module","path":"harness/verifier.py","role":"runs the task's verify command through sh -c at the run root and returns the actual exit code (127 for spawn failure) plus one line of evidence"}
+  {"kind":"module","path":"harness/verifier.py","role":"runs the task's verify command through sh -c at the run root and returns the actual exit code (127 for spawn failure) plus one line of evidence"},
+  {"kind":"tool","path":"install.sh","role":"POSIX shell installer: writes a loop launcher into $HOME/.local/bin by default, --system for /usr/local, --prefix/--bindir, --uninstall, --force and --dry-run; no network, no third-party deps"},
+  {"kind":"test","path":"tests/test_install.py","role":"installer contract: help, dry run, user default, prefix with spaces, idempotent install, uninstall, foreign-file refusal and checkout guard"}
 ],
 "fixture_entrypoints": [
   {"baseline_behavior":"IndexError on the trailing blank line of data/app.log; nonzero exit","cwd":"fixtures/ws1","fixed_behavior":"prints '<code> <count>' sorted by count desc: E42 3, E07 3; exit 0","invoke":["python3","src/analyze.py","data/app.log"],"path":"fixtures/ws1/src/analyze.py","role":"buggy baseline the task scenarios repair"},

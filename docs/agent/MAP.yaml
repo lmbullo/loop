@@ -112,6 +112,7 @@ modules:
     - {path: tui/theme.py, owns: "grey scale plus muted state hues; init_colors"}
     - {path: tui/worker.py, owns: "snapshot polling, queue requests, selected log load"}
   support:
+    - {path: install.sh, owns: "write a loop launcher to $HOME/.local/bin or /usr/local/bin; prefix/bindir, uninstall, force, dry-run"}
     - {path: scripts/verify.py, owns: "run manifest.checks[] offline; --skip-server, --only, --json, --list"}
     - {path: scripts/check_manifest.py, owns: "registered files, importable entries, record/check/scenario integrity"}
     - {path: scripts/repo_map.py, owns: "generated manifest map with line counts"}

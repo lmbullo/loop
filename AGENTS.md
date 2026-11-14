@@ -68,6 +68,8 @@ as the only source of truth.
 ## Commands
 
 ```sh
+sh install.sh                       # install loop on PATH for this user (~/.local/bin)
+sh install.sh --system              # system-wide (/usr/local/bin); run with sudo if needed
 python3 run.py --json               # agent index, loop-index/1
 python3 run.py                      # usage and the manifest entry point list
 python3 run.py check lines          # 200-line source audit
@@ -96,6 +98,7 @@ argv has an element exactly equal to `server` or `api`.
 ## Layout
 
 - `run.py` - dispatcher and `--json` index; reads `manifest.json`.
+- `install.sh` - user/global launcher installer; `--prefix`, `--bindir`, `--system`, `--uninstall`, `--force`, `--dry-run`.
 - `harness/` - loop, record, control plane, sims, offline checks.
 - `tui/` - thin polling renderer over daemon snapshots.
 - `scenarios/` - offline sim transcripts.

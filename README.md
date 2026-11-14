@@ -37,6 +37,7 @@ Offline, deterministic, no credentials:
 
 | argv | effect |
 | --- | --- |
+| `sh install.sh` / `sudo sh install.sh --system` | install `loop` on PATH for the current user (`~/.local/bin`) or all users (`/usr/local/bin`) |
 | `python3 run.py --json` / `make index` | agent index (`loop-index/1`) |
 | `python3 run.py` | usage and manifest entry points (exit 2) |
 | `python3 run.py check lines` | 200-line source audit |
@@ -82,7 +83,7 @@ element exactly equal to `server` or `api`.
 
 ## Layout
 
-`run.py` dispatcher; `harness/` loop and control plane; `tui/` thin renderer;
+`run.py` dispatcher; `install.sh` user/global launcher installer; `harness/` loop and control plane; `tui/` thin renderer;
 `scenarios/` transcripts; `fixtures/` sandboxes; `records/` frozen artifacts;
 `tests/`, `scripts/`, `docs/agent/`. Runtime state is generated under `.logs/`
 and git-ignored.

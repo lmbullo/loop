@@ -19,6 +19,7 @@ ladder:
     - {n: 8, cmd: "git status --short", catches: unintended files}
 
 shortcuts:
+  - {cmd: "sh install.sh", effect: "install loop for the current user (~/.local/bin); --system for /usr/local/bin; --uninstall removes it"}
   - {cmd: "python3 run.py --json", effect: "one-call agent index (loop-index/1)"}
   - {cmd: make index, effect: "alias for python3 run.py --json"}
   - {cmd: make check, effect: "compile + line + tui"}
@@ -53,6 +54,7 @@ test_map:
   - {test: test_workers.py, contract: worker registry, pid+start liveness, reap, record state}
   - {test: test_agent_context.py, contract: usage totals, derive, context fold, response parsing, dispatch, finish, terminal text}
   - {test: test_verify.py, contract: pending verify fold, sh -c exit/evidence/root, declaration and settle order, resume command, --verify argv, view lines}
+  - {test: test_install.py, contract: "installer help, dry run, user default, prefix with spaces, idempotent install, uninstall, foreign-file refusal, checkout guard"}
   - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring}
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
   - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}

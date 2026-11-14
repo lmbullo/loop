@@ -20,6 +20,7 @@ facts:
   inline_limit: "LOOP_MAX_INLINE, default 32768 bytes"
   binary_obs: binary is a digest; raw bytes are not saved
   schemas: {record: loop-record/1, view: loop-view/1}
+  install: "sh install.sh -> $HOME/.local/bin/loop; --system -> /usr/local/bin/loop; --uninstall removes the launcher"
 
 docs:
   - {path: docs/agent/MAP.yaml, title: Tree map, read_when: [find the owning module, find an entry point, find who writes state], topics: [entrypoints, execution model, subsystems, write ownership, imports]}
@@ -43,11 +44,14 @@ routes:
   - {task: change tui redraw or live-log tailing, read: [docs/agent/MAP.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, check, tui]}
   - {task: cancel the selected task in the tui, read: [docs/agent/MAP.yaml, docs/agent/SERVER.yaml], run: [python3, run.py, tui]}
   - {task: add a test or scenario, read: [docs/agent/WORKFLOWS.yaml], run: [make, test]}
+  - {task: install the loop command for users, read: [README.md, AGENTS.md], run: [sh, install.sh]}
   - {task: verify before commit, read: [docs/agent/WORKFLOWS.yaml], run: [make, verify]}
   - {task: commit a change, read: [AGENTS.md, docs/agent/WORKFLOWS.yaml], run: [python3, scripts/commit_check.py, --range, HEAD~1..HEAD]}
 
 commands:
   offline:
+    - [sh, install.sh, --help]
+    - [sh, install.sh, --dry-run]
     - [python3, run.py]
     - [python3, run.py, --json]
     - [make, index]
@@ -76,6 +80,9 @@ commands:
 
 paths:
   entrypoint: run.py
+  installer: install.sh
+  user_command: "$HOME/.local/bin/loop"
+  system_command: /usr/local/bin/loop
   source: harness/
   tui: tui/
   tests: tests/
@@ -106,6 +113,7 @@ exit_codes:
   view: {0: rendered, 2: no such run, corrupt record, or usage error}
   resume: {0: finished, 2: refused or usage error, 3: no credentials, 4: api error, 5: tree/record busy or live worker}
   check: {0: audit passed, 1: audit failed, 2: usage error}
+  install.sh: {0: "installed, removed or already absent", 2: "usage error, foreign file, missing checkout or unwritable bindir"}
   sim1: {0: ran, 2: usage or unknown scenario}
   sim2: {0: ran, 2: usage or unknown scenario}
   tui: {0: quit, 2: usage error or no tty}
