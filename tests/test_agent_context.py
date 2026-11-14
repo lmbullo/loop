@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 from harness import agent, recwrite
 from tests.support import END, RUN_ID, RUN_START, TURN, event, sandbox
@@ -38,6 +39,7 @@ class AgentContextTest(unittest.TestCase):
         self.assertEqual(got["turn"], 3)
         self.assertEqual(got["obs_n"], 2)
         self.assertEqual(got["done"], done)
+        self.assertEqual(got["max_inline"], RUN_START["max_inline"])
 
     def test_context_fold(self):
         events = [event(RUN_ID, 1, "run_start", dict(RUN_START)),
@@ -48,6 +50,14 @@ class AgentContextTest(unittest.TestCase):
         self.assertEqual(msgs[2]["role"], "assistant")
         self.assertEqual(msgs[3], {"role": "tool", "tool_call_id": "c1", "content": "ok"})
         self.assertEqual(len(msgs), 4)
+
+    def test_context_pins_run_inline_limit(self):
+        start = dict(RUN_START, max_inline=1234)
+        events = [event(RUN_ID, 1, "run_start", start), turn_with_call(2)]
+        with unittest.mock.patch.dict(os.environ, {"LOOP_MAX_INLINE": "999"}):
+            msgs = agent.context(events, start["task"])
+        self.assertIn("1234 bytes", msgs[0]["content"])
+        self.assertNotIn("999 bytes", msgs[0]["content"])
 
     def test_read_turn(self):
         response = {
@@ -73,6 +83,15 @@ class AgentContextTest(unittest.TestCase):
             self.assertIn("malformed_arguments", calls[0]["observation"])
             self.assertEqual(done, {"id": "done", "result": "r"})
             self.assertEqual(obs_n, 0)
+
+    def test_run_calls_use_run_inline_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            message = {"tool_calls": [{
+                "id": "c1", "function": {"name": "exec", "arguments": json.dumps(
+                    {"argv": [sys.executable, "-c", "print('x' * 200)"]})}}]}
+            calls, _, _ = agent.run_calls(message, tmp, tmp, 0, max_inline=100)
+            self.assertIn("kind=text", calls[0]["observation"])
+            self.assertTrue(calls[0]["saved"])
 
     def test_run_calls_exec(self):
         with tempfile.TemporaryDirectory() as tmp:

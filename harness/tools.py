@@ -3,14 +3,15 @@ import os
 from . import config, observe, spawn
 
 
-def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None):
+def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None):
     argv = a.get("argv")
     if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
         return f"err bad_args exec requires argv:list[str], got {type(argv).__name__}"
     cwd = config.resolve(a.get("cwd") or ".", sandbox or config.root())
     code, out, err, dur = spawn.spawn(argv, cwd, a.get("stdin", ""), a.get("timeout_ms", 120000), kill_group=True)
     raw = out + (b"\n--stderr--\n" + err if err else b"")
-    return f"exit={code} ms={dur}\n" + observe.render_api(raw, obs_dir, name, saved=saved, rel_base=rel_base)
+    return f"exit={code} ms={dur}\n" + observe.render_api(raw, obs_dir, name, max_inline=max_inline,
+                                                          saved=saved, rel_base=rel_base)
 
 
 def do_write(a, sandbox=None):
@@ -58,9 +59,9 @@ def do_edit(a, sandbox=None):
     return f"ok -{len(old)} +{len(new)} {a['path']}\n" + s2[lo:hi].decode("utf-8", "replace")
 
 
-def dispatch(fn, a, obs_dir, name, sandbox=None, rel_base=None, saved=None):
+def dispatch(fn, a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None):
     if fn == "exec":
-        return do_exec(a, obs_dir, name, sandbox, rel_base, saved)
+        return do_exec(a, obs_dir, name, sandbox, rel_base, saved, max_inline)
     if fn == "write":
         return do_write(a, sandbox)
     if fn == "edit":

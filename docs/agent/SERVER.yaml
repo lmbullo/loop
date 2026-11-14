@@ -109,7 +109,7 @@ reconcile:
   never: delete records or infer end
 
 reload_restart:
-  reload: "increments reload.json.generation; at the top of each turn reload.maybe() re-imports harness.config, harness.api, harness.observe, harness.tools and harness.pricing; the header is regenerated at the next fold; no process restart and no interruption of the in-flight turn"
+  reload: "increments reload.json.generation; at the top of each turn reload.maybe() re-imports harness.config, harness.api, harness.observe, harness.tools and harness.pricing; the header is regenerated at the next fold from run_start.max_inline, so the prompt prefix stays stable; no process restart and no interruption of the in-flight turn"
   restart: "shuts down the daemon with the shutdown command and starts a new one; workers survive; the new daemon reads worker entries and reports the live run; clients reconnect with attach and from_seq"
   stop: "stops the daemon; without --force it refuses while a worker is live; restart --force only detaches the control plane, it does not kill the worker"
 

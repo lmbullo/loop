@@ -34,7 +34,7 @@ shortcuts:
 
 verify_selection:
   network: scripts/verify.py never selects network true checks
-  skip_server: "--skip-server also skips any check whose argv has an element exactly equal to server or api, including server-start, server-status, server-runs and api-auth-guard"
+  skip_server: "--skip-server skips any check whose argv contains a token exactly equal to server or api, including tokens inside sh -c strings; this covers server-start, server-status, server-runs and api-auth-guard"
   offline_absent: api and resume are deliberately absent from the offline ladder; they need credentials, network and real tokens
 
 test_map:
@@ -45,17 +45,17 @@ test_map:
   - {test: test_recwrite.py, contract: append/fsync, per-run and tree locks, seal, reconcile, torn-tail repair}
   - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
-  - {test: test_observe.py, contract: binary detection, three bounding rules, saved bytes}
+  - {test: test_observe.py, contract: binary detection, three bounding rules, saved bytes, deduplicated head/tail}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
   - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}
   - {test: test_queue.py, contract: add/promote/update/finish/drop/move, corrupt reset}
   - {test: test_regstore.py, contract: atomic registry writes, locking, current-entry precedence}
   - {test: test_workers.py, contract: worker registry, pid+start liveness, reap, record state}
-  - {test: test_agent_context.py, contract: usage totals, derive, context fold, response parsing, dispatch, finish, terminal text}
+  - {test: test_agent_context.py, contract: usage totals, derive, run-scoped prompt prefix, context fold, response parsing, dispatch, finish, terminal text}
   - {test: test_verify.py, contract: pending verify fold, sh -c exit/evidence/root, declaration and settle order, resume command, --verify argv, view lines}
   - {test: test_install.py, contract: "installer help, dry run, user default, prefix with spaces, idempotent install, uninstall, foreign-file refusal, checkout guard"}
-  - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring}
+  - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring, --skip-server token filtering}
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
   - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}
   - {test: test_tui_input.py, contract: arrow selection across running/queued/done, pane handoff, queued-row notice, shift+arrow reorder, delete drop, ctrl+x cancel, text prompt, SS3 arrows}

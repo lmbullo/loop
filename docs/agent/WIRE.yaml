@@ -7,7 +7,7 @@ verify: ["python3 -m unittest tests.test_agent_context tests.test_verify tests.t
 
 messages:
   order: |
-    system   api.header()            rebuilt at each fold from current config
+    system   api.header(run max_inline)  rebuilt at each fold from run_start
     user     run_start.task
     for each turn event:
       assistant  turn.message         content is null; tool_calls carry the calls
@@ -18,6 +18,7 @@ messages:
     - "empty terminal reply -> finish=no_tool_call; non-empty terminal reply -> finish=done with result=content.strip()"
     - done ends the run; it is recorded in turn.done and end, not as a tool observation
     - the whole list is re-sent each turn; only the appended suffix is a cache miss
+    - run_start.max_inline pins the header and the observation bound for the whole run, so resume and soft reload keep a byte-identical prefix when LOOP_MAX_INLINE changes
     - there is no text channel in the message list
 
 tools:
@@ -72,15 +73,15 @@ observation:
   production_input: 'stdout + "\n--stderr--\n" + stderr when stderr is non-empty'
   cases:
     - {when: binary sample, output: "kind=binary bytes=<n> sha256=<16 hex> head_hex=<24 bytes>"}
-    - {when: "len(raw) <= LOOP_MAX_INLINE", output: raw UTF-8 text, verbatim}
-    - {when: larger text, output: "kind=text bytes=<n> lines=<n> saved=<root-relative path> then first15: and last5:"}
+    - {when: "len(raw) <= run max_inline", output: raw UTF-8 text, verbatim}
+    - {when: larger text, output: "kind=text bytes=<n> lines=<n> saved=<root-relative path> then first15: and last5: when tail lines remain"}
     - {when: no output, output: empty string}
   bounding:
     - binary means more than 20% of the first 4096 bytes are non-printable (<9, 14..31, or >126)
     - binary output is not saved; the digest is the only recoverable description
     - large text is saved at .logs/runs/<run_id>/obs/obs-<k>.txt; k counts dispatched tool observations over the run; done and malformed-argument calls do not consume a name
     - saved paths are root-relative (.logs/runs/<run_id>/obs/obs-<k>.txt), so the agent reads one from the run cwd without knowing the run id; an obs dir outside the run root yields an absolute path
-    - first15 and last5 show at most 15 and 5 source lines, each cut to 160 characters; full bytes are in the saved file
+    - first15 and last5 show at most 15 and 5 source lines, each cut to 160 characters; a line appears once, so last5 starts after the head and is omitted when all lines fit in first15; full bytes are in the saved file
     - read saved files in ranges; do not dump them back into the message list
     - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set only when a large text file was saved
 
@@ -116,7 +117,7 @@ cost:
 header:
   function: api.header()
   content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, no text channel, the inline limit, and the four tool signatures
-  refresh: current config at each fold; refreshed again at a soft reload boundary
+  refresh: run_start.max_inline at each fold; current config only when the record has no run_start; refreshed again at a soft reload boundary
 
 sims:
   note: experiments, not the production wire

@@ -61,7 +61,7 @@ def read_turn(r):
     return hit, miss, out, len(msg.get("reasoning_content") or ""), choice.get("finish_reason"), message, msg.get("content")
 
 
-def run_calls(message, obs_dir, root, obs_n):
+def run_calls(message, obs_dir, root, obs_n, max_inline=None):
     calls = []
     done = None
     for call in message["tool_calls"]:
@@ -82,7 +82,7 @@ def run_calls(message, obs_dir, root, obs_n):
         saved = []
         try:
             obs = tools.dispatch(fn, args, obs_dir, f"obs-{obs_n}", root,
-                                 rel_base=root, saved=saved)
+                                 rel_base=root, saved=saved, max_inline=max_inline)
         except Exception as e:
             obs = (f"err harness {type(e).__name__}: {e}; "
                    f"exec argv, write path+data, edit path+old+new")
@@ -113,6 +113,9 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         events = [ev]
     st = fold.derive(events)
     root = root or st["root"]
+    max_inline = st.get("max_inline")
+    if max_inline is None:
+        max_inline = config.max_inline()
     cmd = fold.pending_verify(events) or verify
     if cmd and not any(ev["type"] == "verify" for ev in events):
         ev = writer.append("verify", {"command": cmd, "ran": False, "exit": None, "note": None})
@@ -129,7 +132,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         if should_stop is not None and should_stop():
             return stopped(writer, events, turn)
         reload.maybe()
-        msgs = fold.context(events, st["task"])
+        msgs = fold.context(events, st["task"], max_inline)
         turn += 1
         try:
             r = api.call(msgs, key)
@@ -143,7 +146,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
             emit(ev)
             return finish(writer, emit, events + [ev], turn, "http_error", None, 4)
         hit, miss, out, reason, finish_reason, message, text = read_turn(r)
-        calls, done, obs_n = run_calls(message, obs_dir, root, obs_n)
+        calls, done, obs_n = run_calls(message, obs_dir, root, obs_n, max_inline)
         ev = writer.append("turn", {
             "turn": turn, "finish_reason": finish_reason,
             "usage": {"hit": hit, "miss": miss, "out": out, "reasoning_c": reason,

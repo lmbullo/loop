@@ -17,7 +17,7 @@ facts:
   network: api and resume only; both cost real tokens
   tools: [exec, write, edit, done]
   verify: "run.py api --verify CMD; declared before the first turn, run after done, recorded as verify events before end"
-  inline_limit: "LOOP_MAX_INLINE, default 32768 bytes"
+  inline_limit: "LOOP_MAX_INLINE, default 32768 bytes; run_start.max_inline pins the bound for a run, so resume keeps the prompt prefix"
   binary_obs: binary is a digest; raw bytes are not saved
   schemas: {record: loop-record/1, view: loop-view/1}
   install: "sh install.sh -> $HOME/.local/bin/loop; --system -> /usr/local/bin/loop; --uninstall removes the launcher"
@@ -77,7 +77,7 @@ commands:
     - [python3, run.py, api, --verify, CMD, TASK]
     - [python3, run.py, resume, RUN_ID]
   never_in_offline_verification: [api, resume]
-  skip_server_filter: argv has an element exactly equal to server or api
+  skip_server_filter: any argv token exactly server or api, including tokens inside sh -c strings
 
 paths:
   entrypoint: run.py
@@ -150,7 +150,7 @@ traps:
   - a second api queues a front item and streams that run; it does not attach to the in-flight run
   - server restart is not a run restart; use resume
   - binary observations are digest-only; raw bytes are not saved
-  - run_start.max_inline is recorded metadata; the fold uses the current header
+  - run_start.max_inline pins the prompt header and observation bound; resume and soft reload reuse it
   - LOOP_RUNS selects the daemon state dir; keep it stable per tree
   - do not delete .logs while a worker is live
   - do not rewrite complete record lines

@@ -46,10 +46,13 @@ def render_api(raw, obs_dir, name, max_inline=None, saved=None, rel_base=None):
     def cut(x):
         return x[:160].decode("utf-8", "replace")
 
-    head = "\n".join("  " + cut(l) for l in lines[:15])
-    tail = "\n".join("  " + cut(l) for l in lines[-5:])
-    return (f"kind=text bytes={len(raw)} lines={len(lines)} saved={path}\n"
-            f"first15:\n{head}\nlast5:\n{tail}")
+    head = lines[:15]
+    tail = lines[max(len(head), len(lines) - 5):]
+    out = [f"kind=text bytes={len(raw)} lines={len(lines)} saved={path}",
+           "first15:\n" + "\n".join("  " + cut(l) for l in head)]
+    if tail:
+        out.append("last5:\n" + "\n".join("  " + cut(l) for l in tail))
+    return "\n".join(out)
 
 
 def render_v1(payload, obs_dir, name):

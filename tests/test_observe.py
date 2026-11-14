@@ -44,6 +44,22 @@ class ObserveTest(unittest.TestCase):
         with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
             self.assertEqual(f.read(), raw)
 
+    def test_render_api_head_tail_do_not_repeat_lines(self):
+        raw = b"\n".join([b"unique-%02d" % i for i in range(20)])
+        out = observe.render_api(raw, self.obs, "o1", max_inline=50)
+        self.assertIn("first15:", out)
+        self.assertIn("last5:", out)
+        for i in range(20):
+            self.assertEqual(out.count("unique-%02d" % i), 1)
+
+    def test_render_api_omits_tail_when_all_lines_are_in_head(self):
+        raw = b"\n".join([b"row-%02d" % i for i in range(10)])
+        out = observe.render_api(raw, self.obs, "o1", max_inline=20)
+        self.assertIn("first15:", out)
+        self.assertNotIn("last5:", out)
+        for i in range(10):
+            self.assertEqual(out.count("row-%02d" % i), 1)
+
     def test_save_rel_base_outside_base_falls_back(self):
         elsewhere = os.path.join(self.tmp.name, "other")
         os.makedirs(elsewhere)

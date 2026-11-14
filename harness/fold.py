@@ -14,20 +14,22 @@ def totals_of(events):
 
 
 def derive(events):
-    task = root = None
+    task = root = max_inline = None
     turn = obs_n = 0
     done = None
     for ev in events:
         d = ev["data"]
         if ev["type"] == "run_start":
             task, root = d.get("task"), d.get("root")
+            max_inline = d.get("max_inline")
         elif ev["type"] == "turn":
             turn = int(d.get("turn") or turn)
             obs_n += len(d.get("calls") or [])
             done = d.get("done")
         elif ev["type"] == "resume" and root is None:
             root = d.get("root")
-    return {"task": task, "root": root, "turn": turn, "obs_n": obs_n, "done": done}
+    return {"task": task, "root": root, "turn": turn, "obs_n": obs_n,
+            "done": done, "max_inline": max_inline}
 
 
 def pending_verify(events):
@@ -38,8 +40,13 @@ def pending_verify(events):
     return cmd
 
 
-def context(events, task):
-    msgs = [{"role": "system", "content": api.header()},
+def context(events, task, max_inline=None):
+    if max_inline is None:
+        for ev in events:
+            if ev["type"] == "run_start":
+                max_inline = ev["data"].get("max_inline")
+                break
+    msgs = [{"role": "system", "content": api.header(max_inline)},
             {"role": "user", "content": task or ""}]
     for ev in events:
         if ev["type"] != "turn":

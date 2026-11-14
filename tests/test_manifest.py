@@ -100,6 +100,13 @@ class ManifestTest(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertIn("over=0", proc.stdout)
 
+    def test_skip_server_sees_tokens_inside_shell_commands(self):
+        import scripts.verify as verify
+        selected = {c["id"] for c in verify.select(self.manifest["checks"], set(), True)}
+        self.assertNotIn("api-auth-guard", selected)
+        self.assertNotIn("server-start", selected)
+        self.assertIn("sim1-task", selected)
+
     def test_contract_script(self):
         proc = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "check_manifest.py")],
                               cwd=ROOT, capture_output=True, text=True, timeout=60)

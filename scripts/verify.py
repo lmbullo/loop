@@ -7,6 +7,7 @@ plane can be skipped with --skip-server.
 """
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -15,6 +16,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(ROOT, "manifest.json")
 SERVER_TOKENS = ("server", "api")
+TOKEN_RE = re.compile(r"[^A-Za-z0-9_.+-]+")
 
 
 def load():
@@ -23,7 +25,10 @@ def load():
 
 
 def needs_server(check):
-    return any(token in (check.get("argv") or []) for token in SERVER_TOKENS)
+    for arg in check.get("argv") or []:
+        if any(token in SERVER_TOKENS for token in TOKEN_RE.split(str(arg))):
+            return True
+    return False
 
 
 def select(checks, only, skip_server):
