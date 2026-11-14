@@ -47,7 +47,7 @@ def load():
         return _load()
 
 
-def add(task, root, env, front=False, run_id=None):
+def add(task, root, env, front=False, run_id=None, verify=None):
     def fn(data):
         data["seq"] = int(data.get("seq") or 0) + 1
         item = {
@@ -56,6 +56,7 @@ def add(task, root, env, front=False, run_id=None):
             "task": task,
             "root": root,
             "env": dict(env or {}),
+            "verify": verify,
             "state": "queued",
             "created_at": record.utc(),
             "created_ts": time.time(),

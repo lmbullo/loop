@@ -120,7 +120,7 @@ def stream(address, request, as_json=False, budget=600.0):
     return code
 
 
-def run_local(task, as_json=False):
+def run_local(task, as_json=False, verify=None):
     try:
         entry, created = srvctl.start()
     except (OSError, RuntimeError) as e:
@@ -131,5 +131,6 @@ def run_local(task, as_json=False):
         print(f"[server] started pid={entry['pid']} addr={entry['address']} log={entry['log']}",
               file=sys.stderr, flush=True)
     env = {k: os.environ[k] for k in srvwire.ENV_KEYS if k in os.environ}
-    request = {"cmd": "run", "task": task, "root": config.root(), "env": env}
+    request = {"cmd": "run", "task": task, "root": config.root(), "env": env,
+               "verify": verify}
     return stream(entry["address"], request, as_json)

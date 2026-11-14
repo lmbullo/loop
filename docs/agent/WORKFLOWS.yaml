@@ -49,6 +49,7 @@ test_map:
   - {test: test_regstore.py, contract: atomic registry writes, locking, current-entry precedence}
   - {test: test_workers.py, contract: worker registry, pid+start liveness, reap, record state}
   - {test: test_agent_context.py, contract: usage totals, derive, context fold, response parsing, dispatch, finish, terminal text}
+  - {test: test_verify.py, contract: pending verify fold, sh -c exit/evidence/root, declaration and settle order, resume command, --verify argv, view lines}
   - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring}
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
   - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}
@@ -127,6 +128,11 @@ recipes:
     - update tests/test_recschema.py, tests/test_recread.py, tests/test_recwrite.py, tests/test_view.py and fixtures
     - keep end the only completion marker and seq contiguous
     - run the full ladder and python3 run.py view --schema
+  verify_command:
+    - update harness/verifier.py for execution and harness/fold.py for pending-command recovery
+    - keep the order declaration (ran=false) -> terminal turn -> result (ran=true) -> end
+    - update tests/test_verify.py and the verify event in manifest.record and docs/agent/RECORD.yaml
+    - "run: python3 -m unittest tests.test_verify and python3 run.py view --schema"
   tool_or_observation:
     - update harness/tools.py, harness/observe.py or harness/spawn.py
     - update tests/test_tools.py, tests/test_observe.py or tests/test_spawn.py

@@ -22,7 +22,7 @@ def resolve(path, base=None):
 
 
 def runs():
-    return os.path.abspath(os.environ.get("LOOP_RUNS") or os.path.join(ROOT, LOGS))
+    return os.path.abspath(os.environ.get("LOOP_RUNS") or os.path.join(root(), LOGS))
 
 
 def display(path):

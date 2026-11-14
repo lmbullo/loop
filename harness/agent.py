@@ -2,58 +2,19 @@ import json
 import sys
 import urllib.error
 
-from . import api, auth, config, pricing, record, recread, reload, tools
+from . import api, auth, config, fold, pricing, record, recread, reload, tools, verifier
 
-ZERO = {"hit": 0, "miss": 0, "out": 0, "reasoning_c": 0}
-TOOL_NAMES = [t["function"]["name"] for t in api.TOOLS]
+totals_of = fold.totals_of
+derive = fold.derive
+context = fold.context
 
 
 def cost_of(totals):
     return pricing.cost(totals["hit"], totals["miss"], totals["out"])
 
 
-def totals_of(events):
-    t = dict(ZERO)
-    for ev in events:
-        if ev["type"] == "turn":
-            u = ev["data"].get("usage") or {}
-            for k in t:
-                t[k] += int(u.get(k) or 0)
-    return t
-
-
-def derive(events):
-    task = root = None
-    turn = obs_n = 0
-    done = None
-    for ev in events:
-        d = ev["data"]
-        if ev["type"] == "run_start":
-            task, root = d.get("task"), d.get("root")
-        elif ev["type"] == "turn":
-            turn = int(d.get("turn") or turn)
-            obs_n += len(d.get("calls") or [])
-            done = d.get("done")
-        elif ev["type"] == "resume" and root is None:
-            root = d.get("root")
-    return {"task": task, "root": root, "turn": turn, "obs_n": obs_n, "done": done}
-
-
-def context(events, task):
-    msgs = [{"role": "system", "content": api.header()},
-            {"role": "user", "content": task or ""}]
-    for ev in events:
-        if ev["type"] != "turn":
-            continue
-        msgs.append(ev["data"]["message"])
-        for call in ev["data"].get("calls") or []:
-            msgs.append({"role": "tool", "tool_call_id": call["id"],
-                         "content": call["observation"]})
-    return msgs
-
-
 def finish(writer, emit, events, turn, finish, result, exit_code):
-    totals = totals_of(events)
+    totals = fold.totals_of(events)
     summary = {"exit": int(exit_code), "finish": finish, "result": result,
                "turns": int(turn), "hit": totals["hit"], "miss": totals["miss"],
                "out": totals["out"], "reasoning_c": totals["reasoning_c"],
@@ -64,7 +25,7 @@ def finish(writer, emit, events, turn, finish, result, exit_code):
 
 
 def stopped(writer, events, turn):
-    totals = totals_of(events)
+    totals = fold.totals_of(events)
     return {"run_id": writer.run_id, "entrypoint": "api", "exit": 130,
             "finish": "stopped", "result": None, "turns": int(turn),
             "hit": totals["hit"], "miss": totals["miss"], "out": totals["out"],
@@ -129,21 +90,35 @@ def run_calls(message, obs_dir, run_dir, root, obs_n):
     return calls, done, obs_n
 
 
-def run_task(writer, emit, task=None, root=None, should_stop=None):
+def settle(writer, emit, events, turn, cmd, root, kind, result, code):
+    if cmd:
+        ok, note = verifier.run(root or config.root(), cmd)
+        ev = writer.append("verify", {"command": cmd, "ran": True, "exit": ok, "note": note})
+        emit(ev)
+        events = events + [ev]
+    return finish(writer, emit, events, turn, kind, result, code)
+
+
+def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
     events = recread.read(writer.run_id)["events"]
     if not events:
-        if task is None:
-            task = "No task."
-        ev = writer.append("run_start", {"task": task, "root": root or config.root(),
+        ev = writer.append("run_start", {"task": task or "No task.",
+                                         "root": root or config.root(),
                                          "entrypoint": "api", "model": api.model(),
-                                         "tools": list(TOOL_NAMES),
+                                         "tools": [t["function"]["name"] for t in api.TOOLS],
                                          "max_inline": config.max_inline(),
                                          "record_source": "live"})
         emit(ev)
         events = [ev]
-    st = derive(events)
+    st = fold.derive(events)
+    root = root or st["root"]
+    cmd = fold.pending_verify(events) or verify
+    if cmd and not any(ev["type"] == "verify" for ev in events):
+        ev = writer.append("verify", {"command": cmd, "ran": False, "exit": None, "note": None})
+        emit(ev)
+        events = events + [ev]
     if st["done"] is not None:
-        return finish(writer, emit, events, st["turn"], "done", st["done"]["result"], 0)
+        return settle(writer, emit, events, st["turn"], cmd, root, "done", st["done"]["result"], 0)
     key = credentials(writer, emit, events)
     if key is None:
         return {"run_id": writer.run_id, "entrypoint": "api", "exit": 3}
@@ -154,7 +129,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None):
         if should_stop is not None and should_stop():
             return stopped(writer, events, turn)
         reload.maybe()
-        msgs = context(events, st["task"])
+        msgs = fold.context(events, st["task"])
         turn += 1
         try:
             r = api.call(msgs, key)
@@ -168,7 +143,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None):
             emit(ev)
             return finish(writer, emit, events + [ev], turn, "http_error", None, 4)
         hit, miss, out, reason, finish_reason, message, text = read_turn(r)
-        calls, done, obs_n = run_calls(message, obs_dir, run_dir, root or st["root"], obs_n)
+        calls, done, obs_n = run_calls(message, obs_dir, run_dir, root, obs_n)
         ev = writer.append("turn", {
             "turn": turn, "finish_reason": finish_reason,
             "usage": {"hit": hit, "miss": miss, "out": out, "reasoning_c": reason,
@@ -177,23 +152,30 @@ def run_task(writer, emit, task=None, root=None, should_stop=None):
         emit(ev)
         events = events + [ev]
         if done is not None:
-            return finish(writer, emit, events, turn, "done", done["result"], 0)
+            return settle(writer, emit, events, turn, cmd, root, "done", done["result"], 0)
         if not message["tool_calls"]:
             ok = isinstance(text, str) and text.strip()
-            return finish(writer, emit, events, turn, "done" if ok else "no_tool_call",
-                          text.strip() if ok else None, 0)
+            return settle(writer, emit, events, turn, cmd, root,
+                          "done" if ok else "no_tool_call", text.strip() if ok else None, 0)
 
 
 def main(argv):
-    as_json = False
-    args = []
-    for arg in argv:
+    as_json, verify, args, i = False, None, [], 0
+    while i < len(argv):
+        arg = argv[i]
         if arg == "--json":
             as_json = True
+        elif arg == "--verify" and i + 1 < len(argv):
+            verify = argv[i + 1]
+            i += 1
+        elif arg == "--verify":
+            print("err --verify needs a command string", file=sys.stderr)
+            return 2
         else:
             args.append(arg)
+        i += 1
     task = args[0] if args else "No task."
     if task == "-":
         task = sys.stdin.read()
     from . import srvclient
-    return srvclient.run_local(task, as_json)
+    return srvclient.run_local(task, as_json, verify)

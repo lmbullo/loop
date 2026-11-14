@@ -15,6 +15,7 @@ facts:
   tree_lock: ".logs/run.lock; one run per tree; a second api queues a front item and waits"
   network: api and resume only; both cost real tokens
   tools: [exec, write, edit, done]
+  verify: "run.py api --verify CMD; declared before the first turn, run after done, recorded as verify events before end"
   inline_limit: "LOOP_MAX_INLINE, default 32768 bytes"
   binary_obs: binary is a digest; raw bytes are not saved
   schemas: {record: loop-record/1, view: loop-view/1}
@@ -31,6 +32,7 @@ routes:
   - {task: find the owner of a behavior, read: [docs/agent/MAP.yaml], run: [python3, scripts/repo_map.py]}
   - {task: inspect a run without executing, read: [docs/agent/RECORD.yaml], run: [python3, run.py, view, RUN_ID]}
   - {task: change a tool or observation rule, read: [docs/agent/WIRE.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, sim1, edge]}
+  - {task: add or change a post-run verify command, read: [docs/agent/WIRE.yaml, docs/agent/RECORD.yaml], run: [python3, -m, unittest, tests.test_verify]}
   - {task: operate or debug the control plane, read: [docs/agent/SERVER.yaml, docs/agent/DEBUG.yaml], run: [python3, run.py, server, status]}
   - {task: render a snapshot headlessly, read: [docs/agent/MAP.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, probe]}
   - {task: see a run's tool calls in the tui, read: [docs/agent/MAP.yaml], run: [python3, run.py, tui]}
@@ -63,6 +65,7 @@ commands:
     - [python3, scripts/verify.py, --list]
   network_and_cost:
     - [python3, run.py, api, TASK]
+    - [python3, run.py, api, --verify, CMD, TASK]
     - [python3, run.py, resume, RUN_ID]
   never_in_offline_verification: [api, resume]
   skip_server_filter: argv has an element exactly equal to server or api
@@ -108,7 +111,7 @@ record:
   schema: loop-record/1
   view_schema: loop-view/1
   id_pattern: "^[0-9]{8}T[0-9]{6}[0-9]{3}Z-[0-9a-f]{8}$"
-  events: [run_start, turn, resume, error, interrupted, end]
+  events: [run_start, turn, verify, resume, error, interrupted, end]
   terminal_marker: end
   state:
     empty: no events

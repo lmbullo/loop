@@ -46,7 +46,7 @@ def global_path():
 
 
 def tree(root=None):
-    return os.path.realpath(root or config.ROOT)
+    return os.path.realpath(root or config.root())
 
 
 def iso(ts=None):

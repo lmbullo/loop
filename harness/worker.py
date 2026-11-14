@@ -109,7 +109,8 @@ def main(argv):
         with env_scope(spec.get("env") or {}):
             summary = agent.run_task(writer, emit, spec.get("task") or "No task.",
                                      spec.get("root") or config.root(),
-                                     should_stop=lambda: state["stop"])
+                                     should_stop=lambda: state["stop"],
+                                     verify=spec.get("verify"))
         if state["stop"] and writer.last_type != "end":
             writer.interrupt("server_stop", "server")
             summary = agent.stopped(writer, recread.read(writer.run_id)["events"], turn_count["n"])

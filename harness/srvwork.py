@@ -63,7 +63,8 @@ def tick(daemon):
 def launch(daemon, item):
     run_id = item["run_id"]
     job.write(run_id, {"item_id": item["id"], "task": item["task"],
-                       "root": item.get("root"), "env": item.get("env") or {}})
+                       "root": item.get("root"), "env": item.get("env") or {},
+                       "verify": item.get("verify")})
     queue.update(item["id"], state="running", launched_ts=time.time())
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"

@@ -8,7 +8,7 @@ def target(request):
     task = "No task." if not isinstance(task, str) or not task else task
     root = request.get("root")
     env = request.get("env") if isinstance(request.get("env"), dict) else {}
-    item = queue.add(task, root, env, front=True)
+    item = queue.add(task, root, env, front=True, verify=request.get("verify"))
     return item["run_id"], False
 
 

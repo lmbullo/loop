@@ -34,6 +34,7 @@ events:
   - {type: run_start, terminal: false, data: "task str, root str, entrypoint str, model str, tools list<str>, max_inline int, record_source str"}
   - {type: turn, terminal: false, data: "turn int, finish_reason str|null, usage usage, message message, calls list<call>, done done|null"}
   - {type: resume, terminal: false, data: "from_seq int, turn int, messages int, root str, by str"}
+  - {type: verify, terminal: false, data: "command str, ran bool, exit int|null, note str|null"}
   - {type: error, terminal: false, data: "code int, text str, finish str"}
   - {type: interrupted, terminal: marker, data: "reason str, last_seq int, by str"}
   - {type: end, terminal: true, data: "exit int, finish str, result str|null, turns int, hit int, miss int, out int, reasoning_c int, cost num"}
@@ -51,6 +52,10 @@ event_notes:
   done_call: appears on the assistant message but is not appended as a call; turn.done records it and the run ends
   no_tool_call: "empty content -> finish=no_tool_call; non-empty content -> finish=done with result=stripped content"
   resume_event: records from_seq, turn and rebuilt message count; it does not replay old tool calls
+  verify_declaration: {ran: false, exit: null, note: null, when: "before the first turn, only when the task carries a command"}
+  verify_result: {ran: true, when: "after the terminal turn, before end", ok: "exit == 0", note: "first output line plus ms=<duration>"}
+  verify_absent: no verify event means no command was requested; never render it as a pass
+  verify_resume: fold.pending_verify returns the last declared command; a ran=true event clears it, so a recorded result is never rerun
 
 state:
   record_state: {empty: no events, interrupted: "last event is not end", complete: "last event is end"}
@@ -65,7 +70,13 @@ derived_view_lines:
   - "[torn] bytes=N dropped=1 when the reader found a partial trailing line"
 
 fold:
-  function: agent.context(events, task)
+  module: harness/fold.py
+  functions:
+    - {name: totals_of, effect: "sum turn.usage into hit/miss/out/reasoning_c"}
+    - {name: derive, effect: "task, root, turn, obs_n and the last done call"}
+    - {name: pending_verify, effect: "last verify.command with ran=false, else null; a ran=true event clears it"}
+    - {name: context, effect: "rebuild the request message list"}
+  aliases: harness.agent re-exports totals_of, derive and context for callers and tests
   shape: |
     [
       {"role":"system","content":api.header()},

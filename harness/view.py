@@ -48,6 +48,12 @@ def lines(ev):
     elif kind == "resume":
         out.append(f"[resume] from_seq={data['from_seq']} turn={data['turn']} "
                    f"messages={data['messages']} by={data['by']}")
+    elif kind == "verify":
+        if data["ran"]:
+            ok = 1 if data["exit"] == 0 else 0
+            out.append(f"[verify] ok={ok} exit={data['exit']} " + one(data["note"] or "", _limit("obs")))
+        else:
+            out.append("[verify] pending cmd=" + one(data["command"], _limit("obs")))
     elif kind == "error":
         out.append(f"[err] code={data['code']} finish={data['finish']} "
                    + one(data["text"], _limit("err")))

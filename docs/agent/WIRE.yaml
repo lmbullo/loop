@@ -1,9 +1,9 @@
 schema: loop-agent-doc/1
 id: wire
 title: "Agent wire: tools, observations, cost"
-read_when: [change a tool, change observation bounding, change the stop condition, reason about cost]
-source: [harness/api.py, harness/agent.py, harness/tools.py, harness/observe.py, harness/spawn.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
-verify: ["python3 -m unittest tests.test_agent_context tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
+read_when: [change a tool, change observation bounding, change the stop condition, change verify behavior, reason about cost]
+source: [harness/api.py, harness/agent.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
+verify: ["python3 -m unittest tests.test_agent_context tests.test_verify tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
 
 messages:
   order: |
@@ -55,6 +55,18 @@ tools:
     signature: "done(result: str)"
     behavior: end the run; result goes to turn.done.result and end.result
     dispatch: not dispatched; agent.run_calls() sets turn.done and breaks the call list; any other tool name falls through to edit and normally fails with err bad_args edit ...
+
+verify:
+  entry: "run.py api --verify CMD [TASK|-]"
+  transport: task request field verify -> queue item -> job -> worker spec -> agent.run_task
+  root: run root (run_start.root); not the client cwd
+  shell: sh -c CMD with a 120000 ms timeout and process-group kill
+  evidence: first output line cut to 180 chars plus " ms=<duration>"; no output is "no output ms=<duration>"
+  order: "declare before the first turn: {command, ran:false, exit:null, note:null}; after done or a terminal reply, append {ran:true, exit, note} before end"
+  pass_fail: exit 0 records ok=1; any other exit records ok=0; status never gates the run
+  absent: no command means no verify event; view renders absence, never a pass
+  resume: fold.pending_verify recovers the declared command; a ran=true event is final and is not rerun
+  run_editor: report only; the command may write anywhere under the run root
 
 observation:
   production_input: 'stdout + "\n--stderr--\n" + stderr when stderr is non-empty'

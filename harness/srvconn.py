@@ -85,7 +85,8 @@ def handle(daemon, conn):
             task = "No task." if not isinstance(task, str) or not task else task
             root = request.get("root")
             env = request.get("env") if isinstance(request.get("env"), dict) else {}
-            item = queue.add(task, root, env, front=bool(request.get("front")))
+            item = queue.add(task, root, env, front=bool(request.get("front")),
+                             verify=request.get("verify"))
             srvwire.send_line(conn, {"k": "queued", "item": item})
         elif cmd == "drop":
             ok = queue.drop(request.get("id"))
