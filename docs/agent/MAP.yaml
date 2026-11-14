@@ -53,7 +53,8 @@ lock_note: the tree lock serializes workers, so a queued second api waits behind
 modules:
   turn_loop:
     - {path: harness/config.py, owns: "machine values: ROOT from __file__, root(), asset(), runs(), resolve(), env helpers"}
-    - {path: harness/agent.py, owns: "turn loop, response parsing, tool calls, verify settlement, end"}
+    - {path: harness/agent.py, owns: "run lifecycle: per-turn reload boundary, credentials, verify settlement, end"}
+    - {path: harness/turn.py, owns: "one model turn: response parsing, tool-call dispatch, done-result validation, terminal/nudge stop policy"}
     - {path: harness/fold.py, owns: "pure record fold: totals, derived state, pending verify, request messages"}
     - {path: harness/verifier.py, owns: "run the verify command through sh -c at the run root; exit code plus one evidence line"}
     - {path: harness/api.py, owns: "tool schemas, system header, model id, HTTP call"}
@@ -150,7 +151,7 @@ imports:
 
 change_map:
   - {change: tool or observation shape, start: [harness/tools.py, harness/observe.py], test: [tests/test_tools.py, tests/test_observe.py]}
-  - {change: turn loop, stop condition, end payload, start: [harness/agent.py, harness/fold.py], test: [tests/test_agent_context.py, tests/test_view.py]}
+  - {change: turn loop, stop condition, end payload, start: [harness/agent.py, harness/turn.py, harness/fold.py], test: [tests/test_agent_context.py, tests/test_agent_loop.py, tests/test_view.py]}
   - {change: verify command, start: [harness/agent.py, harness/fold.py, harness/verifier.py], test: [tests/test_verify.py, tests/test_view.py]}
   - {change: record fields or state rules, start: [manifest.record, harness/recschema.py], test: [tests/test_recschema.py, tests/test_recread.py]}
   - {change: daemon command or guard, start: [harness/srvcmd.py, harness/srvconn.py], test: [tests/test_manifest.py, scripts/verify.py --skip-server]}

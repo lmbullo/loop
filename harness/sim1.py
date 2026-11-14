@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-from . import assets, config, observe, spawn
+from . import assets, config, observe, pricing, spawn
 
 HEADER = """\
 tool: exec(argv:[str], cwd?:str, stdin?:str, timeout_ms?:int) -> observation
@@ -46,7 +46,7 @@ def run(sc):
         tot_tok = whole / 4
         miss_tok = appended / 4
         hit = 100 * (1 - miss_tok / tot_tok) if tot_tok else 0
-        cost = (tot_tok - miss_tok) * 0.006 / 1e6 + miss_tok * 0.30 / 1e6
+        cost = pricing.cost(tot_tok - miss_tok, miss_tok, 0)
         print(f"  <cache prefix={tot_tok:.0f}t miss={miss_tok:.0f}t hit={hit:.0f}% cost=${cost*1000:.4f}/call>")
     log_path = os.path.join(run_dir, "log.json")
     assets.write_json(log_path, log)

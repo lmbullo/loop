@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-from . import assets, config, observe, spawn
+from . import assets, config, observe, pricing, spawn
 
 
 def do_exec(call, n, ws, obs_dir):
@@ -60,11 +60,11 @@ def run(sc):
         print(f"[{n}] {call.get('argv', call.get('path', ''))}")
         print(f"  $ code={code} out={nb}B " + body.replace("\n", "\n  ")[:500])
         print(f"  <miss={miss:.0f}t hit={100*(1-miss/tot):.0f}%>")
-    print(f"  TOTAL MISS ~{miss_tot:.0f}t  $" + "{:.5f}".format(miss_tot * 0.30 / 1e6))
+    print(f"  TOTAL MISS ~{miss_tot:.0f}t  $" + "{:.5f}".format(pricing.cost(0, miss_tot, 0)))
     log_path = os.path.join(run_dir, "log.json")
     assets.write_json(log_path, log)
     summary = {"entrypoint": "sim2", "scenario": sc["id"], "turns": len(log) - 1,
-               "miss_tokens": round(miss_tot), "miss_cost_usd": round(miss_tot * 0.30 / 1e6, 6),
+               "miss_tokens": round(miss_tot), "miss_cost_usd": round(pricing.cost(0, miss_tot, 0), 6),
                "run_dir": config.display(run_dir), "log": config.display(log_path),
                "bytes_log": os.path.getsize(log_path)}
     print("summary: " + json.dumps(summary, sort_keys=True))

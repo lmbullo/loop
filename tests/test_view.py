@@ -2,8 +2,8 @@ import json
 import unittest
 
 from harness import record, recschema, view
-from tests.support import (END, ERROR, INTERRUPTED, RESUME, RUN_ID, RUN_START, TURN,
-                           event)
+from tests.support import (END, ERROR, INTERRUPTED, NUDGE, RESUME, RUN_ID, RUN_START,
+                           TURN, event)
 
 
 def turn_event(seq=2):
@@ -24,15 +24,17 @@ class ViewTest(unittest.TestCase):
 
     def test_lines_for_every_event(self):
         events = [event(RUN_ID, 1, "run_start", dict(RUN_START)), turn_event(),
-                  event(RUN_ID, 3, "resume", dict(RESUME)),
-                  event(RUN_ID, 4, "error", dict(ERROR)),
-                  event(RUN_ID, 5, "interrupted", dict(INTERRUPTED)),
-                  event(RUN_ID, 6, "end", dict(END))]
+                  event(RUN_ID, 3, "nudge", dict(NUDGE)),
+                  event(RUN_ID, 4, "resume", dict(RESUME)),
+                  event(RUN_ID, 5, "error", dict(ERROR)),
+                  event(RUN_ID, 6, "interrupted", dict(INTERRUPTED)),
+                  event(RUN_ID, 7, "end", dict(END))]
         text = "\n".join(line for ev in events for line in view.lines(ev))
         self.assertIn("run=" + RUN_ID, text)
         self.assertIn("[turn 1]", text)
         self.assertIn("exec: ", text)
         self.assertIn("-> hello", text)
+        self.assertIn("[nudge] continue after the silent stop", text)
         self.assertIn("[resume]", text)
         self.assertIn("[err]", text)
         self.assertIn("[interrupted]", text)

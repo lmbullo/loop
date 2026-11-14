@@ -44,7 +44,8 @@ class ManifestTest(unittest.TestCase):
         record = self.manifest["record"]
         self.assertEqual(record["schema"], "loop-record/1")
         self.assertEqual(record["version"], 1)
-        for event in ("run_start", "turn", "verify", "resume", "error", "interrupted", "end"):
+        for event in ("run_start", "turn", "nudge", "verify", "resume", "error",
+                      "interrupted", "end"):
             self.assertIn(event, record["events"])
         self.assertTrue(record["events"]["end"]["terminal"])
         self.assertEqual(record["view"]["schema"], "loop-view/1")

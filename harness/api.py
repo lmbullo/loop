@@ -50,8 +50,8 @@ highest, and reasoning is never re-sent, so it costs nothing after the turn.
 
 Assistant text is not re-sent; only tool calls and their observations persist.
 Call done(result) when the task is complete. A turn with no tool call also ends
-the run: non-empty text becomes end.result, and an empty reply finishes it as
-no_tool_call.
+the run: non-empty text becomes end.result. An empty reply gets one nudge to
+call done or continue; a second empty reply finishes it as no_tool_call.
 
 Issue independent tool calls together in one assistant message; they run in the
 order given. Chain only calls whose arguments depend on an earlier result, and do

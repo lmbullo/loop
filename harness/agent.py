@@ -1,8 +1,8 @@
-import json
 import sys
 import urllib.error
 
-from . import api, auth, config, fold, pricing, record, recread, reload, tools, verifier
+from . import api, auth, config, fold, pricing, record, recread, reload, verifier
+from .turn import read_turn, run_calls, stop
 
 totals_of = fold.totals_of
 derive = fold.derive
@@ -44,53 +44,6 @@ def credentials(writer, emit, events):
         return None
 
 
-def read_turn(r):
-    usage = r.get("usage") or {}
-    hit = int(usage.get("prompt_cache_hit_tokens", 0) or 0)
-    miss = int(usage.get("prompt_cache_miss_tokens", 0) or 0)
-    out = int(usage.get("completion_tokens", 0) or 0)
-    choice = (r.get("choices") or [{}])[0]
-    msg = choice.get("message") or {}
-    message = {"role": "assistant", "content": None, "tool_calls": []}
-    for call in msg.get("tool_calls") or []:
-        fn = call.get("function") or {}
-        message["tool_calls"].append({
-            "id": call.get("id") or "", "type": call.get("type") or "function",
-            "function": {"name": fn.get("name") or "",
-                         "arguments": fn.get("arguments") or "{}"}})
-    return hit, miss, out, len(msg.get("reasoning_content") or ""), choice.get("finish_reason"), message, msg.get("content")
-
-
-def run_calls(message, obs_dir, root, obs_n, max_inline=None):
-    calls = []
-    done = None
-    for call in message["tool_calls"]:
-        fn = call["function"]["name"]
-        try:
-            args = json.loads(call["function"]["arguments"], strict=False)
-            if not isinstance(args, dict):
-                raise ValueError(f"arguments are {type(args).__name__}, not object")
-        except (ValueError, TypeError) as e:
-            obs = f"err malformed_arguments {e}"
-            calls.append({"id": call["id"], "name": fn, "observation": obs,
-                          "bytes": len(obs.encode()), "saved": None})
-            continue
-        if fn == "done":
-            done = {"id": call["id"], "result": args.get("result", "")}
-            break
-        obs_n += 1
-        saved = []
-        try:
-            obs = tools.dispatch(fn, args, obs_dir, f"obs-{obs_n}", root,
-                                 rel_base=root, saved=saved, max_inline=max_inline)
-        except Exception as e:
-            obs = (f"err harness {type(e).__name__}: {e}; "
-                   f"exec argv, write path+data, edit path+old+new")
-        calls.append({"id": call["id"], "name": fn, "observation": obs,
-                      "bytes": len(obs.encode()), "saved": saved[0] if saved else None})
-    return calls, done, obs_n
-
-
 def settle(writer, emit, events, turn, cmd, root, kind, result, code):
     if cmd:
         ok, note = verifier.run(root or config.root(), cmd)
@@ -127,6 +80,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
     if key is None:
         return {"run_id": writer.run_id, "entrypoint": "api", "exit": 3}
     turn, obs_n = st["turn"], st["obs_n"]
+    nudged = st["nudged"]
     obs_dir = record.obs_dir(writer.run_id)
     while True:
         if should_stop is not None and should_stop():
@@ -156,10 +110,17 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         events = events + [ev]
         if done is not None:
             return settle(writer, emit, events, turn, cmd, root, "done", done["result"], 0)
-        if not message["tool_calls"]:
-            ok = isinstance(text, str) and text.strip()
-            return settle(writer, emit, events, turn, cmd, root,
-                          "done" if ok else "no_tool_call", text.strip() if ok else None, 0)
+        action = stop(message, text, turn, nudged)
+        if action is None:
+            continue
+        kind, result = action
+        if kind == "nudge":
+            ev = writer.append("nudge", {"text": result})
+            emit(ev)
+            events = events + [ev]
+            nudged = True
+            continue
+        return settle(writer, emit, events, turn, cmd, root, kind, result, 0)
 
 
 def main(argv):

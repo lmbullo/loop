@@ -12,11 +12,15 @@ messages:
     for each turn event:
       assistant  turn.message         content is null; tool_calls carry the calls
       tool       one per call         keyed by call.id, content is call.observation
+    for each nudge event:
+      user       nudge.text           only after a silent stop with prior work; at most one per run
   rules:
     - reasoning is never re-sent; turn.usage.reasoning_c counts characters of reasoning_content, not tokens
     - assistant text is not stored in the message and is never re-sent; a terminal reply is kept only as end.result
-    - "empty terminal reply -> finish=no_tool_call; non-empty terminal reply -> finish=done with result=content.strip()"
-    - the prompt tells the model to call done(result); a silent stop is still terminal but loses the result
+    - "non-empty terminal reply -> finish=done with result=content.strip()"
+    - "empty terminal reply after prior work -> one nudge user message, then the next turn; a second empty reply -> finish=no_tool_call"
+    - a silent stop stores message.content="" so the following nudge has a valid assistant turn; the nudge itself is a separate event
+    - the prompt tells the model to call done(result); a second silent stop still loses the result
     - done ends the run; it is recorded in turn.done and end, not as a tool observation
     - the whole list is re-sent each turn; only the appended suffix is a cache miss
     - the system header is constant across runs; run_start.max_inline pins only the observation bound, so resume and soft reload keep a byte-identical observation wire
@@ -57,7 +61,9 @@ tools:
   done:
     signature: "done(result: str)"
     behavior: finish the task; result goes to turn.done.result and end.result
-    dispatch: not dispatched; agent.run_calls() sets turn.done and breaks the call list; any other name returns err unknown_tool <name> expected one of exec, write, edit, done
+    details:
+      - result must be str; a non-str result becomes err bad_args done requires result:str, got <Type> and the run continues
+    dispatch: not dispatched; harness/turn.py sets turn.done and breaks the call list; any other name returns err unknown_tool <name> expected one of exec, write, edit, done
 
 verify:
   entry: "run.py api --verify CMD [TASK|-]"
@@ -98,6 +104,7 @@ failures:
     - {trigger: "edit missing or empty path", observation: "err bad_args edit requires path:str"}
     - {trigger: "edit missing or non-str old or new", observation: "err bad_args edit requires old:str and new:str; <key> incorrect"}
     - {trigger: edit match count is not 1, observation: "err match=<n> expected=1 <path>"}
+    - {trigger: "done result is not a str", observation: "err bad_args done requires result:str, got <Type>"}
     - {trigger: tool name is not exec, write, edit or done, observation: "err unknown_tool <name> expected one of exec, write, edit, done"}
     - {trigger: tool body raises, observation: "err harness <TypeName>: <detail>; exec argv, write path+data, edit path+old+new"}
     - {trigger: file open or write fails, observation: "err <TypeName>: <detail>"}
@@ -116,11 +123,11 @@ cost:
     - each turn.usage.cost is rounded to 6 decimals
     - end sums hit, miss, out, reasoning_c and computes the run cost once
     - the unchanged prefix is a cache hit; only the appended suffix is a miss; output bills highest
-    - the sim projection uses bytes/4 as tokens
+    - the sim projection uses bytes/4 as tokens and pricing.cost, so rates come from the manifest
 
 header:
   function: api.header()
-  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, done semantics, parallel-call guidance, large-observation guidance, and the four tool signatures
+  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, done and one-nudge stop semantics, parallel-call guidance, large-observation guidance, and the four tool signatures
   stability: constant bytes for every run; no max_inline, task, root or model value enters it, so the first system message is a reusable cache prefix
   migration: records written before this change replay with the current constant header because the prompt text is not stored; their turn messages are unchanged
   refresh: none needed; a soft reload re-imports the module, so the next fold picks up edited text while old turns stay untouched

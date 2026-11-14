@@ -6,7 +6,7 @@ import unittest
 import unittest.mock
 
 from harness import agent, recwrite
-from tests.support import END, RUN_ID, RUN_START, TURN, event, sandbox
+from tests.support import END, NUDGE, RUN_ID, RUN_START, TURN, event, sandbox
 
 
 def turn_with_call(seq=2, done=None):
@@ -51,6 +51,18 @@ class AgentContextTest(unittest.TestCase):
         self.assertEqual(msgs[3], {"role": "tool", "tool_call_id": "c1", "content": "ok"})
         self.assertEqual(len(msgs), 4)
 
+    def test_derive_and_context_include_one_nudge(self):
+        events = [event(RUN_ID, 1, "run_start", dict(RUN_START)),
+                  event(RUN_ID, 2, "turn", dict(TURN)),
+                  event(RUN_ID, 3, "nudge", dict(NUDGE)),
+                  turn_with_call(4)]
+        self.assertTrue(agent.derive(events)["nudged"])
+        msgs = agent.context(events, RUN_START["task"])
+        self.assertEqual(msgs[2]["content"], None)
+        self.assertEqual(msgs[3], {"role": "user", "content": NUDGE["text"]})
+        self.assertEqual(msgs[4]["role"], "assistant")
+        self.assertEqual(msgs[5], {"role": "tool", "tool_call_id": "c1", "content": "ok"})
+
     def test_context_header_is_stable_across_inline_limits(self):
         one = dict(RUN_START, max_inline=1234)
         two = dict(RUN_START, max_inline=999)
@@ -69,6 +81,7 @@ class AgentContextTest(unittest.TestCase):
         self.assertIn("Issue independent tool calls together", text)
         self.assertIn("Large observations", text)
         self.assertIn("Grep for the line you need", text)
+        self.assertIn("one nudge", text)
         self.assertNotIn("{max_inline}", text)
 
     def test_read_turn(self):

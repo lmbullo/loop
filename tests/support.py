@@ -23,6 +23,7 @@ TURN = {"turn": 1, "finish_reason": "stop",
         "calls": [], "done": None}
 ERROR = {"code": 4, "text": "bad", "finish": "http_error"}
 RESUME = {"from_seq": 1, "turn": 1, "messages": 2, "root": "/tmp/root", "by": "resume"}
+NUDGE = {"text": "continue after the silent stop"}
 INTERRUPTED = {"reason": "server_stop", "last_seq": 2, "by": "server"}
 
 

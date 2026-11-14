@@ -53,6 +53,9 @@ as the only source of truth.
 - The system header is constant across runs; task and run-specific values enter
   after it, so the prefix is cacheable.
 - Output is metered and reported, never gated.
+- A terminal turn with no tool call and no text is not final on its own: after
+  prior work the loop records one `nudge` user message and retries; a second
+  silent stop ends with `finish=no_tool_call`.
 - `LOOP_ROOT` is the workspace identity: root, sandbox, daemon, socket, queue
   and registry all follow it; `LOOP_RUNS` selects the state directory.
 - One run per tree, enforced by `.logs/run.lock`; a second `api` queues a front

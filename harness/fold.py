@@ -17,6 +17,7 @@ def derive(events):
     task = root = max_inline = None
     turn = obs_n = 0
     done = None
+    nudged = False
     for ev in events:
         d = ev["data"]
         if ev["type"] == "run_start":
@@ -26,10 +27,12 @@ def derive(events):
             turn = int(d.get("turn") or turn)
             obs_n += len(d.get("calls") or [])
             done = d.get("done")
+        elif ev["type"] == "nudge":
+            nudged = True
         elif ev["type"] == "resume" and root is None:
             root = d.get("root")
     return {"task": task, "root": root, "turn": turn, "obs_n": obs_n,
-            "done": done, "max_inline": max_inline}
+            "done": done, "max_inline": max_inline, "nudged": nudged}
 
 
 def pending_verify(events):
@@ -44,6 +47,9 @@ def context(events, task):
     msgs = [{"role": "system", "content": api.header()},
             {"role": "user", "content": task or ""}]
     for ev in events:
+        if ev["type"] == "nudge":
+            msgs.append({"role": "user", "content": ev["data"]["text"]})
+            continue
         if ev["type"] != "turn":
             continue
         msgs.append(ev["data"]["message"])

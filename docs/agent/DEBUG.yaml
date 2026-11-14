@@ -33,6 +33,7 @@ symptoms:
   - {symptom: api exits 4, inspect: "record error event; server logs", action: "HTTP error; read the recorded body and the model/env settings before retrying"}
   - {symptom: api exits 5, inspect: "server logs; server status", action: "control plane unavailable; fix the daemon, then retry; do not assume the task ran"}
   - {symptom: api exits 130, inspect: "record interrupted event; server logs", action: "the run was cancelled or force-stopped; inspect the record, then decide whether to resume"}
+  - {symptom: run ends finish=no_tool_call, inspect: "view RUN_ID; the last turn has no tool_calls and empty content; a nudge event should precede a second turn", action: "after prior work the loop nudges once; a second silent stop is terminal; resume the run if the work is still usable"}
   - {symptom: resume exits 5, inspect: "server status; lock holders; live worker", action: "a tree run or the record is held, or the run is live; wait; do not force"}
   - {symptom: resume exits 2, inspect: "view --list; record state", action: "the run is complete, corrupt or the id is wrong; nothing to resume"}
   - {symptom: record is corrupt, inspect: "view RUN_ID; raw lines", action: "never rewrite complete lines; preserve the file, find the first bad seq/field/JSON line and fix the producer/test"}

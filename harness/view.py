@@ -45,6 +45,8 @@ def lines(ev):
             out.append("   -> " + one(call["observation"], _limit("obs")))
         if data["done"] is not None:
             out.append("  done: " + one(data["done"]["result"], _limit("text")))
+    elif kind == "nudge":
+        out.append("[nudge] " + one(data["text"], _limit("text")))
     elif kind == "resume":
         out.append(f"[resume] from_seq={data['from_seq']} turn={data['turn']} "
                    f"messages={data['messages']} by={data['by']}")

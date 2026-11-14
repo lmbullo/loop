@@ -33,6 +33,7 @@ line:
 events:
   - {type: run_start, terminal: false, data: "task str, root str, entrypoint str, model str, tools list<str>, max_inline int, record_source str"}
   - {type: turn, terminal: false, data: "turn int, finish_reason str|null, usage usage, message message, calls list<call>, done done|null"}
+  - {type: nudge, terminal: false, data: "text str"}
   - {type: resume, terminal: false, data: "from_seq int, turn int, messages int, root str, by str"}
   - {type: verify, terminal: false, data: "command str, ran bool, exit int|null, note str|null"}
   - {type: error, terminal: false, data: "code int, text str, finish str"}
@@ -48,9 +49,11 @@ types:
   done: {id: str, result: str}
 
 event_notes:
-  assistant_content: stored as null in the message; terminal text is kept only in end.result
+  assistant_content: stored as null in the message; a silent stop stores "" so the next request has a valid assistant turn; terminal text is kept only in end.result
   done_call: appears on the assistant message but is not appended as a call; turn.done records it and the run ends
-  no_tool_call: "empty content -> finish=no_tool_call; non-empty content -> finish=done with result=stripped content"
+  non_str_done: "done.result must be str; a non-str result is an err bad_args observation and the run continues"
+  no_tool_call: "non-empty content -> finish=done with result=stripped content; empty content after prior work -> one nudge event and another turn; a second empty content -> finish=no_tool_call"
+  nudge: "one user message recorded after an empty terminal turn with turn > 1 and no earlier nudge; fold.context inserts it at its seq; it is not a turn"
   resume_event: records from_seq, turn and rebuilt message count; it does not replay old tool calls
   verify_declaration: {ran: false, exit: null, note: null, when: "before the first turn, only when the task carries a command"}
   verify_result: {ran: true, when: "after the terminal turn, before end", exit: "0 means ok; the event stores exit and view renders ok=1/0", note: "first non-blank stdout+stderr line plus ms=<duration>"}
@@ -66,6 +69,7 @@ state:
   view_text_note: "view RUN_ID renders record state, not listing state; a live run still shows [interrupted] reason=no_terminal_event until end or an interrupted event"
 
 derived_view_lines:
+  - "[nudge] <text> for a nudge event"
   - "[interrupted] reason=no_terminal_event last_seq=N by=- when the last event is not interrupted and state != complete"
   - "[torn] bytes=N dropped=1 when the reader found a partial trailing line"
 
@@ -73,10 +77,10 @@ fold:
   module: harness/fold.py
   functions:
     - {name: totals_of, effect: "sum turn.usage into hit/miss/out/reasoning_c"}
-    - {name: derive, effect: "task, root, turn, obs_n, the last done call and max_inline"}
+    - {name: derive, effect: "task, root, turn, obs_n, nudged, the last done call and max_inline"}
     - {name: pending_verify, effect: "last verify.command with ran=false, else null; a ran=true event clears it"}
     - {name: context, effect: "rebuild the request message list"}
-  aliases: harness.agent re-exports totals_of, derive and context for callers and tests
+  aliases: harness.agent re-exports totals_of, derive, context and the turn helpers read_turn/run_calls/stop for callers and tests
   shape: |
     [
       {"role":"system","content":api.header()},
@@ -85,6 +89,8 @@ fold:
         turn.data.message,
         for each call in turn.data.calls:
           {"role":"tool","tool_call_id":call.id,"content":call.observation}
+      for each nudge event, at its seq:
+        {"role":"user","content":nudge.text}
     ]
   header: constant api.header() text; it carries no run id, task, root, model or max_inline value
   max_inline: run_start.max_inline pins only the observation bound for the run
