@@ -3,21 +3,45 @@ import curses
 from .prompt import cw, display, swidth
 from .model import money
 
-PAIR = {"status": 1, "label": 2, "dim": 3, "sel": 4, "rule": 5, "err": 6}
+PAIR = {"status": 1, "label": 2, "dim": 3, "sel": 4, "rule": 5, "err": 6,
+        "ok": 7, "accent": 8}
+
+# Gruvbox 256-color approximations on a grey base. Every pair keeps the
+# terminal background (-1), so the user's background is never repainted.
+GRUVBOX = {
+    "status": 250,  # light2 #d5c4a1
+    "label": 208,   # orange #fe8019
+    "dim": 245,     # gray   #928374
+    "sel": 214,     # yellow #fabd2f
+    "rule": 243,    # dark4  #7c6f64
+    "err": 167,     # red    #fb4934
+    "ok": 142,      # green  #b8bb26
+    "accent": 108,  # aqua   #8ec07c
+}
+BASE = {  # eight-color terminals: grey from white, gruvbox hues elsewhere
+    "status": curses.COLOR_WHITE,
+    "label": curses.COLOR_YELLOW,
+    "dim": curses.COLOR_WHITE,
+    "sel": curses.COLOR_YELLOW,
+    "rule": curses.COLOR_WHITE,
+    "err": curses.COLOR_RED,
+    "ok": curses.COLOR_GREEN,
+    "accent": curses.COLOR_CYAN,
+}
 
 
 def init_colors():
     try:
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
-        curses.init_pair(2, curses.COLOR_CYAN, -1)
-        curses.init_pair(3, curses.COLOR_BLUE, -1)
-        curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_YELLOW)
-        curses.init_pair(5, curses.COLOR_CYAN, -1)
-        curses.init_pair(6, curses.COLOR_RED, -1)
+        fg = GRUVBOX if curses.COLORS >= 256 else BASE
     except curses.error:
-        pass
+        return
+    for name, pair in PAIR.items():
+        try:
+            curses.init_pair(pair, fg[name], -1)
+        except curses.error:
+            pass
 
 
 def attr(name):
@@ -80,6 +104,9 @@ def rule(width, left="", right=""):
     return left + "\u2500" * fill + right
 
 
+STATE = {"running": "accent", "complete": "ok", "corrupt": "err"}
+
+
 def task_rows(snap, width):
     cur = snap["current"]
     if cur is None:
@@ -88,7 +115,7 @@ def task_rows(snap, width):
             f"cost={money(cur['cost'])}")
     if cur.get("finish"):
         info += f" finish={cur['finish']}"
-    rows = [(fit(info, width), "label")]
+    rows = [(fit(info, width), STATE.get(cur["state"], "label"))]
     if cur.get("detail"):
         rows.append((fit(display(cur["detail"]), width), "err"))
     text = display(cur.get("text") or "")
@@ -144,7 +171,7 @@ def queue_block(scr, snap, y, end, width, height, focus, qsel):
         first = (item.get("text") or "").replace("\n", " ").replace("\r", " ")
         mark = ">" if focus and idx == qsel else " "
         line = f"{mark} {item['id']:<8} {item['state']:<8} {first}"
-        at = attr("sel") if focus and idx == qsel else 0
+        at = (attr("sel") | curses.A_BOLD) if focus and idx == qsel else 0
         put(scr, y, 0, fit(line, width), width, height, at)
         y += 1
     return y

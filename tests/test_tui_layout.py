@@ -72,5 +72,18 @@ class TuiLayoutTest(unittest.TestCase):
             self.assertEqual(swidth(status_line(snap, width, "prompt")), width)
 
 
+class TuiPaletteTest(unittest.TestCase):
+    def test_palette_tables_are_complete(self):
+        from tui import panes
+        pairs = panes.PAIR
+        self.assertEqual(sorted(pairs.values()), list(range(1, len(pairs) + 1)))
+        self.assertEqual(set(pairs), set(panes.GRUVBOX))
+        self.assertEqual(set(pairs), set(panes.BASE))
+        for fg in panes.BASE.values():
+            self.assertTrue(0 <= fg < 8)
+        for fg in panes.GRUVBOX.values():
+            self.assertTrue(0 <= fg < 256)
+
+
 if __name__ == "__main__":
     unittest.main()

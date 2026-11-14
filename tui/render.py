@@ -44,7 +44,8 @@ def prompt_block(scr, prompt, top, width, height, focus, content_w, max_rows):
             down += f" \u2193 {below}"
         down += " "
     label = " prompt " if focus == "prompt" else " prompt (tab) "
-    put(scr, top, 0, rule(width, label, up), width, height, attr("rule"))
+    at = attr("accent") if focus == "prompt" else attr("rule")
+    put(scr, top, 0, rule(width, label, up), width, height, at)
     for k in range(h):
         idx = scroll + k
         text = rows[idx]["text"] if idx < len(rows) else ""
@@ -65,7 +66,8 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
     open_prompt = focus == "prompt"
     ph = lay["height"] + 2 if open_prompt else 0
     ptop = max(0, height - ph)
-    put(scr, 0, 0, status_line(snap, width, focus), width, height, attr("status"))
+    put(scr, 0, 0, status_line(snap, width, focus), width, height,
+        attr("status") | curses.A_BOLD)
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
     tv = {"n": 0, "vis": 0, "sel": 0, "scroll": 0}

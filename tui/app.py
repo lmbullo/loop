@@ -7,7 +7,7 @@ import termios
 import time
 import tty
 
-from . import input, keys, model, prompt, render, worker
+from . import input, keys, model, panes, prompt, render, worker
 
 USAGE = "usage: python3 run.py tui\n\ninteractive terminal client for this tree's daemon"
 
@@ -89,7 +89,7 @@ class App:
             curses.curs_set(1)
         except curses.error:
             pass
-        render.init_colors()
+        panes.init_colors()
         try:
             self.scr.keypad(True)
         except curses.error:
