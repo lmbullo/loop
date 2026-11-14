@@ -1,9 +1,14 @@
 # AGENTS.md
 
-Read this file before changing the tree. It is the operating contract for
-agents. `manifest.json` is the machine-readable contract; `docs/agent/` is the
-task-oriented YAML reference. If code and docs disagree, code wins: fix the doc and,
-when the contract is affected, `manifest.json` in the same commit.
+audience: agents. Read before changing the tree.
+
+`manifest.json` is the machine contract. `docs/agent/index.yaml` is the route
+table. Code wins over docs: fix the doc and, when the contract is affected,
+`manifest.json` in the same commit. Do not add human-facing prose.
+
+Bootstrap: `python3 run.py --json` prints one compact `loop-index/1` line
+(entrypoints, checks, scenarios, docs, invariants, env, layout, record, wire).
+It reads `manifest.json` only: no tree walk, no module import, no absolute paths.
 
 ## What this tree is
 
@@ -12,15 +17,16 @@ observation designs by token cost and correctness, using an append-only record
 as the only source of truth.
 
 - One exec waist: `exec`, `write`, `edit`, `done`.
-- Bounded observations: inline while small, shape summary plus saved bytes
-  when large; binary output is a digest.
-- Cache-aware accounting: the unchanged prefix is a cache hit, only the
-  appended suffix is a miss.
-- Durable runs: one JSONL record per run; `view` is a pure function over the
-  bytes, and `resume` rebuilds state from the same bytes and continues.
-- Detached execution: a per-tree control plane owns the queue and worker
-  registry; a detached worker owns the run; the daemon can restart without
-  interrupting work.
+- Bounded observations: inline while small, shape summary plus saved bytes when
+  large; binary output is a digest.
+- Cache-aware accounting: the unchanged prefix is a cache hit, only the appended
+  suffix is a miss.
+- Durable runs: one JSONL record per run; `view` is a pure function over bytes;
+  `resume` rebuilds state from the same bytes and continues.
+- Detached execution: a per-tree control plane owns queue and worker registry; a
+  detached worker owns the run; the daemon can restart without interrupting work.
+- Optional verification: `--verify CMD` is declared before the first turn, run
+  at the run root after `done`, and recorded before `end`; absence is not a pass.
 
 ## Read order
 
@@ -30,7 +36,7 @@ as the only source of truth.
 | Route by task, fast facts, machine routes | `docs/agent/index.yaml` |
 | Find the owning module | `docs/agent/MAP.yaml` |
 | Inspect, resume, change records | `docs/agent/RECORD.yaml` |
-| Tools, observations, cost | `docs/agent/WIRE.yaml` |
+| Tools, observations, verify, cost | `docs/agent/WIRE.yaml` |
 | Daemon, queue, workers | `docs/agent/SERVER.yaml` |
 | Change/test/verify/commit | `docs/agent/WORKFLOWS.yaml` |
 | Diagnose a failure | `docs/agent/DEBUG.yaml` |
@@ -43,21 +49,26 @@ as the only source of truth.
   completion marker. A missing `end` is the interrupted marker.
 - Observations are verbatim except for the bounding rule in `harness/observe.py`.
 - Output is metered and reported, never gated.
-- Fixtures and `records/` are read-only. Every run mounts a fresh fixture copy
-  under `.logs/`.
-- No absolute paths in tracked files; roots come from `__file__` or env.
+- `LOOP_ROOT` is the workspace identity: root, sandbox, daemon, socket, queue
+  and registry all follow it; `LOOP_RUNS` selects the state directory.
+- One run per tree, enforced by `.logs/run.lock`; a second `api` queues a front
+  item and waits for the live run.
 - The control plane never executes a run; workers survive daemon restart.
 - The TUI never owns a run or authoritative state; server code never imports
   `tui/`.
-- One run per tree, enforced by the tree lock; a second `api` queues a front
-  item and waits for the live run.
+- Fixtures and `records/` are read-only. Every run mounts a fresh fixture copy
+  under `.logs/`.
+- No absolute paths in tracked files; roots come from `__file__` or env.
 - `exec` argv is literal: no shell, globs, pipes or redirects unless the caller
   passes `sh -c` explicitly.
 - Source modules stay under 200 lines. Split, do not grow.
+- A `verify` event is evidence, not a gate: exit 0 -> `ok=1`, any other exit ->
+  `ok=0`; no command -> no event.
 
 ## Commands
 
 ```sh
+python3 run.py --json               # agent index, loop-index/1
 python3 run.py                      # usage and the manifest entry point list
 python3 run.py check lines          # 200-line source audit
 python3 run.py check tui            # resize/truncation contract
@@ -69,6 +80,7 @@ python3 run.py sim2 task2           # offline shape-aware sim
 python3 run.py probe                # headless TUI render of a snapshot
 python3 run.py server status        # this tree's control plane
 python3 run.py api "task"           # real model call; costs money and network
+python3 run.py api --verify CMD "task"  # same, then record verify evidence
 make check                          # compile + line + tui checks
 make test                           # stdlib unittest suite
 make verify                         # manifest-driven offline checks
@@ -83,7 +95,7 @@ argv has an element exactly equal to `server` or `api`.
 
 ## Layout
 
-- `run.py` - dispatcher; reads `manifest.json`.
+- `run.py` - dispatcher and `--json` index; reads `manifest.json`.
 - `harness/` - loop, record, control plane, sims, offline checks.
 - `tui/` - thin polling renderer over daemon snapshots.
 - `scenarios/` - offline sim transcripts.
@@ -96,7 +108,8 @@ argv has an element exactly equal to `server` or `api`.
 
 ## Change protocol
 
-1. Find the affected file in `manifest.files[]` and read its `role`.
+1. Run `python3 run.py --json`; find the affected file in `files[]` and read its
+   `role`.
 2. Make the smallest change that preserves the invariants above.
 3. Keep every source module under 200 lines. New behavior goes in a new module
    if needed, not as an append to a near-limit file.
@@ -130,6 +143,7 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 
 ## Definition of done
 
+- `python3 run.py --json` exits 0 and parses as `loop-index/1`.
 - `python3 -m compileall -q harness tui run.py` exits 0.
 - `python3 run.py check lines` exits 0 with `over=0`.
 - `python3 run.py check tui` exits 0.
@@ -143,9 +157,8 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 
 ## Traps
 
-- `.logs/` is shared by the queue, worker registry, records and server. Stop
-  the daemon before deleting it; deleting it under a live worker corrupts the
-  run.
+- `.logs/` is shared by the queue, worker registry, records and server. Stop the
+  daemon before deleting it; deleting it under a live worker corrupts the run.
 - `record.jsonl` is a durable log, not a cache. Never rewrite complete lines.
 - `view` must not read the clock, cwd, network or server.
 - `server restart` replaces the control plane only. Do not assume workers die.
@@ -155,4 +168,6 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 - `edit` requires exactly one match; fix the caller, not the matcher.
 - Binary observations are a digest only; raw bytes are not saved. Large text
   bytes are saved under the run's `obs/`.
+- A declared verify command with `ran: false` is pending; a `ran: true` result is
+  final and is never rerun on resume.
 - See `docs/agent/DEBUG.yaml` for the full symptom matrix and recovery order.

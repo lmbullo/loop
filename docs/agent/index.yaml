@@ -152,7 +152,7 @@ traps:
 format:
   schema: loop-agent-doc/1
   ext: .yaml
-  roots: AGENTS.md and README.md stay Markdown entry points; docs/agent/* are YAML
+  roots: AGENTS.md and README.md are machine-first Markdown entry points; docs/agent/* are YAML
   style: dense keys, facts not prose, prefer manifest references over duplicated contract values
   add_doc:
     - create docs/agent/NAME.yaml with schema, id, title, read_when, source, verify
