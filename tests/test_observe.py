@@ -44,6 +44,13 @@ class ObserveTest(unittest.TestCase):
         with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
             self.assertEqual(f.read(), raw)
 
+    def test_save_rel_base_outside_base_falls_back(self):
+        elsewhere = os.path.join(self.tmp.name, "other")
+        os.makedirs(elsewhere)
+        path = observe.save(b"data", self.obs, "o2.txt", rel_base=elsewhere)
+        self.assertTrue(os.path.isabs(path))
+        self.assertTrue(os.path.isfile(path))
+
     def test_render_v1_small_and_large(self):
         body, nbytes, trunc = observe.render_v1(b"hello", self.obs, "v1")
         self.assertEqual((body, nbytes, trunc), ("hello", 5, False))

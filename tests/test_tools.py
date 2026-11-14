@@ -34,9 +34,9 @@ class ToolsTest(unittest.TestCase):
 
     def test_edit_requires_unique_match(self):
         tools.do_write({"path": "a.txt", "data": "x x"}, self.root)
-        self.assertIn("match=2 expected=1",
+        self.assertIn("match=2 expected=1 a.txt",
                       tools.do_edit({"path": "a.txt", "old": "x", "new": "y"}, self.root))
-        self.assertIn("match=0 expected=1",
+        self.assertIn("match=0 expected=1 a.txt",
                       tools.do_edit({"path": "a.txt", "old": "z", "new": "y"}, self.root))
 
     def test_edit_bad_args(self):
@@ -60,6 +60,11 @@ class ToolsTest(unittest.TestCase):
         out = tools.dispatch("edit", {"path": "d.txt", "old": "z", "new": "q"},
                              self.obs, "o2", self.root)
         self.assertIn("ok -1 +1", out)
+
+    def test_dispatch_unknown_tool(self):
+        out = tools.dispatch("read", {"path": "d.txt"}, self.obs, "o1", self.root)
+        self.assertIn("err unknown_tool read", out)
+        self.assertIn("exec, write, edit, done", out)
 
 
 if __name__ == "__main__":

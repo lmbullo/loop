@@ -61,7 +61,7 @@ def read_turn(r):
     return hit, miss, out, len(msg.get("reasoning_content") or ""), choice.get("finish_reason"), message, msg.get("content")
 
 
-def run_calls(message, obs_dir, run_dir, root, obs_n):
+def run_calls(message, obs_dir, root, obs_n):
     calls = []
     done = None
     for call in message["tool_calls"]:
@@ -81,7 +81,8 @@ def run_calls(message, obs_dir, run_dir, root, obs_n):
         obs_n += 1
         saved = []
         try:
-            obs = tools.dispatch(fn, args, obs_dir, f"obs-{obs_n}", root, run_dir, saved)
+            obs = tools.dispatch(fn, args, obs_dir, f"obs-{obs_n}", root,
+                                 rel_base=root, saved=saved)
         except Exception as e:
             obs = (f"err harness {type(e).__name__}: {e}; "
                    f"exec argv, write path+data, edit path+old+new")
@@ -124,7 +125,6 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         return {"run_id": writer.run_id, "entrypoint": "api", "exit": 3}
     turn, obs_n = st["turn"], st["obs_n"]
     obs_dir = record.obs_dir(writer.run_id)
-    run_dir = record.run_dir(writer.run_id)
     while True:
         if should_stop is not None and should_stop():
             return stopped(writer, events, turn)
@@ -143,7 +143,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
             emit(ev)
             return finish(writer, emit, events + [ev], turn, "http_error", None, 4)
         hit, miss, out, reason, finish_reason, message, text = read_turn(r)
-        calls, done, obs_n = run_calls(message, obs_dir, run_dir, root, obs_n)
+        calls, done, obs_n = run_calls(message, obs_dir, root, obs_n)
         ev = writer.append("turn", {
             "turn": turn, "finish_reason": finish_reason,
             "usage": {"hit": hit, "miss": miss, "out": out, "reasoning_c": reason,

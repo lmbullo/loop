@@ -68,7 +68,7 @@ class AgentContextTest(unittest.TestCase):
             message = {"tool_calls": [
                 {"id": "bad", "function": {"name": "exec", "arguments": "[]"}},
                 {"id": "done", "function": {"name": "done", "arguments": '{"result":"r"}'}}]}
-            calls, done, obs_n = agent.run_calls(message, tmp, tmp, tmp, 0)
+            calls, done, obs_n = agent.run_calls(message, tmp, tmp, 0)
             self.assertEqual(len(calls), 1)
             self.assertIn("malformed_arguments", calls[0]["observation"])
             self.assertEqual(done, {"id": "done", "result": "r"})
@@ -79,10 +79,21 @@ class AgentContextTest(unittest.TestCase):
             message = {"tool_calls": [{
                 "id": "c1", "function": {"name": "exec", "arguments": json.dumps(
                     {"argv": [sys.executable, "-c", "print('hi')"]})}}]}
-            calls, done, obs_n = agent.run_calls(message, tmp, tmp, tmp, 0)
+            calls, done, obs_n = agent.run_calls(message, tmp, tmp, 0)
             self.assertIsNone(done)
             self.assertEqual(obs_n, 1)
             self.assertIn("hi", calls[0]["observation"])
+
+    def test_run_calls_saved_path_is_root_relative(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            obs_dir = os.path.join(tmp, ".logs", "runs", "r1", "obs")
+            message = {"tool_calls": [{
+                "id": "c1", "function": {"name": "exec", "arguments": json.dumps(
+                    {"argv": [sys.executable, "-c", "print('x' * 40000)"]})}}]}
+            calls, _, _ = agent.run_calls(message, obs_dir, tmp, 0)
+            saved = calls[0]["saved"]
+            self.assertFalse(os.path.isabs(saved))
+            self.assertTrue(os.path.isfile(os.path.join(tmp, saved)))
 
     def test_finish_and_stopped(self):
         with sandbox():

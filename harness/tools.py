@@ -49,7 +49,7 @@ def do_edit(a, sandbox=None):
         return f"err {type(e).__name__}: {e}"
     old, new = a["old"].encode(), a["new"].encode()
     if s.count(old) != 1:
-        return f"err match={s.count(old)} expected=1"
+        return f"err match={s.count(old)} expected=1 {a['path']}"
     i = s.find(old)
     s2 = s[:i] + new + s[i + len(old):]
     with open(path, "wb") as f:
@@ -63,4 +63,6 @@ def dispatch(fn, a, obs_dir, name, sandbox=None, rel_base=None, saved=None):
         return do_exec(a, obs_dir, name, sandbox, rel_base, saved)
     if fn == "write":
         return do_write(a, sandbox)
-    return do_edit(a, sandbox)
+    if fn == "edit":
+        return do_edit(a, sandbox)
+    return f"err unknown_tool {fn} expected one of exec, write, edit, done"

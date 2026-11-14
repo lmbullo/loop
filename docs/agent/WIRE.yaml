@@ -49,12 +49,12 @@ tools:
     details:
       - missing or empty path returns err bad_args edit requires path:str
       - old and new must be str; otherwise "err bad_args edit requires old:str and new:str; <key> incorrect"
-      - exactly one match is required; zero or multiple returns err match=<n> expected=1 and does not change the file
+      - exactly one match is required; zero or multiple returns err match=<n> expected=1 <path> and does not change the file
       - success is "ok -<old bytes> +<new bytes> <path>" and a window from 40 bytes before to 40 bytes after the replacement
   done:
     signature: "done(result: str)"
     behavior: end the run; result goes to turn.done.result and end.result
-    dispatch: not dispatched; agent.run_calls() sets turn.done and breaks the call list; any other tool name falls through to edit and normally fails with err bad_args edit ...
+    dispatch: not dispatched; agent.run_calls() sets turn.done and breaks the call list; any other name returns err unknown_tool <name> expected one of exec, write, edit, done
 
 verify:
   entry: "run.py api --verify CMD [TASK|-]"
@@ -73,13 +73,13 @@ observation:
   cases:
     - {when: binary sample, output: "kind=binary bytes=<n> sha256=<16 hex> head_hex=<24 bytes>"}
     - {when: "len(raw) <= LOOP_MAX_INLINE", output: raw UTF-8 text, verbatim}
-    - {when: larger text, output: "kind=text bytes=<n> lines=<n> saved=<run-relative path> then first15: and last5:"}
+    - {when: larger text, output: "kind=text bytes=<n> lines=<n> saved=<root-relative path> then first15: and last5:"}
     - {when: no output, output: empty string}
   bounding:
     - binary means more than 20% of the first 4096 bytes are non-printable (<9, 14..31, or >126)
     - binary output is not saved; the digest is the only recoverable description
     - large text is saved at .logs/runs/<run_id>/obs/obs-<k>.txt; k counts dispatched tool observations over the run; done and malformed-argument calls do not consume a name
-    - saved paths in the wire are run-relative (obs/obs-<k>.txt) so a record renders the same from any cwd
+    - saved paths are root-relative (.logs/runs/<run_id>/obs/obs-<k>.txt), so the agent reads one from the run cwd without knowing the run id; an obs dir outside the run root yields an absolute path
     - first15 and last5 show at most 15 and 5 source lines, each cut to 160 characters; full bytes are in the saved file
     - read saved files in ranges; do not dump them back into the message list
     - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set only when a large text file was saved
@@ -92,7 +92,8 @@ failures:
     - {trigger: "write missing or empty path", observation: "err bad_args write requires path:str"}
     - {trigger: "edit missing or empty path", observation: "err bad_args edit requires path:str"}
     - {trigger: "edit missing or non-str old or new", observation: "err bad_args edit requires old:str and new:str; <key> incorrect"}
-    - {trigger: edit match count is not 1, observation: "err match=<n> expected=1"}
+    - {trigger: edit match count is not 1, observation: "err match=<n> expected=1 <path>"}
+    - {trigger: tool name is not exec, write, edit or done, observation: "err unknown_tool <name> expected one of exec, write, edit, done"}
     - {trigger: tool body raises, observation: "err harness <TypeName>: <detail>; exec argv, write path+data, edit path+old+new"}
     - {trigger: file open or write fails, observation: "err <TypeName>: <detail>"}
   malformed_rule: malformed arguments and harness errors are appended as call observations; the turn continues

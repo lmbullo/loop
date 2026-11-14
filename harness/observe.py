@@ -23,7 +23,8 @@ def save(raw, obs_dir, name, rel_base=None):
     with open(path, "wb") as f:
         f.write(raw)
     if rel_base:
-        return os.path.relpath(path, rel_base)
+        rel = os.path.relpath(path, rel_base)
+        return path if rel.startswith(os.pardir + os.sep) or rel == os.pardir else rel
     return config.display(path)
 
 
