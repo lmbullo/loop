@@ -1,4 +1,4 @@
-from . import api, config
+from . import api
 
 ZERO = {"hit": 0, "miss": 0, "out": 0, "reasoning_c": 0}
 
