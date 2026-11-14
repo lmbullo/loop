@@ -1,5 +1,6 @@
 from .cancel import cancel_queue, cancel_task
 from .loginput import close_log, log_key, open_log
+from .mouse import handle as mouse_event
 from .nav import queue_sel, sync_queue_sel, toggle_focus
 from .rows import task_sel
 
@@ -157,10 +158,9 @@ def task_key(app, key):
 
 def handle(app, ev):
     kind, value = ev
-    if kind == "paste":
-        open_prompt(app, value)
-        return
-    if kind == "text":
+    if kind == "mouse":
+        return mouse_event(app, value)
+    if kind in ("paste", "text"):
         open_prompt(app, value)
         return
     if value == "ctrl_q":

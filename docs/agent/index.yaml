@@ -42,6 +42,7 @@ routes:
   - {task: read a run's full final summary in the tui, read: [docs/agent/MAP.yaml], run: [python3, run.py, tui]}
   - {task: scroll a run log or open the prompt from the log, read: [docs/agent/MAP.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, tui]}
   - {task: change tui redraw or live-log tailing, read: [docs/agent/MAP.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, check, tui]}
+  - {task: copy text from the tui, read: [docs/agent/MAP.yaml], run: [python3, run.py, tui]}
   - {task: cancel the selected task in the tui, read: [docs/agent/MAP.yaml, docs/agent/SERVER.yaml], run: [python3, run.py, tui]}
   - {task: add a test or scenario, read: [docs/agent/WORKFLOWS.yaml], run: [make, test]}
   - {task: install the loop command for users, read: [README.md, AGENTS.md], run: [sh, install.sh]}

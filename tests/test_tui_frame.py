@@ -116,5 +116,65 @@ class FrameTest(unittest.TestCase):
         self.assertEqual(target.lines[4], "x" * 11)
 
 
+class HighlightTest(unittest.TestCase):
+    def test_selected_cells_are_repainted_in_reverse_video(self):
+        target = Target()
+        f = frame.Frame(target)
+        f.resize(12, 5)
+        f.erase()
+        f.addstr(0, 0, "hello")
+        f.highlight([(0, 1, 4)])
+        flush(f)
+        marked = {call[1:3] for call in target.calls
+                  if call[0] == 0 and call[3] == frame.HIGHLIGHT}
+        self.assertIn((1, "ell"), marked)
+        self.assertEqual(f.row_text(0), "hello       ")
+
+    def test_the_highlight_can_cover_blank_cells(self):
+        target = Target()
+        f = frame.Frame(target)
+        f.resize(12, 5)
+        f.erase()
+        f.addstr(0, 0, "hi")
+        f.highlight([(0, 4, 7)])
+        flush(f)
+        self.assertIn((4, "   ", frame.HIGHLIGHT),
+                      [call[1:] for call in target.calls if call[0] == 0])
+
+    def test_clearing_the_highlight_repaints_without_reverse(self):
+        target = Target()
+        f = frame.Frame(target)
+        f.resize(12, 5)
+        f.erase()
+        f.addstr(0, 0, "hello")
+        f.highlight([(0, 1, 4)])
+        flush(f)
+        target.calls = []
+        f.highlight([])
+        flush(f)
+        self.assertTrue(target.calls)
+        self.assertFalse([c for c in target.calls if c[3] == frame.HIGHLIGHT])
+
+    def test_an_unchanged_highlight_does_not_repaint(self):
+        target = Target()
+        f = frame.Frame(target)
+        f.resize(12, 5)
+        f.erase()
+        f.addstr(0, 0, "hello")
+        f.highlight([(0, 1, 4)])
+        flush(f)
+        target.calls = []
+        flush(f)
+        self.assertEqual(target.calls, [])
+
+    def test_spans_are_clipped_and_merged(self):
+        f = frame.Frame(Target())
+        f.resize(6, 3)
+        f.highlight([(-1, 0, 2), (0, 1, 3), (0, 2, 5), (0, 9, 12)])
+        self.assertEqual(f.marks, [(0, 1, 5)])
+        f.highlight([(7, 0, 2)])
+        self.assertEqual(f.marks, [])
+
+
 if __name__ == "__main__":
     unittest.main()

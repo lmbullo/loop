@@ -7,7 +7,8 @@ import termios
 import time
 import tty
 
-from . import frame, input, keys, loginput, model, prompt, render, theme, worker
+from . import (frame, input, keys, loginput, model, prompt, render,
+               select as selection, theme, worker)
 
 USAGE = "usage: python3 run.py tui\n\ninteractive terminal client for this tree's daemon"
 
@@ -26,6 +27,7 @@ class App:
         self.tview = {"n": 1, "vis": 1, "sel": 0, "scroll": 0}
         self.quit = False
         self.log = None
+        self.sel = None
         self.prompt_from = "task"
         self.h, self.w = scr.getmaxyx()
         self.frame = frame.Frame(scr, sync=True)
@@ -88,6 +90,7 @@ class App:
             self.last_draw = now
             self.dirty = False
             self.frame.resize(self.w, self.h)
+            self.frame.highlight(selection.spans(self.sel, self.w))
             self.layout = render.draw(self.frame, snap, self.prompt, self.w, self.h,
                                       self.focus, self.qsel, self.tsel, self.tscroll,
                                       self.log)
@@ -116,7 +119,7 @@ class App:
         except curses.error:
             pass
         fd = sys.stdin.fileno()
-        os.write(1, b"\x1b[?2004h\x1b[?1000h\x1b[?1006h")
+        os.write(1, b"\x1b[?2004h\x1b[?1002h\x1b[?1006h")
         try:
             old_term = termios.tcgetattr(fd)
             tty.setraw(fd)
@@ -142,7 +145,7 @@ class App:
                 self.paint()
         finally:
             try:
-                os.write(1, b"\x1b[?2004l\x1b[?1006l\x1b[?1000l")
+                os.write(1, b"\x1b[?2004l\x1b[?1006l\x1b[?1002l")
             except OSError:
                 pass
             if old_term is not None:

@@ -14,8 +14,11 @@ import curses
 import os
 import sys
 
+from . import highlight
+
 SYNC_BEGIN = b"\x1b[?2026h"
 SYNC_END = b"\x1b[?2026l"
+HIGHLIGHT = curses.A_REVERSE
 
 
 def sync_supported():
@@ -51,6 +54,8 @@ class Frame:
         self.height = 0
         self.rows = []
         self.prev = None
+        self.marks = []
+        self.prev_marks = []
         self.cursor = None
         self.visible = None
 
@@ -67,6 +72,17 @@ class Frame:
     def invalidate(self):
         """Drop the previous frame so the next flush repaints every row."""
         self.prev = None
+
+    def highlight(self, spans):
+        """Reverse-video spans ``(row, x0, x1)`` in screen cells, merged per row."""
+        self.marks = highlight.spans(spans, self.width, self.height)
+
+    def row_text(self, y, width=None):
+        """The characters committed on row ``y``, spaces included."""
+        if not (0 <= y < self.height):
+            return ""
+        return highlight.row_text(self.rows[y], y,
+                                  self.width if width is None else width)
 
     def erase(self):
         self.rows = [[] for _ in range(self.height)]
@@ -92,11 +108,17 @@ class Frame:
     def flush(self, show_cursor=False):
         """Commit changed rows, then update the real terminal exactly once."""
         self._visibility(bool(show_cursor))
+        moved = set()
+        if self.prev_marks != self.marks:
+            moved = {y for y, _, _ in self.prev_marks + self.marks}
+        if self.prev is None:
+            moved = set()
         for y, ops in enumerate(self.rows):
-            if self.prev is not None and self.prev[y] == ops:
+            if self.prev is not None and self.prev[y] == ops and y not in moved:
                 continue
-            self._paint(y, ops)
+            self._paint(y, ops, self._marks(y))
         self.prev = [list(ops) for ops in self.rows]
+        self.prev_marks = list(self.marks)
         if show_cursor and self.cursor is not None:
             try:
                 self.target.move(self.cursor[0], self.cursor[1])
@@ -117,6 +139,9 @@ class Frame:
             if begin:
                 _write(SYNC_END)
 
+    def _marks(self, y):
+        return highlight.row_marks(self.marks, y)
+
     def _visibility(self, on):
         if self.visible == on:
             return
@@ -126,7 +151,7 @@ class Frame:
             pass
         self.visible = on
 
-    def _paint(self, y, ops):
+    def _paint(self, y, ops, marks=()):
         room = self.width
         if y == self.height - 1:
             room -= 1
@@ -136,8 +161,17 @@ class Frame:
             self.target.addstr(y, 0, " " * room)
         except curses.error:
             return
+        for x0, x1 in marks:
+            x0, x1 = max(0, min(x0, room)), max(0, min(x1, room))
+            if x1 > x0:
+                try:
+                    self.target.addstr(y, x0, " " * (x1 - x0), HIGHLIGHT)
+                except curses.error:
+                    break
         for x, text, attr in ops:
-            try:
-                self.target.addstr(y, x, text, attr)
-            except curses.error:
-                break
+            for px, piece, pattr in highlight.pieces(x, text, attr, marks,
+                                                     HIGHLIGHT):
+                try:
+                    self.target.addstr(y, px, piece, pattr)
+                except curses.error:
+                    return

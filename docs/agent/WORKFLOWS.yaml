@@ -67,6 +67,8 @@ test_map:
   - {test: test_tui_summary.py, contract: wrapped final summary paragraphs, fitted rows, first-row anchoring, free-scroll to the last row}
   - {test: test_tui_loginput.py, contract: enter opens/closes the log, selection/free-scroll keys, refresh policy, prompt over the log, return focus}
   - {test: test_tui_live.py, contract: live tail on open/refresh, navigation pauses, end resumes, wheel pauses, finished logs open at top, unchanged refresh stays clean}
+  - {test: test_tui_mouse.py, contract: "mouse decode and copy-on-select: press/drag/release cells, ignored buttons, reverse drag, click without motion, copy failure still clears, clamping"}
+  - {test: test_tui_select.py, contract: selection ordering/spans/text, OSC 52 base64 and tmux passthrough, helper fallback, transport failure}
   - {test: test_tui_frame.py, contract: first paint, silent identical frame, row-only repaint, stale-cell clearing, resize/invalidate, cursor visibility, bottom-right safety}
   - {test: test_tui_sections.py, contract: running/queued/done order, queued label, newest-first done rows, glyphs, fitted rows, disk fallback}
   - {test: test_tui_prompt.py, contract: prompt overlay over an open log, task body without a log, log window shrinking above the prompt}
