@@ -1,15 +1,19 @@
 PYTHON ?= python3
 UNIT := $(PYTHON) -m unittest discover -s tests -t . -v
 
-.PHONY: help check test lint verify sim clean
+.PHONY: help index check test lint verify sim clean
 
 help:
+	@echo "index   one-call loop-index/1 from manifest.json"
 	@echo "check   compile + 200-line + tui layout audits"
 	@echo "test    stdlib unittest suite"
 	@echo "lint    ruff E4/E9/F when installed"
 	@echo "verify  manifest-driven offline checks"
 	@echo "sim     run both offline sims"
 	@echo "clean   remove bytecode and test caches (never .logs)"
+
+index:
+	$(PYTHON) run.py --json
 
 check:
 	$(PYTHON) -m compileall -q harness tui run.py

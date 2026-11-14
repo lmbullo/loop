@@ -9,6 +9,7 @@ dispatch:
   entry: run.py
   rule: argv[1] -> manifest.entrypoints[] -> import module.function (default main); no second top-level script
   usage: run.py prints manifest purpose and entrypoint rows on no args or unknown command
+  index: "--json prints one compact loop-index/1 line from manifest.agent_index; no module import, no tree walk, no absolute paths"
 
 entrypoints:
   - {id: api, module: harness.agent, network: true, verify: "--verify CMD runs after done, before end", writes: [daemon queue, job, worker registry, record, lock, obs]}

@@ -8,6 +8,7 @@ rule: code is truth; manifest.json is the machine contract; fix docs and manifes
 
 facts:
   runtime: python >=3.8, stdlib only, tested on 3.12
+  bootstrap: "python3 run.py --json -> one compact loop-index/1 line derived from manifest.json; no tree walk, no absolute paths"
   entry: "python3 run.py <command>; modules are import-only"
   root: dirname(run.py), overridable with LOOP_ROOT
   state: "<repo>/.logs, overridable with LOOP_RUNS"
@@ -29,6 +30,7 @@ docs:
   - {path: docs/agent/DEBUG.yaml, title: Debugging and recovery, read_when: [a command is blocked, a run is stuck, a record is corrupt, verification fails], topics: [probes, symptom matrix, safe commands, recovery order]}
 
 routes:
+  - {task: bootstrap, route and enumerate the contract in one call, read: [manifest.json], run: [python3, run.py, --json]}
   - {task: find the owner of a behavior, read: [docs/agent/MAP.yaml], run: [python3, scripts/repo_map.py]}
   - {task: inspect a run without executing, read: [docs/agent/RECORD.yaml], run: [python3, run.py, view, RUN_ID]}
   - {task: change a tool or observation rule, read: [docs/agent/WIRE.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, sim1, edge]}
@@ -47,6 +49,8 @@ routes:
 commands:
   offline:
     - [python3, run.py]
+    - [python3, run.py, --json]
+    - [make, index]
     - [python3, run.py, check, lines]
     - [python3, run.py, check, tui]
     - [python3, run.py, view, --list]

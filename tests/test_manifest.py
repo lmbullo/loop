@@ -20,8 +20,9 @@ class ManifestTest(unittest.TestCase):
         self.assertTrue(m["runtime"]["stdlib_only"])
         self.assertEqual(m["runtime"]["third_party_deps"], [])
         for key in ("entrypoints", "files", "record", "checks", "layout",
-                    "env", "scenarios"):
+                    "env", "scenarios", "agent_index"):
             self.assertIn(key, m)
+        self.assertEqual(m["agent_index"]["schema"], "loop-index/1")
 
     def test_files_exist_and_are_unique(self):
         paths = [entry["path"] for entry in self.manifest["files"]]
@@ -71,6 +72,24 @@ class ManifestTest(unittest.TestCase):
         proc = run_py("view", "--schema")
         self.assertEqual(proc.returncode, 0)
         self.assertEqual(json.loads(proc.stdout)["schema"], "loop-record/1")
+
+    def test_agent_index(self):
+        proc = run_py("--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        doc = json.loads(proc.stdout)
+        self.assertEqual(doc["schema"], "loop-index/1")
+        self.assertEqual(doc["manifest"], "manifest.json")
+        self.assertEqual([e["id"] for e in doc["entrypoints"]],
+                         [e["id"] for e in self.manifest["entrypoints"]])
+        self.assertEqual([c["id"] for c in doc["checks"]],
+                         [c["id"] for c in self.manifest["checks"]])
+        self.assertIn("docs/agent/index.yaml", [d["path"] for d in doc["docs"]])
+        self.assertIn("verify", doc["record"]["events"])
+        self.assertNotIn(ROOT, proc.stdout)
+        again = run_py("--json")
+        self.assertEqual(proc.stdout, again.stdout)
+        bad = run_py("--json", "extra")
+        self.assertEqual(bad.returncode, 2)
 
     def test_view_list_and_line_audit(self):
         with sandbox():

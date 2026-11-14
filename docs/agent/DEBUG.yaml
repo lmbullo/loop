@@ -46,6 +46,7 @@ symptoms:
 
 safe_commands:
   - python3 run.py
+  - python3 run.py --json
   - python3 run.py view --list
   - python3 run.py view RUN_ID [--json]
   - python3 run.py view --schema

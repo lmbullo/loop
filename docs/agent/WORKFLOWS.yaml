@@ -8,6 +8,7 @@ verify: [make verify, python3 scripts/check_manifest.py, "python3 scripts/commit
 ladder:
   rule: run from the tree root; stop at the first failure
   steps:
+    - {n: 0, cmd: "python3 run.py --json", catches: "contract bootstrap: entrypoints, checks, scenarios, docs, invariants, env, layout, record, wire"}
     - {n: 1, cmd: "python3 -m compileall -q harness tui run.py", catches: syntax/import block}
     - {n: 2, cmd: "python3 run.py check lines", catches: "code source over 200 lines or missing"}
     - {n: 3, cmd: "python3 run.py check tui", catches: "fit, one-line call rows, wrapped final summary, log window height, free-scroll clamping, prompt reflow, status width"}
@@ -18,6 +19,8 @@ ladder:
     - {n: 8, cmd: "git status --short", catches: unintended files}
 
 shortcuts:
+  - {cmd: "python3 run.py --json", effect: "one-call agent index (loop-index/1)"}
+  - {cmd: make index, effect: "alias for python3 run.py --json"}
   - {cmd: make check, effect: "compile + line + tui"}
   - {cmd: make test, effect: "stdlib unittest, verbose"}
   - {cmd: make lint, effect: "ruff E4/E9/F when installed; skips otherwise"}
@@ -181,6 +184,7 @@ commit:
     - git status --short
 
 definition_of_done:
+  - python3 run.py --json exits 0 and parses as loop-index/1
   - python3 -m compileall -q harness tui run.py exits 0
   - python3 run.py check lines exits 0 with over=0
   - python3 run.py check tui exits 0

@@ -178,7 +178,7 @@ def main(argv=None):
     if manifest.get("schema") != "harness-manifest/1":
         add(errors, f"schema {manifest.get('schema')!r}")
     for key in ("purpose", "runtime", "entrypoints", "files", "record",
-                "checks", "layout", "env", "scenarios"):
+                "checks", "layout", "env", "scenarios", "agent_index"):
         if key not in manifest:
             add(errors, f"missing top-level {key}")
     paths = check_files(manifest, errors)
