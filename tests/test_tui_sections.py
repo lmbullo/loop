@@ -64,6 +64,14 @@ class SectionsTest(unittest.TestCase):
         self.assertLess(where["running:"], where["queued:"])
         self.assertLess(where["queued:"], where["done:"])
 
+    def test_running_row_does_not_repeat_the_section_state(self):
+        rows = drawn(snap(
+            current={"id": "run", "state": "running", "turns": 1, "cost": 0.1,
+                     "text": "now"}))
+        body = next(line for line in rows.values() if "id=run" in line)
+        self.assertNotIn("running", body)
+        self.assertIn("\u25cf", body)
+
     def test_only_focused_pane_has_selection_marker(self):
         from tui.panes import SELECT
         rows = drawn(snap(

@@ -57,8 +57,7 @@ def task_parts(snap):
     state = (cur.get("state") or "running").lower()
     role = theme.state_role(state)
     parts = [(glyph(state) + " ", role),
-             (state, role),
-             (SEP + f"id={short_id(cur.get('id'))}", "muted"),
+             (f"id={short_id(cur.get('id'))}", "muted"),
              (SEP + f"turns={cur.get('turns') or 0}", "muted"),
              (SEP + f"cost={money(cur.get('cost'))}", "muted")]
     if cur.get("finish"):

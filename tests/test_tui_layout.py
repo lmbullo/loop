@@ -28,9 +28,11 @@ class TuiLayoutTest(unittest.TestCase):
             self.assertNotIn("\n", text)
             self.assertLessEqual(swidth(text), width)
         wide = task_rows(snap, 200)[0][0]
-        for field in ("id=r", "running", "turns=3", "cost=$0.500000",
+        for field in ("id=r", "turns=3", "cost=$0.500000",
                       "bad news", "task"):
             self.assertIn(field, wide)
+        self.assertNotIn("running", wide)
+        self.assertTrue(wide.startswith("\u25cf id=r"))
         self.assertIn("bad news", task_rows(snap, 80)[0][0])
 
     def test_task_rows_idle(self):

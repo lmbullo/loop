@@ -72,8 +72,9 @@ def check_tui():
             want(swidth(text) <= width, f"task row {width} overflow {text!r}")
             want("\n" not in text, f"task row {width} is multiline {text!r}")
     wide = task_rows(snap, 200)[0][0]
-    for field in ("id=run", "running", "turns=3", "cost=$0.000000", "bad news"):
+    for field in ("id=run", "turns=3", "cost=$0.000000", "bad news"):
         want(field in wide, f"task line {field!r} missing from {wide!r}")
+    want("running" not in wide, f"task line repeats the section state: {wide!r}")
     for mark in ("\u25cf", "\u00b7"):
         want(mark in wide, f"task line lost {mark!r} from {wide!r}")
 
