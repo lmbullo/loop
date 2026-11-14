@@ -65,7 +65,7 @@ class App:
             max_rows = max(1, self.h - 2)
             ph = 0
             if self.focus == "prompt":
-                ph = self.prompt.layout(self.content_width(), max_rows)["height"] + 1
+                ph = self.prompt.layout(self.content_width(), max_rows)["height"] + 2
             if self.prompt_h is not None and ph != self.prompt_h:
                 try:
                     self.scr.clear()

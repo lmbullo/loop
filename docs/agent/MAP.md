@@ -110,9 +110,9 @@ run.py api TASK
 | `tui/app.py` | curses shell and raw input loop |
 | `tui/client.py` | daemon snapshot/enqueue/drop/move client |
 | `tui/{input,keys,prompt}.py` | arrow key dispatch, editing, history, wrapping |
-| `tui/panes.py` | fitting/clipping, one-line task and queue rows, muted chrome with a `>` selection marker |
+| `tui/panes.py` | fitting/clipping, horizontal rules, one-line task and queue rows, muted chrome with a `>` selection marker |
 | `tui/theme.py` | one palette: grey chrome roles, muted state hues, grey prompt roles, `init_colors` |
-| `tui/{model,render,worker}.py` | snapshot copy, themed painting, polling |
+| `tui/{model,render,worker}.py` | snapshot copy, themed painting with prompt box edge rules, polling |
 
 ### Support surface
 

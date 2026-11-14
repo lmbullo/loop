@@ -65,6 +65,26 @@ class TuiLayoutTest(unittest.TestCase):
         self.assertEqual(display("a\tb\nc"), "a    b c")
         self.assertNotIn("\n", display("a\nb"))
 
+    def test_prompt_box_edges(self):
+        from tui import render
+
+        class Screen:
+            def __init__(self):
+                self.calls = []
+
+            def addstr(self, y, x, text, at=0):
+                self.calls.append((y, x, text, at))
+
+        prompt = Prompt()
+        prompt.set("hello")
+        screen = Screen()
+        render.prompt_block(screen, prompt, 0, 20, 10, "prompt", 20, 5)
+        top, bottom = screen.calls[0], screen.calls[-1]
+        self.assertIn("\u2500", top[2])
+        self.assertTrue(top[2].startswith(" prompt "))
+        self.assertEqual(bottom[2], "\u2500" * 20)
+        self.assertEqual(bottom[0], top[0] + 2)
+
     def test_status_line_width_is_exact(self):
         for width in (1, 5, 20, 80):
             snap = {"daemon": {"state": "running", "detail": "", "pid": 7},

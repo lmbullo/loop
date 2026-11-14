@@ -42,6 +42,15 @@ def marked(text, cells, mark=""):
     return fit(mark + fit(text, max(0, cells - swidth(mark))), cells)
 
 
+def rule(width, left="", right=""):
+    if width <= 0:
+        return ""
+    left = clip(left, width)
+    right = clip(right, width - swidth(left))
+    fill = max(0, width - swidth(left) - swidth(right))
+    return left + "\u2500" * fill + right
+
+
 def put(scr, y, x, text, width, height, at=0):
     if y < 0 or y >= height or x < 0 or x >= width:
         return

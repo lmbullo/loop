@@ -2,7 +2,7 @@ import curses
 import time
 
 from .prompt import swidth
-from .panes import fit, put, queue_block, task_block
+from .panes import fit, put, queue_block, rule, task_block
 from . import theme
 
 
@@ -33,18 +33,19 @@ def status_line(snap, width, focus):
 def prompt_block(scr, prompt, top, width, height, focus, content_w, max_rows):
     lay = prompt.layout(content_w, max_rows)
     rows, scroll, n, h = lay["rows"], lay["scroll"], lay["n"], lay["height"]
-    label = "prompt"
+    label = " prompt "
     if n > h or scroll:
-        label += f" {scroll + 1}-{min(n, scroll + h)}/{n}"
+        label += f"{scroll + 1}-{min(n, scroll + h)}/{n} "
     role = theme.PROMPT_FOCUS if focus == "prompt" else theme.PROMPT_IDLE
     at = theme.attr(role)
-    put(scr, top, 0, fit(label, width), width, height, at)
+    put(scr, top, 0, rule(width, label), width, height, at)
     for k in range(h):
         idx = scroll + k
         text = rows[idx]["text"] if idx < len(rows) else ""
         text = fit(text, content_w, mark="")
         put(scr, top + 1 + k, 0,
             text + " " * max(0, content_w - swidth(text)), width, height, at)
+    put(scr, top + h + 1, 0, rule(width), width, height, at)
     return lay
 
 
@@ -56,7 +57,7 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
     max_rows = max(1, height - 2)
     lay = prompt.layout(content_w, max_rows)
     open_prompt = focus == "prompt"
-    ph = lay["height"] + 1 if open_prompt else 0
+    ph = lay["height"] + 2 if open_prompt else 0
     ptop = max(0, height - ph)
     put(scr, 0, 0, status_line(snap, width, focus), width, height,
         theme.attr(theme.status_role(snap)))
