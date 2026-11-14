@@ -79,12 +79,57 @@ class TuiLayoutTest(unittest.TestCase):
         self.assertLessEqual(swidth(marked("long task", 3, "> ")), 3)
 
 
-class TuiMinimalTest(unittest.TestCase):
-    def test_no_color_or_bold_surface(self):
-        from tui import panes
-        self.assertFalse(hasattr(panes, "init_colors"))
-        self.assertFalse(hasattr(panes, "PAIR"))
-        self.assertFalse(hasattr(panes, "GRUVBOX"))
+class TuiThemeTest(unittest.TestCase):
+    def test_palette_is_complete_and_muted(self):
+        from tui import theme
+        self.assertEqual(set(theme.SCHEME), set(theme.PAIR))
+        self.assertEqual(set(theme.BASE), set(theme.PAIR))
+        self.assertEqual(len(set(theme.PAIR.values())), len(theme.PAIR))
+        self.assertTrue(all(0 <= value <= 255 for value in theme.SCHEME.values()))
+        self.assertNotEqual(theme.SCHEME["muted"], theme.SCHEME["strong"])
+        for role in ("muted", "strong"):
+            self.assertNotEqual(theme.SCHEME[role], theme.SCHEME["accent"])
+
+    def test_prompt_box_is_grey(self):
+        from tui import theme
+        self.assertEqual(theme.PROMPT_IDLE, "muted")
+        self.assertEqual(theme.PROMPT_FOCUS, "strong")
+        self.assertNotIn(theme.PROMPT_IDLE, theme.STATE.values())
+        self.assertNotIn(theme.PROMPT_FOCUS, theme.STATE.values())
+
+    def test_prompt_block_applies_grey_roles(self):
+        from unittest import mock
+        from tui import render, theme
+
+        class Screen:
+            def __init__(self):
+                self.calls = []
+
+            def addstr(self, y, x, text, at=0):
+                self.calls.append((y, x, text, at))
+
+        prompt = Prompt()
+        prompt.set("hello")
+        for focus, role in (("prompt", "strong"), ("task", "muted")):
+            screen = Screen()
+            with mock.patch.object(theme, "attr", side_effect=lambda name: f"<{name}>"):
+                render.prompt_block(screen, prompt, 0, 20, 10, focus, 20, 5)
+            self.assertEqual(screen.calls[0][3], f"<{role}>")
+            self.assertEqual(screen.calls[1][3], f"<{role}>")
+
+    def test_state_roles(self):
+        from tui import theme
+        self.assertEqual(theme.state_role("running"), "accent")
+        self.assertEqual(theme.state_role("complete"), "ok")
+        self.assertEqual(theme.state_role("corrupt"), "err")
+        self.assertEqual(theme.state_role("queued"), "muted")
+        self.assertEqual(theme.status_role({"daemon": {"state": "running"}}), "muted")
+        self.assertEqual(theme.status_role({"daemon": {"state": "stopped"}}), "err")
+
+    def test_attr_is_safe_before_init(self):
+        from tui import theme
+        self.assertEqual(theme.attr("missing"), 0)
+        self.assertIsInstance(theme.attr("muted"), int)
 
 
 if __name__ == "__main__":

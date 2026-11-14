@@ -3,6 +3,7 @@ import time
 
 from .prompt import swidth
 from .panes import fit, put, queue_block, task_block
+from . import theme
 
 
 def status_line(snap, width, focus):
@@ -29,19 +30,21 @@ def status_line(snap, width, focus):
     return left + " " * space + right
 
 
-def prompt_block(scr, prompt, top, width, height, content_w, max_rows):
+def prompt_block(scr, prompt, top, width, height, focus, content_w, max_rows):
     lay = prompt.layout(content_w, max_rows)
     rows, scroll, n, h = lay["rows"], lay["scroll"], lay["n"], lay["height"]
     label = "prompt"
     if n > h or scroll:
         label += f" {scroll + 1}-{min(n, scroll + h)}/{n}"
-    put(scr, top, 0, fit(label, width), width, height)
+    role = theme.PROMPT_FOCUS if focus == "prompt" else theme.PROMPT_IDLE
+    at = theme.attr(role)
+    put(scr, top, 0, fit(label, width), width, height, at)
     for k in range(h):
         idx = scroll + k
         text = rows[idx]["text"] if idx < len(rows) else ""
         text = fit(text, content_w, mark="")
         put(scr, top + 1 + k, 0,
-            text + " " * max(0, content_w - swidth(text)), width, height)
+            text + " " * max(0, content_w - swidth(text)), width, height, at)
     return lay
 
 
@@ -55,7 +58,8 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
     open_prompt = focus == "prompt"
     ph = lay["height"] + 1 if open_prompt else 0
     ptop = max(0, height - ph)
-    put(scr, 0, 0, status_line(snap, width, focus), width, height)
+    put(scr, 0, 0, status_line(snap, width, focus), width, height,
+        theme.attr(theme.status_role(snap)))
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
     tv = {"n": 0, "vis": 0, "sel": 0, "scroll": 0}
@@ -73,7 +77,7 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0):
         if task_end < body_end:
             queue_block(scr, snap, task_end, body_end, width, height, focus, qsel)
     if open_prompt:
-        lay = prompt_block(scr, prompt, ptop, width, height, content_w, max_rows)
+        lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)
         row = ptop + 1 + lay["cursor_row"] - lay["scroll"]
         col = min(width - 1, max(0, lay["cursor_col"]))
         if 0 <= row < height:

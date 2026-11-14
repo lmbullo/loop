@@ -2,6 +2,7 @@ import curses
 
 from .prompt import cw, display, swidth
 from .model import money
+from . import theme
 
 SELECT = "> "
 BLANK = "  "
@@ -58,14 +59,14 @@ def put(scr, y, x, text, width, height, at=0):
 def task_rows(snap, width):
     cur = snap["current"]
     if cur is None:
-        return [(fit("idle - type a task and press enter", width), None)]
+        return [(fit("idle - type a task and press enter", width), "muted")]
     info = (f"id={cur['id']} state={cur['state']} turns={cur['turns']} "
             f"cost={money(cur['cost'])}")
     if cur.get("finish"):
         info += f" finish={cur['finish']}"
-    rows = [(fit(info, width), None)]
+    rows = [(fit(info, width), theme.state_role(cur["state"]))]
     if cur.get("detail"):
-        rows.append((fit(display(cur["detail"]), width), None))
+        rows.append((fit(display(cur["detail"]), width), "err"))
     text = display(cur.get("text") or "")
     if text:
         rows.append((fit("  " + text, width), None))
@@ -89,21 +90,24 @@ def task_block(scr, snap, y, end, width, height, focus, sel, scroll):
     label = "task"
     if n > vis:
         label += f" {scroll + 1}-{min(n, scroll + vis)}/{n}"
-    put(scr, y, 0, fit(label, width), width, height)
+    put(scr, y, 0, fit(label, width), width, height, theme.attr("muted"))
     for k in range(vis):
         idx = scroll + k
         if idx >= n:
             break
-        text, _ = rows[idx]
+        text, role = rows[idx]
+        if focus == "task" and idx == sel:
+            role = "strong"
         mark = SELECT if focus == "task" and idx == sel else BLANK
-        put(scr, y + 1 + k, 0, marked(text, width, mark), width, height)
+        put(scr, y + 1 + k, 0, marked(text, width, mark), width, height,
+            theme.attr(role))
     return {"n": n, "vis": vis, "sel": sel, "scroll": scroll}
 
 
 def queue_block(scr, snap, y, end, width, height, focus, qsel):
     queue = snap["queue"]
     put(scr, y, 0, fit(f"queue {len(queue)}" if queue else "queue", width),
-        width, height)
+        width, height, theme.attr("muted"))
     y += 1
     if y >= end:
         return y
@@ -114,8 +118,10 @@ def queue_block(scr, snap, y, end, width, height, focus, qsel):
     for idx in range(offset, min(len(queue), offset + room)):
         item = queue[idx]
         first = (item.get("text") or "").replace("\n", " ").replace("\r", " ")
-        mark = SELECT if focus and idx == qsel else BLANK
+        selected = focus and idx == qsel
+        mark = SELECT if selected else BLANK
         line = f"{item['id']:<8} {item['state']:<8} {first}"
-        put(scr, y, 0, marked(line, width, mark), width, height)
+        put(scr, y, 0, marked(line, width, mark), width, height,
+            theme.attr("strong" if selected else "muted"))
         y += 1
     return y

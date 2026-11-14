@@ -66,7 +66,7 @@ credentials and a network, and they cost real tokens.
 | `test_agent_context.py` | derive, totals, context fold, response parsing, dispatch, finish |
 | `test_manifest.py` | contract integrity, entry imports, record/scenario checks, CLI wiring |
 | `test_checks.py` | audited kinds, line-limit failure, TUI contract |
-| `test_tui_layout.py` | fit, selection marker, one-line task rows, prompt reflow/editing, exact status width, no color surface |
+| `test_tui_layout.py` | fit, selection marker, one-line task rows, prompt reflow/editing, exact status width, theme palette and grey prompt roles |
 | `test_tui_input.py` | arrow focus/selection, shift+arrow reorder, delete drop, text opens prompt |
 
 `tests/support.py` provides `sandbox()`, fixed run ids, event builders, record
@@ -187,10 +187,12 @@ set without a version strategy makes old records corrupt.
 ### Change the TUI
 
 1. Keep it a renderer over daemon snapshots; never add queue or run authority.
-2. Keep the surface plain text: no color pairs, bold or reverse video; use the
-   `>` marker for selection. Arrows drive selection and pane focus.
-3. Update `tui/panes.py`, `tui/input.py`, or `tui/render.py` and the matching
-   tests.
+2. Define every color role in `tui/theme.py`: a neutral grey scale for chrome
+   and the prompt box, muted hues only for state (`accent`, `ok`, `warn`,
+   `err`). Keep the terminal background (`-1`); do not add bold, reverse video
+   or per-line color noise. Use the `>` marker for selection.
+3. Update `tui/panes.py`, `tui/theme.py`, `tui/input.py`, or `tui/render.py`
+   and the matching tests.
 4. Run `python3 run.py check tui`; it pins fit, one-line rows, prompt reflow and
    exact status width.
 5. Server modules must not import `tui/`.
