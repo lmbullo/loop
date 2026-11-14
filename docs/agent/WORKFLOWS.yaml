@@ -207,5 +207,5 @@ ci:
   file: .github/workflows/ci.yml
   trigger: [push, pull_request, workflow_dispatch]
   python: "3.12 on Ubuntu; 15-minute timeout"
-  steps: [compile, line and tui audits, check_manifest, unittest, verify --skip-server, git status --porcelain]
+  steps: [compile, line and tui audits, check_manifest, unittest, verify --skip-server, tracked-file secret scan, git status --porcelain]
   rule: keep the tree clean; CI fails on untracked or modified files left by a check

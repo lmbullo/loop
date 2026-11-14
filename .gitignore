@@ -16,3 +16,14 @@ dist/
 .venv/
 venv/
 .DS_Store
+
+# Credentials: never tracked, even by an explicit git add.
+.env
+.env.*
+auth.json
+credentials*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*

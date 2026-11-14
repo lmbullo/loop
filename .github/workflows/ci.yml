@@ -30,6 +30,15 @@ jobs:
         run: python -m unittest discover -s tests -t . -v
       - name: manifest checks
         run: python scripts/verify.py --skip-server
+      - name: secret hygiene
+        run: |
+          pattern='sk-[A-Za-z0-9_-]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY'
+          matches="$(git grep -nIE "$pattern" -- . || true)"
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
+            echo "possible API key or private key in tracked files"
+            exit 1
+          fi
       - name: git hygiene
         run: |
           test -z "$(git status --porcelain)"
