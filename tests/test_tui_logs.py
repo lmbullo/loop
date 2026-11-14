@@ -18,6 +18,9 @@ class Screen:
     def addstr(self, y, x, text, at=0):
         self.rows[y] = self.rows.get(y, "") + text
 
+    def move(self, y, x):
+        self.cursor = (y, x)
+
     def noutrefresh(self):
         pass
 
@@ -170,7 +173,6 @@ class RenderLogTest(unittest.TestCase):
         self.assertIn("esc back", text)
         self.assertNotIn("running:", text)
         self.assertEqual(lay["log"]["n"], 3)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -99,6 +99,8 @@ def check_tui():
     want(window(6, 4, 5, 0) == (6, 4, 5, 2), "selection window does not follow sel")
     want(window(6, 4, None, 2) == (6, 4, None, 2), "selection window moved without sel")
     want(window(0, 4, 3, 9) == (0, 4, None, 0), "empty window kept a selection")
+    want(window(6, 4, 0, 2, False) == (6, 4, 0, 2),
+         "free-scroll window moved back to the selection")
 
     from tui.logview import log_block
     from tui.rows import join_parts, log_parts
@@ -131,6 +133,11 @@ def check_tui():
     log_block(tall, log_data, 0, 40, 40, 41)
     want(len(short.rows) == 6, f"short log drew {len(short.rows)} rows")
     want(len(tall.rows) == 22, f"tall log drew {len(tall.rows)} rows")
+    free = LogScreen()
+    info = log_block(free, log_data, 0, 8, 40, 9, sel=0, scroll=5,
+                     follow=False)
+    want((info["sel"], info["scroll"], info["follow"]) == (0, 5, False),
+         "free-scroll log moved its selection or offset")
 
     for msg in bad:
         print("err tui " + msg, file=sys.stderr)

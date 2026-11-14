@@ -26,6 +26,7 @@ class App:
         self.tview = {"n": 1, "vis": 1, "sel": 0, "scroll": 0}
         self.quit = False
         self.log = None
+        self.prompt_from = "task"
         self.h, self.w = scr.getmaxyx()
         self.dirty = True
         self.last_version = -1
@@ -94,6 +95,7 @@ class App:
                     self.log["sel"] = lv["sel"] if lv["sel"] is not None else 0
                     self.log["scroll"] = lv["scroll"]
                     self.log["vis"] = max(1, lv["vis"])
+                    self.log["follow"] = lv.get("follow", True)
 
     def run(self):
         try:
@@ -106,7 +108,7 @@ class App:
         except curses.error:
             pass
         fd = sys.stdin.fileno()
-        os.write(1, b"\x1b[?2004h")
+        os.write(1, b"\x1b[?2004h\x1b[?1000h\x1b[?1006h")
         try:
             old_term = termios.tcgetattr(fd)
             tty.setraw(fd)
@@ -132,7 +134,7 @@ class App:
                 self.paint()
         finally:
             try:
-                os.write(1, b"\x1b[?2004l")
+                os.write(1, b"\x1b[?2004l\x1b[?1006l\x1b[?1000l")
             except OSError:
                 pass
             if old_term is not None:

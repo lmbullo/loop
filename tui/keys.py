@@ -32,6 +32,30 @@ PASTE_ON = b"\x1b[200~"
 PASTE_OFF = b"\x1b[201~"
 
 
+WHEEL = {64: "scroll_up", 65: "scroll_down"}
+
+
+def _wheel(button):
+    """Strip shift/meta/ctrl bits; xterm reports the wheel as buttons 64/65."""
+    return WHEEL.get(button & ~(4 | 8 | 16))
+
+
+def _sgr_mouse(seq):
+    if not seq.startswith(b"\x1b[<") or seq[-1:] not in (b"M", b"m"):
+        return None
+    parts = seq[3:-1].decode("ascii", "ignore").split(";")
+    if len(parts) != 3:
+        return None
+    try:
+        return _wheel(int(parts[0]))
+    except ValueError:
+        return None
+
+
+def _x10_mouse(b):
+    return _wheel(b[3] - 32) if len(b) >= 6 else None
+
+
 def _text(raw):
     return raw.decode("utf-8", "replace")
 
@@ -129,6 +153,11 @@ class Parser:
     def _esc(self, b):
         if len(b) == 1:
             return None, 0, True
+        if b.startswith(b"\x1b[M"):
+            if len(b) < 6:
+                return None, 0, True
+            ev = _x10_mouse(b)
+            return (("key", ev) if ev else None), 6, False
         if b.startswith(b"\x1b[") or b.startswith(b"\x1bO"):
             end = _csi_end(b, 2)
             if end < 0:
@@ -136,6 +165,9 @@ class Parser:
             seq = b[:end]
             if seq in CSI:
                 return ("key", CSI[seq]), end, False
+            ev = _sgr_mouse(seq)
+            if ev:
+                return ("key", ev), end, False
             mod = _modified_enter(seq)
             if mod:
                 return ("key", mod), end, False

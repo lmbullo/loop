@@ -27,7 +27,7 @@ def open_log(app):
     if live and data.get("state") == "interrupted":
         data = dict(data, state="running")
     app.log = {"id": ident, "data": data, "sel": 0, "scroll": 0, "vis": 1,
-               "live": live, "at": time.time()}
+               "follow": True, "live": live, "at": time.time()}
     app.focus = "log"
     app.dirty = True
     return True
@@ -67,20 +67,34 @@ def log_key(app, key):
     n = len((log.get("data") or {}).get("entries") or [])
     vis = max(1, int(log.get("vis") or 1))
     sel = max(0, min(int(log.get("sel") or 0), max(0, n - 1)))
+    scroll = max(0, int(log.get("scroll") or 0))
+    follow = bool(log.get("follow", True))
     if key in ("up", "hist_prev"):
-        sel = max(0, sel - 1)
+        sel, follow = max(0, sel - 1), True
     elif key in ("down", "hist_next"):
-        sel = min(max(0, n - 1), sel + 1)
+        sel, follow = min(max(0, n - 1), sel + 1), True
     elif key == "page_up":
-        sel = max(0, sel - vis)
+        sel, follow = max(0, sel - vis), True
     elif key == "page_down":
-        sel = min(max(0, n - 1), sel + vis)
+        sel, follow = min(max(0, n - 1), sel + vis), True
     elif key == "home":
-        sel = 0
+        sel, follow = 0, True
     elif key == "end":
-        sel = max(0, n - 1)
-    elif key in ("enter", "newline", "esc", "tab", "backtab", "left"):
+        sel, follow = max(0, n - 1), True
+    elif key in ("scroll_up", "wheel_up", "shift_up"):
+        scroll = max(0, scroll - 1)
+        follow = False
+    elif key in ("scroll_down", "wheel_down", "shift_down"):
+        scroll = min(max(0, n - vis), scroll + 1)
+        follow = False
+    elif key in ("tab", "backtab"):
+        from .input import open_prompt
+        open_prompt(app)
+        return
+    elif key in ("enter", "newline", "esc", "left"):
         close_log(app)
         return
     log["sel"] = sel
+    log["scroll"] = scroll
+    log["follow"] = follow
     app.dirty = True

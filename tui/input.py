@@ -3,8 +3,25 @@ from .nav import queue_sel, sync_queue_sel, toggle_focus
 from .rows import task_sel
 
 
+def prompt_return(app):
+    """The view the prompt overlays: a log stays open, a queue keeps its cursor."""
+    prev = getattr(app, "prompt_from", "task")
+    if prev == "log" and getattr(app, "log", None) is not None:
+        return "log"
+    if prev == "queue":
+        return "queue" if app.snapshot().get("queue") else "task"
+    return "task"
+
+
 def open_prompt(app, text=""):
-    close_log(app)
+    if app.focus != "prompt":
+        keep_log = app.focus == "log" and getattr(app, "log", None) is not None
+        app.prompt_from = "log" if keep_log else (
+            "task" if app.focus == "log" else app.focus)
+    keep_log = app.focus == "log" or (
+        app.focus == "prompt" and getattr(app, "prompt_from", "") == "log")
+    if not keep_log:
+        close_log(app)
     app.focus = "prompt"
     if text:
         app.prompt.insert(text)
@@ -14,7 +31,7 @@ def open_prompt(app, text=""):
 def close_prompt(app, clear=True):
     if clear:
         app.prompt.clear()
-    app.focus = "task"
+    app.focus = prompt_return(app)
     app.dirty = True
 
 
@@ -66,14 +83,24 @@ def queue_key(app, key):
         app.qsel = max(0, len(queue) - 1)
     elif key in ("delete", "backspace"):
         drop(app)
-    elif key in ("enter", "newline"):
+    elif key in ("enter", "newline", "tab", "backtab"):
         open_prompt(app)
-    elif key in ("esc", "tab", "backtab"):
+    elif key == "esc":
         app.focus = "task"
     app.dirty = True
 
 
 def prompt_key(app, key):
+    if key == "enter":
+        submit(app)
+        return
+    if key == "newline":
+        app.prompt.insert("\n")
+        app.dirty = True
+        return
+    if key in ("tab", "backtab"):
+        close_prompt(app, clear=False)
+        return
     width = app.content_width()
     height = app.layout["height"] if app.layout else 10
     moves = {
@@ -89,17 +116,7 @@ def prompt_key(app, key):
         "page_up": lambda: app.prompt.page(-1, width, height),
         "page_down": lambda: app.prompt.page(1, width, height),
     }
-    if key == "enter":
-        submit(app)
-    elif key == "newline":
-        app.prompt.insert("\n")
-    elif key in ("tab", "backtab"):
-        if queue_sel(app):
-            app.focus = "queue"
-        else:
-            app.focus = "task"
-        app.dirty = True
-    elif key in moves:
+    if key in moves:
         moves[key]()
     app.dirty = True
 
@@ -166,6 +183,8 @@ def handle(app, ev):
         else:
             app.focus = "task"
         app.dirty = True
+    elif value in ("tab", "backtab") and app.focus in ("task", "queue", "log"):
+        open_prompt(app)
     elif app.focus == "queue":
         queue_key(app, value)
     elif app.focus == "prompt":

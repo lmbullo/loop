@@ -160,6 +160,20 @@ class ShiftArrowParserTest(unittest.TestCase):
                                            ("key", "shift_down"),
                                            ("key", "up"), ("key", "down")])
 
+    def test_wheel_events_are_scroll_up_and_scroll_down(self):
+        parser = keys.Parser()
+        parser.feed(b"\x1b[<64;10;5M\x1b[<65;10;5M")
+        self.assertEqual(parser.events(), [("key", "scroll_up"),
+                                           ("key", "scroll_down")])
+        parser.feed(b"\x1b[M" + bytes([64 + 32, 10 + 32, 5 + 32]))
+        self.assertEqual(parser.events(), [("key", "scroll_up")])
+
+    def test_wheel_modifiers_keep_the_direction(self):
+        parser = keys.Parser()
+        parser.feed(b"\x1b[<68;10;5M\x1b[<69;10;5M")
+        self.assertEqual(parser.events(), [("key", "scroll_up"),
+                                           ("key", "scroll_down")])
+
 
 if __name__ == "__main__":
     unittest.main()

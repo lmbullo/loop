@@ -25,16 +25,17 @@ def status_line(snap, width, focus):
         right = notice
     elif focus == "task":
         action = "logs" if snap.get("current") or snap.get("done") else "type"
-        right = f"\u21b5 {action} \u00b7 ^Q quit"
+        right = f"\u21b5 {action} \u00b7 \u21e5 prompt \u00b7 ^Q quit"
         if snap.get("current") or snap.get("queue") or snap.get("done"):
             right = "\u2191\u2193 tasks \u00b7 " + right
         if snap.get("queue"):
             right = "\u2192 queue \u00b7 " + right
     elif focus == "queue":
         right = ("\u2190 task \u00b7 \u2191\u2193 select \u00b7 "
-                 "\u21e7\u2191\u2193 move \u00b7 del drop \u00b7 \u21b5 type")
+                 "\u21e7\u2191\u2193 move \u00b7 del drop \u00b7 \u21e5 prompt")
     elif focus == "log":
-        right = "esc back \u00b7 \u2191\u2193 calls \u00b7 \u21b5 close"
+        right = ("esc back \u00b7 \u2191\u2193 calls \u00b7 wheel scroll "
+                 "\u00b7 \u21e5 prompt \u00b7 \u21b5 close")
     else:
         right = "esc cancel \u00b7 \u21b5 submit"
     right = fit(right, max(1, width))
@@ -80,6 +81,28 @@ def body_spans(snap, top, end):
     return running, queue_h
 
 
+def place_cursor(scr, lay, top, width, height):
+    row = top + 1 + lay["cursor_row"] - lay["scroll"]
+    col = min(width - 1, max(0, lay["cursor_col"]))
+    if 0 <= row < height:
+        try:
+            scr.move(row, col)
+        except (curses.error, AttributeError):
+            pass
+
+
+def present(scr, cursor):
+    try:
+        curses.curs_set(1 if cursor else 0)
+    except curses.error:
+        pass
+    try:
+        scr.noutrefresh()
+        curses.doupdate()
+    except curses.error:
+        pass
+
+
 def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
          log=None):
     if width < 2 or height < 3:
@@ -93,20 +116,18 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
     ptop = max(0, height - ph)
     put(scr, 0, 0, status_line(snap, width, focus), width, height,
         theme.attr(theme.status_role(snap)))
-    if log is not None and focus == "log":
-        info = log_block(scr, log.get("data"), 1, height, width, height,
-                         log.get("sel", 0), log.get("scroll", 0))
-        try:
-            curses.curs_set(0)
-        except curses.error:
-            pass
-        try:
-            scr.noutrefresh()
-            curses.doupdate()
-        except curses.error:
-            pass
-        return {"log": info, "prompt_open": False, "height": height,
-                "prompt_top": 0}
+    if log is not None and focus in ("log", "prompt"):
+        body_end = ptop if open_prompt else height
+        info = log_block(scr, log.get("data"), 1, body_end, width, height,
+                         log.get("sel", 0), log.get("scroll", 0),
+                         log.get("follow", True))
+        if open_prompt:
+            lay = prompt_block(scr, prompt, ptop, width, height, focus,
+                               content_w, max_rows)
+            place_cursor(scr, lay, ptop, width, height)
+        present(scr, open_prompt)
+        return {"log": info, "prompt_open": open_prompt, "height": height,
+                "prompt_top": ptop}
     body_start = 1 if ptop >= 2 else ptop
     body_end = ptop
     nq = len(snap.get("queue") or [])
@@ -130,23 +151,9 @@ def draw(scr, snap, prompt, width, height, focus, qsel, tsel=0, tscroll=0,
           "sel": max(0, min(tsel, n - 1)), "scroll": dv["scroll"]}
     if open_prompt:
         lay = prompt_block(scr, prompt, ptop, width, height, focus, content_w, max_rows)
-        row = ptop + 1 + lay["cursor_row"] - lay["scroll"]
-        col = min(width - 1, max(0, lay["cursor_col"]))
-        if 0 <= row < height:
-            try:
-                scr.move(row, col)
-            except curses.error:
-                pass
-    try:
-        curses.curs_set(1 if open_prompt else 0)
-    except curses.error:
-        pass
+        place_cursor(scr, lay, ptop, width, height)
+    present(scr, open_prompt)
     lay["task"] = tv
     lay["prompt_open"] = open_prompt
     lay["prompt_top"] = ptop
-    try:
-        scr.noutrefresh()
-        curses.doupdate()
-    except curses.error:
-        pass
     return lay

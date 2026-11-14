@@ -14,16 +14,19 @@ def header(data, n, vis, scroll):
     return f"logs: {tail}"
 
 
-def log_block(scr, data, y, end, width, height, sel=0, scroll=0):
+def log_block(scr, data, y, end, width, height, sel=0, scroll=0, follow=True):
     """One line per tool call plus the final summary; the window fills the body.
 
     Visible rows are exactly the rows the terminal has room for, so a taller
     terminal shows more calls and a shorter one shows fewer with no padding.
+    A free-scrolled window (follow=False) keeps its offset even when the
+    selected call is off screen.
     """
     items = (data or {}).get("entries") or []
     total = max(0, end - y)
-    n, vis, sel, scroll = window(len(items), max(0, total - 1), sel, scroll)
-    out = {"n": n, "vis": vis, "sel": sel, "scroll": scroll}
+    n, vis, sel, scroll = window(len(items), max(0, total - 1), sel, scroll,
+                                 follow)
+    out = {"n": n, "vis": vis, "sel": sel, "scroll": scroll, "follow": follow}
     if total <= 0:
         return out
     put(scr, y, 0, fit(header(data, n, vis, scroll), width), width, height,

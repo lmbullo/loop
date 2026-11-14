@@ -37,15 +37,19 @@ def join_parts(parts):
     return "".join(text for text, _ in parts)
 
 
-def window(n, vis, sel=None, scroll=0):
-    """Clamp a list window and move it so `sel` stays visible; None means no selection."""
+def window(n, vis, sel=None, scroll=0, follow=True):
+    """Clamp a list window and move it so `sel` stays visible; None means no selection.
+
+    `follow=False` keeps a free-scrolled viewport in place even when the
+    selection is off screen; selection keys pass the default and re-anchor it.
+    """
     n = max(0, n)
     vis = max(0, vis)
     scroll = max(0, min(scroll, max(0, n - vis)))
     if not n or sel is None:
         return n, vis, None, scroll
     sel = max(0, min(sel, n - 1))
-    if vis:
+    if vis and follow:
         if sel < scroll:
             scroll = sel
         elif sel >= scroll + vis:

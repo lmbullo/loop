@@ -26,6 +26,7 @@ historical migration log: later entries supersede earlier ones. Use
 | Change code, tests, scenarios or checks | `WORKFLOWS.md` | `make verify` |
 | Diagnose a failure or blocked run | `DEBUG.md` | the command in the symptom row |
 | Commit a change | `AGENTS.md` + `WORKFLOWS.md` | `python3 scripts/commit_check.py` |
+| Scroll a run log or open the prompt | `MAP.md` | `python3 run.py tui` |
 | Get a machine-readable route list | `index.json` | `json.tool` or `grep` |
 
 ## Fast facts

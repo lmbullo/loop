@@ -1,12 +1,14 @@
 import unittest
 
 from tui import input, loginput
+from tui.logview import log_block
 from tui.prompt import Prompt
 
 
 class FakeWorker:
     def __init__(self):
         self.calls = []
+        self.enqueued = []
         self.result = {"id": "run", "state": "complete", "terminal": True,
                        "entries": [{"kind": "result", "result": "ok",
                                     "finish": "done"}]}
@@ -14,6 +16,9 @@ class FakeWorker:
     def log(self, run_id):
         self.calls.append(run_id)
         return self.result
+
+    def enqueue(self, text):
+        self.enqueued.append(text)
 
 
 class FakeApp:
@@ -91,13 +96,82 @@ class LogInputTest(unittest.TestCase):
         input.handle(app, ("key", "home"))
         self.assertEqual(app.log["sel"], 0)
 
-    def test_typing_closes_the_log_and_opens_the_prompt(self):
+    def test_typing_opens_the_prompt_over_the_log(self):
         app = FakeApp(current={"id": "run"})
         loginput.open_log(app)
         input.handle(app, ("text", "hello"))
         self.assertEqual(app.focus, "prompt")
-        self.assertIsNone(app.log)
+        self.assertEqual(app.log["id"], "run")
         self.assertEqual(app.prompt.text, "hello")
+        input.handle(app, ("text", "!"))
+        self.assertIsNotNone(app.log)
+        self.assertEqual(app.prompt.text, "hello!")
+        input.handle(app, ("key", "esc"))
+        self.assertEqual(app.focus, "log")
+        self.assertEqual(app.log["id"], "run")
+
+    def test_submit_from_the_log_queues_and_focuses_the_tasks(self):
+        app = FakeApp(current={"id": "run"})
+        loginput.open_log(app)
+        input.handle(app, ("text", "hello"))
+        input.handle(app, ("key", "enter"))
+        self.assertEqual(app.worker.enqueued, ["hello"])
+        self.assertEqual(app.focus, "task")
+        self.assertIsNotNone(app.log)
+
+    def test_tab_opens_and_closes_the_prompt_from_the_log(self):
+        app = FakeApp(current={"id": "run"})
+        loginput.open_log(app)
+        input.handle(app, ("key", "tab"))
+        self.assertEqual(app.focus, "prompt")
+        self.assertEqual(app.log["id"], "run")
+        input.handle(app, ("key", "tab"))
+        self.assertEqual(app.focus, "log")
+        self.assertEqual(app.log["id"], "run")
+
+    def test_tab_opens_the_prompt_from_the_queue_and_returns(self):
+        app = FakeApp(queue=[{"id": "q1", "state": "queued", "text": "later"}])
+        app.focus = "queue"
+        input.handle(app, ("key", "tab"))
+        self.assertEqual(app.focus, "prompt")
+        input.handle(app, ("key", "esc"))
+        self.assertEqual(app.focus, "queue")
+
+    def test_wheel_scrolls_the_log_without_moving_the_selection(self):
+        app = FakeApp(current={"id": "run"})
+        loginput.open_log(app)
+        app.log["data"] = {"entries": [{"kind": "pending", "text": str(k)}
+                                       for k in range(20)]}
+        app.log["vis"] = 5
+        input.handle(app, ("key", "scroll_down"))
+        self.assertEqual((app.log["sel"], app.log["scroll"]), (0, 1))
+        self.assertFalse(app.log["follow"])
+        input.handle(app, ("key", "scroll_down"))
+        self.assertEqual((app.log["sel"], app.log["scroll"]), (0, 2))
+        input.handle(app, ("key", "scroll_up"))
+        self.assertEqual((app.log["sel"], app.log["scroll"]), (0, 1))
+        input.handle(app, ("key", "down"))
+        self.assertEqual((app.log["sel"], app.log["follow"]), (1, True))
+
+    def test_free_scroll_keeps_the_offset_without_a_visible_selection(self):
+        class Screen:
+            def __init__(self):
+                self.rows = {}
+
+            def addstr(self, y, x, text, at=0):
+                self.rows[y] = self.rows.get(y, "") + text
+
+        entries = [{"kind": "call", "turn": k, "name": "exec", "args": "x",
+                    "obs": "", "failed": False} for k in range(20)]
+        entries.append({"kind": "result", "result": "ok", "finish": "done"})
+        screen = Screen()
+        info = log_block(screen, {"id": "run", "entries": entries}, 0, 8, 60,
+                         9, sel=0, scroll=5, follow=False)
+        self.assertEqual((info["sel"], info["scroll"], info["follow"]),
+                         (0, 5, False))
+        self.assertIn("6\u201312/21", screen.rows[0])
+        self.assertEqual([row for row in screen.rows.values()
+                          if row.startswith("\u203a")], [])
 
     def test_live_run_is_labelled_running(self):
         app = FakeApp(current={"id": "run"})
