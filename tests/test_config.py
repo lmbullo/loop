@@ -42,6 +42,7 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(config.env_int("NOPE", 9), 9)
 
     def test_max_inline(self):
+        self.assertEqual(config.DEFAULT_MAX_INLINE, 8192)
         with mock.patch.dict(os.environ, {"LOOP_MAX_INLINE": "12"}, clear=False):
             self.assertEqual(config.max_inline(), 12)
         with mock.patch.dict(os.environ, {"LOOP_MAX_INLINE": "bad"}, clear=True):

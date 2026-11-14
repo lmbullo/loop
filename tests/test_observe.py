@@ -28,6 +28,24 @@ class ObserveTest(unittest.TestCase):
         self.assertEqual(observe.render_api(b"hello", self.obs, "o1"), "hello")
         self.assertFalse(os.path.exists(self.obs))
 
+    def test_default_bound_summarizes_and_preserves_bytes(self):
+        bound = observe.config.DEFAULT_MAX_INLINE
+        raw = b"x" * (bound + 1)
+        saved = []
+        out = observe.render_api(raw, self.obs, "o1", max_inline=bound,
+                                 saved=saved, rel_base=self.tmp.name)
+        self.assertIn("kind=text", out)
+        self.assertLess(len(out.encode()), len(raw) // 2)
+        self.assertEqual(saved, ["obs/o1.txt"])
+        with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
+            self.assertEqual(f.read(), raw)
+
+    def test_bound_is_inclusive(self):
+        bound = observe.config.DEFAULT_MAX_INLINE
+        raw = b"x" * bound
+        self.assertEqual(observe.render_api(raw, self.obs, "o1", max_inline=bound),
+                         raw.decode())
+
     def test_render_api_binary_is_digest(self):
         out = observe.render_api(b"\x00\x01", self.obs, "o1")
         self.assertTrue(out.startswith("kind=binary"))
@@ -38,6 +56,7 @@ class ObserveTest(unittest.TestCase):
         out = observe.render_api(raw, self.obs, "o1", max_inline=100,
                                  saved=saved, rel_base=self.tmp.name)
         self.assertIn("kind=text", out)
+        self.assertIn("note=do not re-read the whole file", out)
         self.assertIn("first15:", out)
         self.assertIn("last5:", out)
         self.assertEqual(saved, ["obs/o1.txt"])

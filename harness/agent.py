@@ -132,7 +132,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         if should_stop is not None and should_stop():
             return stopped(writer, events, turn)
         reload.maybe()
-        msgs = fold.context(events, st["task"], max_inline)
+        msgs = fold.context(events, st["task"])
         turn += 1
         try:
             r = api.call(msgs, key)

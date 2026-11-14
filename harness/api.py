@@ -25,7 +25,7 @@ TOOLS = [
             "new": {"type": "string"}}, "required": ["path", "old", "new"]}}},
     {"type": "function", "function": {
         "name": "done",
-        "description": "Terminate the task.",
+        "description": "Finish the task with a result string; call this instead of stopping silently.",
         "parameters": {"type": "object", "properties": {
             "result": {"type": "string"}}, "required": ["result"]}}},
 ]
@@ -48,13 +48,18 @@ Cost: the whole message list is re-sent each turn, so the unchanged prefix is a
 cache hit and only the appended suffix is a cache miss; output tokens bill
 highest, and reasoning is never re-sent, so it costs nothing after the turn.
 
-There is no text channel. Assistant text is not recorded and not re-sent;
-only tool calls and their observations persist. A turn with no tool call ends
-the run with finish=no_tool_call.
+Assistant text is not re-sent; only tool calls and their observations persist.
+Call done(result) when the task is complete. A turn with no tool call also ends
+the run: non-empty text becomes end.result, and an empty reply finishes it as
+no_tool_call.
 
-Observations over {max_inline} bytes are replaced by a shape summary and the raw
-bytes are saved under the run's obs directory. Read specific ranges instead of
-dumping.
+Issue independent tool calls together in one assistant message; they run in the
+order given. Chain only calls whose arguments depend on an earlier result, and do
+not re-run a call whose result is already in the message list.
+
+Large observations are replaced by a shape summary; the raw bytes are saved
+under the run's obs directory. Grep for the line you need or read a small range;
+do not dump the whole file again.
 
 Paths are relative to the working directory.
 
@@ -65,7 +70,7 @@ exec(argv: [str], cwd?: str, stdin?: str, timeout_ms?: int) -> observation
 write(path: str, data: str, append?: bool) -> observation
 edit(path: str, old: str, new: str) -> observation
   Replaces exactly one occurrence. Fails if match count != 1. Returns hunk.
-done(result: str) -> terminates the task.
+done(result: str) -> finishes the task; call this instead of stopping silently.
 """
 
 
@@ -77,8 +82,8 @@ def url():
     return config.env("LOOP_URL", "https://api.deepseek.com/chat/completions")
 
 
-def header(max_inline=None):
-    return BASE.format(max_inline=config.max_inline() if max_inline is None else max_inline)
+def header():
+    return BASE
 
 
 def call(msgs, key):

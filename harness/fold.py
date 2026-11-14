@@ -40,13 +40,8 @@ def pending_verify(events):
     return cmd
 
 
-def context(events, task, max_inline=None):
-    if max_inline is None:
-        for ev in events:
-            if ev["type"] == "run_start":
-                max_inline = ev["data"].get("max_inline")
-                break
-    msgs = [{"role": "system", "content": api.header(max_inline)},
+def context(events, task):
+    msgs = [{"role": "system", "content": api.header()},
             {"role": "user", "content": task or ""}]
     for ev in events:
         if ev["type"] != "turn":

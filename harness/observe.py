@@ -49,6 +49,7 @@ def render_api(raw, obs_dir, name, max_inline=None, saved=None, rel_base=None):
     head = lines[:15]
     tail = lines[max(len(head), len(lines) - 5):]
     out = [f"kind=text bytes={len(raw)} lines={len(lines)} saved={path}",
+           "note=do not re-read the whole file; grep for a line or read a small range",
            "first15:\n" + "\n".join("  " + cut(l) for l in head)]
     if tail:
         out.append("last5:\n" + "\n".join("  " + cut(l) for l in tail))

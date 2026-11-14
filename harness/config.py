@@ -3,7 +3,7 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGS = ".logs"
 THINK_BUDGET = 32768
-DEFAULT_MAX_INLINE = 32768
+DEFAULT_MAX_INLINE = 8192
 DEFAULT_AUTH_FILE = "~/.pi/agent/auth.json"
 
 
