@@ -43,6 +43,25 @@ class ToolsTest(unittest.TestCase):
         out = tools.do_edit({"path": "a.txt", "old": "x"}, self.root)
         self.assertIn("err bad_args", out)
 
+    def test_exec_rejects_shell_syntax(self):
+        for argv in (["echo", "hi", "|", "cat"],
+                     ["sh", "-c", "echo", "&&", "cat"],
+                     ["for", "x", "in", "a"]):
+            out = tools.do_exec({"argv": argv}, self.obs, "o1", sandbox=self.root)
+            self.assertIn("err shell_syntax", out)
+            self.assertIn('["sh","-c","..."]', out)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "a")))
+
+    def test_exec_allows_quoted_operators_and_real_sh(self):
+        out = tools.do_exec({"argv": [sys.executable, "-c", "print('a|b')"]},
+                            self.obs, "o1", sandbox=self.root)
+        self.assertTrue(out.startswith("exit=0 ms="))
+        self.assertIn("a|b", out)
+        out = tools.do_exec({"argv": ["sh", "-c", "printf hi | cat"]},
+                            self.obs, "o2", sandbox=self.root)
+        self.assertTrue(out.startswith("exit=0 ms="))
+        self.assertIn("hi", out)
+
     def test_exec_uses_sandbox_cwd(self):
         os.makedirs(os.path.join(self.root, "sub"))
         out = tools.do_exec({"argv": [sys.executable, "-c", "import os;print(os.getcwd())"]},

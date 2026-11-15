@@ -2,11 +2,31 @@ import os
 
 from . import config, observe, spawn
 
+SHELL_OPS = frozenset(("|", "||", "&&", ";", "&", ">", ">>", "<", "<<", "2>", "2>>", "&>", "|&"))
+SHELL_WORDS = frozenset((
+    "cd", "for", "while", "until", "if", "then", "elif", "else", "fi", "case", "esac",
+    "do", "done", "select", "function", "export", "unset", "source", "alias", "unalias",
+    "eval", "shift", "trap", "ulimit", "umask", "return", "break", "continue", "read",
+    "local", "declare", "typeset"))
+SHELL_HINT = 'exec has no shell. Use ["sh","-c","..."] for pipes, redirects or compound commands.'
+
+
+def shell_syntax(argv):
+    for tok in argv:
+        if tok in SHELL_OPS:
+            return f"err shell_syntax argv contains {tok!r} as a standalone token; {SHELL_HINT}"
+    if argv[0] in SHELL_WORDS:
+        return f"err shell_syntax argv[0]={argv[0]!r} is a shell keyword; {SHELL_HINT}"
+    return None
+
 
 def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None):
     argv = a.get("argv")
     if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
         return f"err bad_args exec requires argv:list[str], got {type(argv).__name__}"
+    bad = shell_syntax(argv)
+    if bad is not None:
+        return bad
     cwd = config.resolve(a.get("cwd") or ".", sandbox or config.root())
     code, out, err, dur = spawn.spawn(argv, cwd, a.get("stdin", ""), a.get("timeout_ms", 120000), kill_group=True)
     raw = out + (b"\n--stderr--\n" + err if err else b"")
