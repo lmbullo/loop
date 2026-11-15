@@ -65,8 +65,8 @@ sh install.sh --system       # /usr/local/bin/loop (sudo when needed)
 
 ## Run a real task
 
-`api` is the only expensive path: it calls a model. The defaults target a
-DeepSeek-compatible chat-completions endpoint.
+`api` and `resume` are the only expensive paths: they call a model. The
+defaults target a DeepSeek-compatible chat-completions endpoint.
 
 ```sh
 export LOOP_API_KEY=...      # or use LOOP_AUTH_FILE
