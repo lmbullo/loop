@@ -52,10 +52,16 @@ def _valid(value, spec, types, path):
         for idx, item in enumerate(value):
             _valid(item, base[5:-1], types, f"{path}[{idx}]")
     elif base in types:
-        if not isinstance(value, dict) or set(value) != set(types[base]):
-            raise record.Corrupt(f"{path}: expected fields {sorted(types[base])}")
-        for key, sub in types[base].items():
-            _valid(value[key], sub, types, f"{path}.{key}")
+        declared = types[base]
+        required = {k for k in declared if not k.endswith("?")}
+        optional = {k[:-1] for k in declared if k.endswith("?")}
+        if not isinstance(value, dict) or not required <= set(value) <= required | optional:
+            raise record.Corrupt(f"{path}: expected fields {sorted(required)} "
+                                 f"optional {sorted(optional)}")
+        for key, sub in declared.items():
+            name = key[:-1] if key.endswith("?") else key
+            if name in value:
+                _valid(value[name], sub, types, f"{path}.{name}")
     else:
         raise record.Corrupt(f"{path}: schema type {spec!r} is not declared")
 

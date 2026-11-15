@@ -14,20 +14,36 @@ NUDGE = ("No tool call was received. If the task is complete, call "
          "next tool call; do not reply with prose.")
 
 
-def read_turn(r):
+def canonical_args(raw):
+    try:
+        args = json.loads(raw, strict=False)
+    except (ValueError, TypeError):
+        return raw or "{}"
+    if not isinstance(args, dict):
+        return raw or "{}"
+    try:
+        return json.dumps(args, sort_keys=True, separators=(",", ":"),
+                          ensure_ascii=False, allow_nan=False)
+    except (ValueError, TypeError):
+        return raw or "{}"
+
+
+def read_turn(r, turn=0):
     usage = r.get("usage") or {}
     hit = int(usage.get("prompt_cache_hit_tokens", 0) or 0)
     miss = int(usage.get("prompt_cache_miss_tokens", 0) or 0)
     out = int(usage.get("completion_tokens", 0) or 0)
     choice = (r.get("choices") or [{}])[0]
     msg = choice.get("message") or {}
-    message = {"role": "assistant", "content": None, "tool_calls": []}
-    for call in msg.get("tool_calls") or []:
+    message = {"role": "assistant", "content": None, "tool_calls": [],
+               "reasoning_content": msg.get("reasoning_content") or ""}
+    for index, call in enumerate(msg.get("tool_calls") or []):
         fn = call.get("function") or {}
         message["tool_calls"].append({
-            "id": call.get("id") or "", "type": call.get("type") or "function",
+            "id": f"c{turn}.{index}" if turn else (call.get("id") or ""),
+            "type": call.get("type") or "function",
             "function": {"name": fn.get("name") or "",
-                         "arguments": fn.get("arguments") or "{}"}})
+                         "arguments": canonical_args(fn.get("arguments") or "{}")}})
     text = msg.get("content")
     if not message["tool_calls"] and not (isinstance(text, str) and text.strip()):
         # A silent stop may be followed by the nudge; an empty assistant turn
@@ -37,7 +53,7 @@ def read_turn(r):
             choice.get("finish_reason"), message, text)
 
 
-def run_calls(message, obs_dir, root, obs_n, max_inline=None):
+def run_calls(message, obs_dir, root, obs_n, max_inline=None, ledger=None):
     calls = []
     done = None
     for call in message["tool_calls"]:
@@ -65,7 +81,8 @@ def run_calls(message, obs_dir, root, obs_n, max_inline=None):
         saved = []
         try:
             obs = tools.dispatch(fn, args, obs_dir, f"obs-{obs_n}", root,
-                                 rel_base=root, saved=saved, max_inline=max_inline)
+                                 rel_base=root, saved=saved, max_inline=max_inline,
+                                 ledger=ledger, obs_id=f"obs-{obs_n}")
         except Exception as e:
             obs = (f"err harness {type(e).__name__}: {e}; "
                    f"exec argv, write path+data, edit path+old+new")

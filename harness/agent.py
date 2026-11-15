@@ -1,7 +1,7 @@
 import sys
 import urllib.error
 
-from . import api, auth, config, fold, pricing, record, recread, reload, verifier
+from . import api, auth, config, fold, ledger, pricing, record, recread, reload, verifier
 from .turn import read_turn, run_calls, stop
 
 totals_of = fold.totals_of
@@ -64,6 +64,11 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
                                          "record_source": "live"})
         emit(ev)
         events = [ev]
+    if fold.wire(events) is None:
+        ev = writer.append("wire", api.snapshot())
+        emit(ev)
+        events = events + [ev]
+    wire = fold.wire(events) or api.snapshot()
     st = fold.derive(events)
     root = root or st["root"]
     max_inline = st.get("max_inline")
@@ -82,14 +87,15 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
     turn, obs_n = st["turn"], st["obs_n"]
     nudged = st["nudged"]
     obs_dir = record.obs_dir(writer.run_id)
+    seen = ledger.Ledger.from_events(events, root)
     while True:
         if should_stop is not None and should_stop():
             return stopped(writer, events, turn)
         reload.maybe()
-        msgs = fold.context(events, st["task"])
+        msgs = fold.context(events, st["task"], wire)
         turn += 1
         try:
-            r = api.call(msgs, key)
+            r = api.call(msgs, key, wire)
         except urllib.error.HTTPError as e:
             try:
                 body = e.read().decode("utf-8", "replace")[:300]
@@ -99,8 +105,8 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
                                          "finish": "http_error"})
             emit(ev)
             return finish(writer, emit, events + [ev], turn, "http_error", None, 4)
-        hit, miss, out, reason, finish_reason, message, text = read_turn(r)
-        calls, done, obs_n = run_calls(message, obs_dir, root, obs_n, max_inline)
+        hit, miss, out, reason, finish_reason, message, text = read_turn(r, turn)
+        calls, done, obs_n = run_calls(message, obs_dir, root, obs_n, max_inline, seen)
         ev = writer.append("turn", {
             "turn": turn, "finish_reason": finish_reason,
             "usage": {"hit": hit, "miss": miss, "out": out, "reasoning_c": reason,

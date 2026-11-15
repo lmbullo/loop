@@ -1,7 +1,8 @@
 PYTHON ?= python3
+RUN ?=
 UNIT := $(PYTHON) -m unittest discover -s tests -t . -v
 
-.PHONY: help index check test lint verify sim clean
+.PHONY: help index check test lint verify sim clean audit
 
 help:
 	@echo "index   one-call loop-index/1 from manifest.json"
@@ -10,6 +11,7 @@ help:
 	@echo "lint    ruff E4/E9/F when installed"
 	@echo "verify  manifest-driven offline checks"
 	@echo "sim     run both offline sims"
+	@echo "audit   offline cache audit for RUN (default newest)"
 	@echo "clean   remove bytecode and test caches (never .logs)"
 
 index:
@@ -32,6 +34,9 @@ verify:
 sim:
 	$(PYTHON) run.py sim1 task
 	$(PYTHON) run.py sim2 task2
+
+audit:
+	$(PYTHON) scripts/cache_audit.py $(RUN)
 
 clean:
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

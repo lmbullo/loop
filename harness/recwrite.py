@@ -148,7 +148,7 @@ def reconcile(reason="server_start", by="server", run_id=None):
             rec = recread.read(rid)
         except record.Corrupt:
             continue
-        if rec["state"] == "complete":
+        if rec["state"] in ("complete", "empty"):
             continue
         try:
             writer = Writer(rid)

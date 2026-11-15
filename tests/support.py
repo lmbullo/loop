@@ -10,7 +10,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUN_ID = "20240101T000000000Z-abcdef01"
 ENV_KEYS = ("LOOP_ROOT", "LOOP_RUNS", "LOOP_REGISTRY", "LOOP_AUTH_FILE",
             "LOOP_API_KEY", "LOOP_MODEL", "LOOP_URL", "LOOP_MAX_TOKENS",
-            "LOOP_MAX_INLINE", "LOOP_HTTP_TIMEOUT_S", "LOOP_MOBILE_TOKEN",
+            "LOOP_THINK_BUDGET", "LOOP_MAX_INLINE", "LOOP_HTTP_TIMEOUT_S", "LOOP_MOBILE_TOKEN",
             "LOOP_MOBILE_ROOTS")
 
 RUN_START = {"task": "test task", "root": "/tmp/root", "entrypoint": "api",

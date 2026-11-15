@@ -18,10 +18,10 @@ facts:
   tree_lock: ".logs/run.lock; one run per tree; a second api queues a front item and waits"
   network: api and resume RUN_ID only; both cost real tokens
   tools: [exec, write, edit, done]
-  request: "model LOOP_MODEL; max_tokens LOOP_MAX_TOKENS (384000); thinking enabled with a 32768-token budget; authorization from LOOP_API_KEY or LOOP_AUTH_FILE"
+  request: "model LOOP_MODEL; max_tokens LOOP_MAX_TOKENS (65536); thinking enabled with LOOP_THINK_BUDGET (32768); the run start snapshots model, tools, system, max_tokens, thinking and renderer into a wire event; authorization from LOOP_API_KEY or LOOP_AUTH_FILE"
   verify: "run.py api --verify CMD; declared before the first turn, run after the terminal turn, recorded as verify events before end; view derives ok=1 from exit 0 and ok=0 otherwise"
-  inline_limit: "LOOP_MAX_INLINE, default 8192 bytes; run_start.max_inline pins the observation bound for a run; the system header is constant"
-  prompt_prefix: "api.header() is byte-identical across runs; task and observation facts are appended later, so the system message is a reusable cache prefix"
+  inline_limit: "LOOP_MAX_INLINE, default 2048 bytes; run_start.max_inline pins the observation bound for a run; renderer obs/2 emits a compact head/tail/stderr index and same=obs-N for an exact repeat"
+  prompt_prefix: "wire.system, wire.tools, wire.model, wire.max_tokens and wire.thinking are snapshotted at run start; task and observation facts are appended later, so the static prefix cannot change mid-run"
   silent_stop: "a turn with no tool call and no text gets one recorded nudge after turn 1; a second silent stop is finish=no_tool_call"
   sim_pricing: "sim1 and sim2 projections call pricing.cost, so cache rates come from manifest.cost_model"
   binary_obs: binary is a digest; raw bytes are not saved
@@ -176,8 +176,8 @@ invariants:
   - message list append-only
   - record append-only; one fsynced line per event
   - end is the only completion marker
-  - observations verbatim except the bounding rule
-  - api.header() is constant; run-specific values enter after it
+  - observations verbatim except the bounding rule; an exact repeat becomes same=obs-N
+  - the wire snapshot is the static prefix; run-specific values enter after it
   - a silent stop after turn 1 gets one nudge; a second silent stop is no_tool_call
   - "verify is evidence, not a gate: the event stores exit and view derives ok"
   - output metered, never gated
@@ -194,7 +194,8 @@ traps:
   - server restart is not a run restart; use resume
   - binary observations are digest-only; raw bytes are not saved
   - run_start.max_inline pins the observation bound; resume and soft reload reuse it
-  - api.header() is constant; do not put run-specific values in the system prefix
+  - wire.system is a snapshot, not a live read; do not put run-specific values in the system prefix
+  - reasoning_content must be present on a replayed assistant message when thinking is enabled; fold defaults old records to ""
   - LOOP_RUNS selects the daemon state dir; keep it stable per tree
   - do not delete .logs while a worker is live
   - do not rewrite complete record lines

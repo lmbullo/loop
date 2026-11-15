@@ -13,6 +13,13 @@ def totals_of(events):
     return t
 
 
+def wire(events):
+    for ev in events:
+        if ev["type"] == "wire":
+            return ev["data"]
+    return None
+
+
 def derive(events):
     task = root = max_inline = None
     turn = obs_n = 0
@@ -32,7 +39,8 @@ def derive(events):
         elif ev["type"] == "resume" and root is None:
             root = d.get("root")
     return {"task": task, "root": root, "turn": turn, "obs_n": obs_n,
-            "done": done, "max_inline": max_inline, "nudged": nudged}
+            "done": done, "max_inline": max_inline, "nudged": nudged,
+            "wire": wire(events)}
 
 
 def pending_verify(events):
@@ -43,8 +51,10 @@ def pending_verify(events):
     return cmd
 
 
-def context(events, task):
-    msgs = [{"role": "system", "content": api.header()},
+def context(events, task, wire_spec=None):
+    spec = wire_spec or wire(events)
+    system = spec["system"] if spec else api.header()
+    msgs = [{"role": "system", "content": system},
             {"role": "user", "content": task or ""}]
     for ev in events:
         if ev["type"] == "nudge":
@@ -52,7 +62,9 @@ def context(events, task):
             continue
         if ev["type"] != "turn":
             continue
-        msgs.append(ev["data"]["message"])
+        message = dict(ev["data"]["message"])
+        message.setdefault("reasoning_content", "")
+        msgs.append(message)
         for call in ev["data"].get("calls") or []:
             msgs.append({"role": "tool", "tool_call_id": call["id"],
                          "content": call["observation"]})

@@ -25,13 +25,14 @@ line:
     - schema == loop-record/1 and v == 1
     - run_id matches the directory
     - seq is contiguous from 1 and never reused
-    - data fields are exactly the set declared for the event type
+    - data fields are exactly the declared required set plus any optional keys marked with a trailing ? in the type document (currently message.reasoning_content)
     - unknown envelope or payload fields are corruption, not extensions
     - a final line without LF is a torn tail; the next writer truncates it; complete lines are never modified
   crash_safety: one O_APPEND write of one line then fsync, before the next turn
 
 events:
   - {type: run_start, terminal: false, data: "task str, root str, entrypoint str, model str, tools list<str>, max_inline int, record_source str"}
+  - {type: wire, terminal: false, data: "schema str, system str, tools str, thinking str, model str, max_tokens int, renderer str, sha str"}
   - {type: turn, terminal: false, data: "turn int, finish_reason str|null, usage usage, message message, calls list<call>, done done|null"}
   - {type: nudge, terminal: false, data: "text str"}
   - {type: resume, terminal: false, data: "from_seq int, turn int, messages int, root str, by str"}
@@ -42,7 +43,7 @@ events:
 
 types:
   usage: {hit: int, miss: int, out: int, reasoning_c: int, cost: num}
-  message: {role: str, content: str|null, tool_calls: "list<tool_call>"}
+  message: {role: str, content: "str|null", "reasoning_content?": str, tool_calls: "list<tool_call>"}
   tool_call: {id: str, type: str, function: fn}
   fn: {name: str, arguments: str}
   call: {id: str, name: str, observation: str, bytes: int, saved: "str|null"}
@@ -78,24 +79,26 @@ fold:
   module: harness/fold.py
   functions:
     - {name: totals_of, effect: "sum turn.usage into hit/miss/out/reasoning_c"}
-    - {name: derive, effect: "task, root, turn, obs_n, nudged, the last done call and max_inline"}
+    - {name: wire, effect: "the first wire event, or null for records written before wire snapshots"}
+    - {name: derive, effect: "task, root, turn, obs_n, nudged, the last done call, max_inline and the wire snapshot"}
     - {name: pending_verify, effect: "last verify.command with ran=false, else null; a ran=true event clears it"}
-    - {name: context, effect: "rebuild the request message list"}
+    - {name: context, effect: "rebuild the request message list from the recorded wire, turns, calls and nudges"}
   aliases: harness.agent re-exports totals_of, derive, context and the turn helpers read_turn/run_calls/stop for callers and tests
   shape: |
     [
-      {"role":"system","content":api.header()},
+      {"role":"system","content":wire.system or api.header()},
       {"role":"user","content":task},
       for each turn event:
-        turn.data.message,
+        turn.data.message with reasoning_content defaulted to "",
         for each call in turn.data.calls:
           {"role":"tool","tool_call_id":call.id,"content":call.observation}
       for each nudge event, at its seq:
         {"role":"user","content":nudge.text}
     ]
-  header: constant api.header() text; it carries no run id, task, root, model or max_inline value
+  header: wire.system is a run-start snapshot of api.header(); it carries no run id, task, root, model or max_inline value
   max_inline: run_start.max_inline pins only the observation bound for the run
-  resume: rebuilds the same system/user prefix from the record and reuses the recorded observation bound
+  reasoning: message.reasoning_content is optional in old records; context defaults it to "" because thinking mode requires the field
+  resume: rebuilds the same system/user prefix from the recorded wire and reuses the recorded observation bound
 
 writer:
   class: recwrite.Writer

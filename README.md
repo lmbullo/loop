@@ -23,11 +23,13 @@ the human-facing layer.
   act on the world. Editing a file means writing a program that edits it. This
   keeps the wire small and makes every action reproducible.
 - **Bounded observations.** Small results stay inline. Text over the run's
-  bound becomes a shape summary with the raw bytes saved under the run's `obs/`
-  directory; binary output becomes a digest. Context growth is predictable.
-- **Cache-aware accounting.** The system header is constant and the message list
-  is append-only, so the unchanged prefix is a cache hit and only the appended
-  suffix is a miss. Every turn reports hit/miss/output cost.
+  bound becomes a compact head/tail/stderr index with the raw bytes saved under
+  the run's `obs/` directory; binary output becomes a digest, and an exact repeat
+  becomes a one-line `same=obs-N` reference. Context growth is predictable.
+- **Cache-aware accounting.** The system header, tool schema, model and thinking
+  settings are snapshotted at run start and the message list is append-only, so
+  the unchanged prefix is a cache hit and only the appended suffix is a miss.
+  Every turn reports hit/miss/output cost.
 - **Durable by construction.** One record per run, one fsynced JSONL line per
   event, and `end` as the only completion marker. `view` is a pure function over
   record bytes; `resume` rebuilds state from the same bytes and continues.

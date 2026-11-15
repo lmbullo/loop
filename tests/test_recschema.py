@@ -50,6 +50,14 @@ class RecSchemaTest(unittest.TestCase):
         turn["done"] = None
         recschema.check(recschema.event(RUN_ID, 2, "turn", turn), RUN_ID, 2)
 
+    def test_optional_reasoning_content_is_accepted_not_required(self):
+        turn = copy.deepcopy(TURN)
+        turn["message"]["reasoning_content"] = "because"
+        recschema.check(recschema.event(RUN_ID, 2, "turn", turn), RUN_ID, 2)
+        turn["message"]["other"] = "x"
+        with self.assertRaises(record.Corrupt):
+            recschema.check(recschema.event(RUN_ID, 2, "turn", turn), RUN_ID, 2)
+
     def test_event_builder_validates(self):
         with self.assertRaises(record.Corrupt):
             recschema.event(RUN_ID, 1, "end", {"exit": 0})

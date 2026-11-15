@@ -53,8 +53,11 @@ as the only source of truth.
   completion marker. A missing `end` is the interrupted marker.
 - Observations are verbatim except for the bounding rule in `harness/observe.py`;
   text over the run's bound is summarized and its raw bytes are saved.
-- The system header is constant across runs; task and run-specific values enter
-  after it, so the prefix is cacheable.
+- The system header, tool schema, model, `max_tokens`, thinking budget and
+  renderer are constant per run and snapshotted in the `wire` event at run
+  start; task and observations enter after that static prefix, so a soft reload
+  cannot break the cache. `reasoning_content` is replayed because thinking mode
+  requires it.
 - Output is metered and reported, never gated.
 - A terminal turn with no tool call and no text is not final on its own: after
   turn 1 the loop records one `nudge` user message and retries; a second silent

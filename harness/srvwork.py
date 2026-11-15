@@ -41,7 +41,7 @@ def tick(daemon):
         if not launched and current.get("state") == "queued":
             launch(daemon, current)
             return
-        if time.time() - launched < 6.0 and state in ("missing", "running"):
+        if time.time() - launched < 6.0 and state in ("missing", "empty", "running"):
             return
         if state == "missing":
             queue.finish("failed", detail="worker produced no record")

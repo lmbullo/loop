@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from harness import observe
+from harness import ledger, observe
 
 
 class ObserveTest(unittest.TestCase):
@@ -16,6 +16,18 @@ class ObserveTest(unittest.TestCase):
         self.assertTrue(observe.is_binary(b"\x00\x01\x02"))
         self.assertFalse(observe.is_binary(b""))
         self.assertTrue(observe.is_binary(bytes(range(32)) * 10))
+
+    def test_is_binary_keeps_utf8_text(self):
+        self.assertFalse(observe.is_binary("第一行\n".encode()))
+        self.assertFalse(observe.is_binary("résumé café\n".encode()))
+        self.assertFalse(observe.is_binary(("第一行\n" * 300).encode()))
+        self.assertFalse(observe.is_binary("done ✅\n".encode()))
+
+    def test_is_binary_at_sample_boundary(self):
+        raw = b"a" * 4095 + "你".encode()[:2]
+        self.assertEqual(len(raw), 4097)
+        self.assertFalse(observe.is_binary(raw))
+        self.assertTrue(observe.is_binary(b"abc\xff"))
 
     def test_digest(self):
         text = observe.digest(b"\x00\x01")
@@ -34,7 +46,9 @@ class ObserveTest(unittest.TestCase):
         saved = []
         out = observe.render_api(raw, self.obs, "o1", max_inline=bound,
                                  saved=saved, rel_base=self.tmp.name)
-        self.assertIn("kind=text", out)
+        self.assertIn("obs bytes=", out)
+        self.assertIn("saved=", out)
+        self.assertIn("sha=", out)
         self.assertLess(len(out.encode()), len(raw) // 2)
         self.assertEqual(saved, ["obs/o1.txt"])
         with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
@@ -50,15 +64,26 @@ class ObserveTest(unittest.TestCase):
         out = observe.render_api(b"\x00\x01", self.obs, "o1")
         self.assertTrue(out.startswith("kind=binary"))
 
+    def test_render_api_unicode_is_text_and_saved(self):
+        raw = ("第一行内容\n" * 300).encode()
+        saved = []
+        out = observe.render_api(raw, self.obs, "o1", max_inline=2048,
+                                 saved=saved, rel_base=self.tmp.name)
+        self.assertIn("obs bytes=", out)
+        self.assertNotIn("kind=binary", out)
+        self.assertIn("第一行内容", out)
+        self.assertEqual(saved, ["obs/o1.txt"])
+        with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
+            self.assertEqual(f.read(), raw)
+
     def test_render_api_large_saves_and_shapes(self):
         raw = b"\n".join([b"line-%02d" % i for i in range(100)])
         saved = []
         out = observe.render_api(raw, self.obs, "o1", max_inline=100,
                                  saved=saved, rel_base=self.tmp.name)
-        self.assertIn("kind=text", out)
-        self.assertIn("note=do not re-read the whole file", out)
-        self.assertIn("first15:", out)
-        self.assertIn("last5:", out)
+        self.assertIn("obs bytes=", out)
+        self.assertIn("head:", out)
+        self.assertIn("tail:", out)
         self.assertEqual(saved, ["obs/o1.txt"])
         with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
             self.assertEqual(f.read(), raw)
@@ -66,18 +91,45 @@ class ObserveTest(unittest.TestCase):
     def test_render_api_head_tail_do_not_repeat_lines(self):
         raw = b"\n".join([b"unique-%02d" % i for i in range(20)])
         out = observe.render_api(raw, self.obs, "o1", max_inline=50)
-        self.assertIn("first15:", out)
-        self.assertIn("last5:", out)
-        for i in range(20):
+        for i in range(6):
             self.assertEqual(out.count("unique-%02d" % i), 1)
+        for i in range(17, 20):
+            self.assertEqual(out.count("unique-%02d" % i), 1)
+        self.assertNotIn("unique-10", out)
 
-    def test_render_api_omits_tail_when_all_lines_are_in_head(self):
+    def test_render_api_short_output_shows_all_lines_once(self):
         raw = b"\n".join([b"row-%02d" % i for i in range(10)])
         out = observe.render_api(raw, self.obs, "o1", max_inline=20)
-        self.assertIn("first15:", out)
-        self.assertNotIn("last5:", out)
+        self.assertIn("head:", out)
         for i in range(10):
             self.assertEqual(out.count("row-%02d" % i), 1)
+
+    def test_render_api_keeps_stderr_tail(self):
+        raw = b"out\n" + observe.STDERR_SEP + b"\n".join(
+            [b"warn-%d" % i for i in range(20)])
+        out = observe.render_api(raw, self.obs, "o1", max_inline=20)
+        self.assertIn("stderr_tail:", out)
+        self.assertIn("warn-19", out)
+
+    def test_ledger_turns_an_exact_repeat_into_a_reference(self):
+        raw = b"same payload\n" * 20
+        led = ledger.Ledger()
+        first = observe.render_api(raw, self.obs, "o1", max_inline=50,
+                                   ledger=led, obs_id="obs-1",
+                                   rel_base=self.tmp.name)
+        second = observe.render_api(raw, self.obs, "o2", max_inline=50,
+                                    ledger=led, obs_id="obs-2",
+                                    rel_base=self.tmp.name)
+        self.assertIn("obs bytes=", first)
+        self.assertEqual(second, "same=obs-1 bytes=260")
+        self.assertFalse(os.path.exists(os.path.join(self.obs, "o2.txt")))
+
+    def test_ledger_from_events_recovers_exec_payload(self):
+        events = [{"type": "turn", "data": {"calls": [{
+            "name": "exec", "observation": "exit=0 ms=1\nsame payload",
+            "saved": None}]}}]
+        led = ledger.Ledger.from_events(events)
+        self.assertIsNotNone(led.get(b"same payload"))
 
     def test_save_rel_base_outside_base_falls_back(self):
         elsewhere = os.path.join(self.tmp.name, "other")

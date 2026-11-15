@@ -42,11 +42,16 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(config.env_int("NOPE", 9), 9)
 
     def test_max_inline(self):
-        self.assertEqual(config.DEFAULT_MAX_INLINE, 8192)
+        self.assertEqual(config.DEFAULT_MAX_INLINE, 2048)
         with mock.patch.dict(os.environ, {"LOOP_MAX_INLINE": "12"}, clear=False):
             self.assertEqual(config.max_inline(), 12)
         with mock.patch.dict(os.environ, {"LOOP_MAX_INLINE": "bad"}, clear=True):
             self.assertEqual(config.max_inline(), config.DEFAULT_MAX_INLINE)
+
+    def test_think_budget(self):
+        self.assertEqual(config.think_budget(), config.THINK_BUDGET)
+        with mock.patch.dict(os.environ, {"LOOP_THINK_BUDGET": "17"}, clear=False):
+            self.assertEqual(config.think_budget(), 17)
 
     def test_display_relative_and_outside(self):
         inside = os.path.join(config.ROOT, "harness", "config.py")

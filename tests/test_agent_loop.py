@@ -1,9 +1,10 @@
 import json
+import sys
 import unittest
 from unittest import mock
 
 from harness import agent, fold, record, recwrite, turn
-from tests.support import TURN, sandbox
+from tests.support import RUN_START, TURN, sandbox
 
 
 def response(content=None, calls=None, finish="stop", out=10):
@@ -47,9 +48,9 @@ class AgentLoopTest(unittest.TestCase):
         self.assertEqual(summary["result"], "ok")
         self.assertEqual(summary["turns"], 3)
         self.assertEqual([ev["type"] for ev in events],
-                         ["run_start", "turn", "turn", "nudge", "turn", "end"])
-        self.assertEqual(events[2]["data"]["message"]["content"], "")
-        self.assertEqual(events[3]["data"], {"text": turn.NUDGE})
+                         ["run_start", "wire", "turn", "turn", "nudge", "turn", "end"])
+        self.assertEqual(events[3]["data"]["message"]["content"], "")
+        self.assertEqual(events[4]["data"], {"text": turn.NUDGE})
         self.assertTrue(fold.derive(events)["nudged"])
         msgs = fold.context(events, "t")
         self.assertIn({"role": "user", "content": turn.NUDGE}, msgs)
@@ -105,7 +106,44 @@ class AgentLoopTest(unittest.TestCase):
         self.assertEqual(summary["finish"], "no_tool_call")
         self.assertEqual(summary["turns"], 2)
         self.assertEqual([ev["type"] for ev in events],
-                         ["run_start", "turn", "nudge", "turn", "end"])
+                         ["run_start", "turn", "nudge", "wire", "turn", "end"])
+
+    def test_resume_reuses_the_recorded_wire_snapshot(self):
+        with sandbox() as tmp:
+            run_id = record.new_id()
+            spec = {"schema": "loop-wire/1", "system": "PINNED", "tools": "[]",
+                    "thinking": "{}", "model": "m", "max_tokens": 1,
+                    "renderer": "obs/2", "sha": "x"}
+            writer = recwrite.Writer(run_id)
+            try:
+                writer.append("run_start", dict(RUN_START, root=tmp))
+                writer.append("wire", spec)
+                data = json.loads(json.dumps(TURN))
+                data["message"]["tool_calls"] = [call("exec", {"argv": ["true"]})]
+                data["calls"] = [{"id": "c1.0", "name": "exec", "observation": "ok",
+                                  "bytes": 2, "saved": None}]
+                writer.append("turn", data)
+                writer.append("nudge", {"text": turn.NUDGE})
+            finally:
+                writer.close()
+            seen = {}
+
+            def fake_call(msgs, key, wire=None):
+                seen["system"] = msgs[0]["content"]
+                seen["wire"] = wire["sha"]
+                return response(None, [call("done", {"result": "ok"})], "tool_calls")
+
+            writer = recwrite.Writer(run_id)
+            try:
+                with mock.patch.object(agent.auth, "api_key", return_value="k"), \
+                        mock.patch.object(agent.api, "call", side_effect=fake_call):
+                    summary = agent.run_task(writer, lambda ev: ev, root=tmp)
+            finally:
+                writer.close()
+            events = read(run_id)
+        self.assertEqual(summary["finish"], "done")
+        self.assertEqual(seen, {"system": "PINNED", "wire": "x"})
+        self.assertEqual([ev["type"] for ev in events].count("wire"), 1)
 
     def test_first_silent_stop_is_not_nudged(self):
         summary, events = self.run_fake([response(None, [], "stop")])
@@ -119,9 +157,33 @@ class AgentLoopTest(unittest.TestCase):
             response(None, [call("done", {"result": "ok"})], "tool_calls")])
         self.assertEqual(summary["finish"], "done")
         self.assertEqual(summary["result"], "ok")
-        first = events[1]["data"]["calls"][0]
+        first = events[2]["data"]["calls"][0]
         self.assertEqual(first["name"], "done")
         self.assertIn("err bad_args done requires result:str", first["observation"])
+
+    def test_identical_exec_observations_become_references(self):
+        same = [{"id": "c1", "type": "function", "function": {
+            "name": "exec", "arguments": json.dumps(
+                {"argv": [sys.executable, "-c", "print('same')"]})}}]
+        summary, events = self.run_fake([
+            response(None, same, "tool_calls"),
+            response(None, same, "tool_calls"),
+            response(None, [call("done", {"result": "ok"})], "tool_calls")])
+        self.assertEqual(summary["finish"], "done")
+        obs = [c["observation"] for ev in events if ev["type"] == "turn"
+               for c in ev["data"]["calls"]]
+        self.assertIn("same", obs[0])
+        self.assertTrue(obs[1].startswith("exit=") and "same=obs-1" in obs[1])
+
+    def test_reasoning_content_is_recorded_and_replayed(self):
+        reply = response(None, [call("exec", {"argv": ["true"]})], "tool_calls")
+        reply["choices"][0]["message"]["reasoning_content"] = "because"
+        summary, events = self.run_fake([
+            reply, response(None, [call("done", {"result": "ok"})], "tool_calls")])
+        self.assertEqual(summary["finish"], "done")
+        first = events[2]["data"]["message"]
+        self.assertEqual(first["reasoning_content"], "because")
+        self.assertEqual(fold.context(events, "t")[2]["reasoning_content"], "because")
 
     def test_turn_module_owns_the_stop_policy(self):
         quiet = {"role": "assistant", "content": None, "tool_calls": []}

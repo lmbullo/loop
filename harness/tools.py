@@ -20,7 +20,8 @@ def shell_syntax(argv):
     return None
 
 
-def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None):
+def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None,
+            ledger=None, obs_id=None):
     argv = a.get("argv")
     if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
         return f"err bad_args exec requires argv:list[str], got {type(argv).__name__}"
@@ -29,9 +30,9 @@ def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inlin
         return bad
     cwd = config.resolve(a.get("cwd") or ".", sandbox or config.root())
     code, out, err, dur = spawn.spawn(argv, cwd, a.get("stdin", ""), a.get("timeout_ms", 120000), kill_group=True)
-    raw = out + (b"\n--stderr--\n" + err if err else b"")
-    return f"exit={code} ms={dur}\n" + observe.render_api(raw, obs_dir, name, max_inline=max_inline,
-                                                          saved=saved, rel_base=rel_base)
+    return observe.render_exec(code, dur, out, err, obs_dir, name, sandbox=sandbox,
+                               rel_base=rel_base, saved=saved, max_inline=max_inline,
+                               ledger=ledger, obs_id=obs_id)
 
 
 def do_write(a, sandbox=None):
@@ -79,11 +80,24 @@ def do_edit(a, sandbox=None):
     return f"ok -{len(old)} +{len(new)} {a['path']}\n" + s2[lo:hi].decode("utf-8", "replace")
 
 
-def dispatch(fn, a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None):
+def _remember(text, ledger, obs_id):
+    if ledger is None:
+        return text
+    raw = text.encode()
+    prior = ledger.get(raw)
+    if prior is not None and prior.get("id") != obs_id:
+        return observe.same(prior)
+    ledger.add(raw, obs_id or "obs", None, True)
+    return text
+
+
+def dispatch(fn, a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None,
+             ledger=None, obs_id=None):
     if fn == "exec":
-        return do_exec(a, obs_dir, name, sandbox, rel_base, saved, max_inline)
+        return do_exec(a, obs_dir, name, sandbox, rel_base, saved, max_inline,
+                       ledger, obs_id)
     if fn == "write":
-        return do_write(a, sandbox)
+        return _remember(do_write(a, sandbox), ledger, obs_id)
     if fn == "edit":
-        return do_edit(a, sandbox)
+        return _remember(do_edit(a, sandbox), ledger, obs_id)
     return f"err unknown_tool {fn} expected one of exec, write, edit, done"

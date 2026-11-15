@@ -58,12 +58,13 @@ modules:
   turn_loop:
     - {path: harness/config.py, owns: "machine values: ROOT from __file__, root(), asset(), runs(), resolve(), env helpers"}
     - {path: harness/agent.py, owns: "run lifecycle: per-turn reload boundary, credentials, verify settlement, end"}
-    - {path: harness/turn.py, owns: "one model turn: response parsing, tool-call dispatch, done-result validation, terminal/nudge stop policy"}
-    - {path: harness/fold.py, owns: "pure record fold: totals, derived state, pending verify, request messages"}
+    - {path: harness/turn.py, owns: "one model turn: response parsing, canonical short call ids and compact args, tool-call dispatch, done-result validation, terminal/nudge stop policy"}
+    - {path: harness/fold.py, owns: "pure record fold: totals, derived state, wire snapshot, pending verify, request messages"}
     - {path: harness/verifier.py, owns: "run the verify command through sh -c at the run root; exit code plus one evidence line"}
-    - {path: harness/api.py, owns: "tool schemas, system header, model id, HTTP call"}
-    - {path: harness/tools.py, owns: "exec, write, edit bodies and dispatch"}
-    - {path: harness/observe.py, owns: "render_api, render_v1, render_v2 bounding"}
+    - {path: harness/api.py, owns: "tool schemas, system header, per-run wire snapshot, model id, HTTP call"}
+    - {path: harness/tools.py, owns: "exec, write, edit bodies and dispatch; exec forwards the bounded ledgered renderer"}
+    - {path: harness/observe.py, owns: "2048-byte render_api compact head/tail/stderr shape, same=obs-N references, render_v1, render_v2"}
+    - {path: harness/ledger.py, owns: "content-addressed observation memory derived from record events and saved artifacts"}
     - {path: harness/spawn.py, owns: "one literal-argv subprocess; timeout and OSError mapping"}
     - {path: harness/pricing.py, owns: "manifest rates, cost formula, hot reload by mtime"}
     - {path: harness/auth.py, owns: "LOOP_API_KEY, else LOOP_AUTH_FILE with deepseek.key"}
@@ -178,7 +179,8 @@ imports:
   - no absolute paths; roots come from __file__, LOOP_ROOT or LOOP_RUNS
 
 change_map:
-  - {change: tool or observation shape, start: [harness/tools.py, harness/observe.py], test: [tests/test_tools.py, tests/test_observe.py]}
+  - {change: tool or observation shape, start: [harness/tools.py, harness/observe.py, harness/ledger.py], test: [tests/test_tools.py, tests/test_observe.py]}
+  - {change: prompt prefix, wire snapshot, model or thinking budget, start: [harness/api.py, harness/agent.py, harness/fold.py, manifest.record], test: [tests/test_agent_context.py, tests/test_agent_loop.py, scripts/cache_audit.py]}
   - {change: turn loop, stop condition, end payload, start: [harness/agent.py, harness/turn.py, harness/fold.py], test: [tests/test_agent_context.py, tests/test_agent_loop.py, tests/test_view.py]}
   - {change: verify command, start: [harness/agent.py, harness/fold.py, harness/verifier.py], test: [tests/test_verify.py, tests/test_view.py]}
   - {change: record fields or state rules, start: [manifest.record, harness/recschema.py], test: [tests/test_recschema.py, tests/test_recread.py]}

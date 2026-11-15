@@ -90,6 +90,13 @@ class RecWriteTest(unittest.TestCase):
             self.assertEqual(recread.read(done_id)["state"], "complete")
             self.assertEqual(recwrite.reconcile("again", "server"), [])
 
+    def test_reconcile_skips_a_record_with_no_events(self):
+        with sandbox():
+            write_record(RUN_ID, [])
+            self.assertEqual(recread.read(RUN_ID)["state"], "empty")
+            self.assertEqual(recwrite.reconcile("server_start", "server"), [])
+            self.assertEqual(recread.read(RUN_ID)["state"], "empty")
+
     def test_sync_dir_does_not_raise(self):
         with sandbox() as tmp:
             recwrite.sync_dir(tmp)

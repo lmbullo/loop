@@ -29,6 +29,7 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "result": {"type": "string"}}, "required": ["result"]}}},
 ]
+WIRE_SCHEMA = "loop-wire/1"
 
 BASE = """\
 This repo and its artifacts are agent-facing. The code in it is machine text
@@ -46,9 +47,11 @@ literally: no shell, so no globs, pipes or redirects unless you use sh -c.
 
 Cost: the whole message list is re-sent each turn, so the unchanged prefix is a
 cache hit and only the appended suffix is a cache miss; output tokens bill
-highest, and reasoning is never re-sent, so it costs nothing after the turn.
+highest. reasoning_content is replayed because thinking mode requires it; after
+the turn it is part of the cached prefix.
 
-Assistant text is not re-sent; only tool calls and their observations persist.
+Assistant prose text is not re-sent; tool calls, their arguments,
+reasoning_content and observations persist.
 Call done(result) when the task is complete. A turn with no tool call also ends
 the run: non-empty text becomes end.result. An empty reply gets one nudge to
 call done or continue; a second empty reply finishes it as no_tool_call.
@@ -61,7 +64,9 @@ script; repeated single-step probing costs a turn each time.
 
 Large observations are replaced by a shape summary; the raw bytes are saved
 under the run's obs directory. Grep for the line you need or read a small range;
-do not dump the whole file again.
+do not dump the whole file again. An observation marked same=obs-N is byte
+identical to that earlier observation; use the earlier copy instead of probing
+again.
 
 Paths are relative to the working directory.
 
@@ -88,12 +93,45 @@ def header():
     return BASE
 
 
-def call(msgs, key):
+def thinking():
+    return {"type": "enabled", "budget_tokens": config.think_budget()}
+
+
+def max_tokens():
+    return config.env_int("LOOP_MAX_TOKENS", 65536)
+
+
+def snapshot():
+    """Snapshot the request-static prefix once per run.
+
+    A soft reload may re-import this module mid-run. The worker passes the
+    snapshot back into call(), so the system header, tool schemas, model and
+    thinking budget cannot change between turns of one run.
+    """
+    spec = {"schema": WIRE_SCHEMA, "system": header(),
+            "tools": json.dumps(TOOLS, sort_keys=True, separators=(",", ":")),
+            "thinking": json.dumps(thinking(), sort_keys=True, separators=(",", ":")),
+            "model": model(), "max_tokens": max_tokens(),
+            "renderer": config.RENDERER}
+    return dict(spec, sha=_sha(spec))
+
+
+def _sha(spec):
+    import hashlib
+    body = {k: spec[k] for k in ("system", "tools", "thinking", "model",
+                                 "max_tokens", "renderer")}
+    raw = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def call(msgs, key, wire=None):
+    spec = wire or snapshot()
     body = json.dumps({
-        "model": model(), "messages": msgs, "tools": TOOLS,
-        "max_tokens": config.env_int("LOOP_MAX_TOKENS", 384000),
-        "thinking": {"type": "enabled", "budget_tokens": config.THINK_BUDGET},
-    }).encode()
+        "model": spec["model"], "messages": msgs,
+        "tools": json.loads(spec["tools"]),
+        "max_tokens": int(spec["max_tokens"]),
+        "thinking": json.loads(spec["thinking"]),
+    }, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     req = urllib.request.Request(url(), body, {
         "Content-Type": "application/json", "Authorization": f"Bearer {key}"})
     with urllib.request.urlopen(req, timeout=config.env_int("LOOP_HTTP_TIMEOUT_S", 1800)) as r:

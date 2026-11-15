@@ -45,6 +45,9 @@ def lines(ev):
             out.append("   -> " + one(call["observation"], _limit("obs")))
         if data["done"] is not None:
             out.append("  done: " + one(data["done"]["result"], _limit("text")))
+    elif kind == "wire":
+        out.append(f"[wire] schema={data['schema']} renderer={data['renderer']} "
+                   f"model={data['model']} sha={data['sha']}")
     elif kind == "nudge":
         out.append("[nudge] " + one(data["text"], _limit("text")))
     elif kind == "resume":

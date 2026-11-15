@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import unittest.mock
 
-from harness import agent, recwrite
+from harness import agent, fold, recwrite
 from tests.support import END, NUDGE, RUN_ID, RUN_START, TURN, event, sandbox
 
 
@@ -99,6 +99,28 @@ class AgentContextTest(unittest.TestCase):
         self.assertEqual(message["tool_calls"][0]["function"]["name"], "exec")
         self.assertIsNone(text)
 
+    def test_read_turn_canonicalizes_ids_and_arguments(self):
+        response = {
+            "usage": {},
+            "choices": [{"finish_reason": "tool_calls", "message": {
+                "tool_calls": [{"id": "provider-long-id", "type": "function",
+                                "function": {"name": "exec",
+                                             "arguments": '{ "argv" : ["a", "b"] }'}}]}}]}
+        _, _, _, _, _, message, _ = agent.read_turn(response, 7)
+        call = message["tool_calls"][0]
+        self.assertEqual(call["id"], "c7.0")
+        self.assertEqual(call["function"]["arguments"], '{"argv":["a","b"]}')
+
+    def test_context_uses_recorded_wire(self):
+        spec = {"schema": "loop-wire/1", "system": "PINNED HEADER",
+                "tools": "[]", "thinking": "{}", "model": "m",
+                "max_tokens": 1, "renderer": "obs/2", "sha": "x"}
+        events = [event(RUN_ID, 1, "run_start", dict(RUN_START)),
+                  event(RUN_ID, 2, "wire", spec)]
+        msgs = agent.context(events, "t")
+        self.assertEqual(msgs[0]["content"], "PINNED HEADER")
+        self.assertEqual(fold.derive(events)["wire"]["sha"], "x")
+
     def test_run_calls_malformed_and_done(self):
         with tempfile.TemporaryDirectory() as tmp:
             message = {"tool_calls": [
@@ -116,7 +138,7 @@ class AgentContextTest(unittest.TestCase):
                 "id": "c1", "function": {"name": "exec", "arguments": json.dumps(
                     {"argv": [sys.executable, "-c", "print('x' * 200)"]})}}]}
             calls, _, _ = agent.run_calls(message, tmp, tmp, 0, max_inline=100)
-            self.assertIn("kind=text", calls[0]["observation"])
+            self.assertIn("obs bytes=", calls[0]["observation"])
             self.assertTrue(calls[0]["saved"])
 
     def test_run_calls_exec(self):

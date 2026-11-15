@@ -45,15 +45,15 @@ test_map:
   - {test: test_recwrite.py, contract: append/fsync, per-run and tree locks, seal, reconcile, torn-tail repair}
   - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
-  - {test: test_observe.py, contract: binary detection, three bounding rules, the 8192-byte default bound, saved bytes, deduplicated head/tail}
+  - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, compact head/tail/stderr shape, saved bytes, exact-repeat same=obs-N ledger}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
   - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}
   - {test: test_queue.py, contract: add/promote/update/finish/drop/move, corrupt reset}
   - {test: test_regstore.py, contract: atomic registry writes, locking, current-entry precedence}
   - {test: test_workers.py, contract: worker registry, pid+start liveness, reap, record state}
-  - {test: test_agent_context.py, contract: usage totals, derive, constant prompt prefix independent of the inline bound, context fold, response parsing, dispatch, finish, terminal text}
-  - {test: test_agent_loop.py, contract: offline run loop, one nudge after a silent stop, second silent stop ends no_tool_call, non-str done result is an observation}
+  - {test: test_agent_context.py, contract: usage totals, derive, recorded wire prefix, canonical short ids and compact args, context fold with reasoning_content, response parsing, dispatch, finish, terminal text}
+  - {test: test_agent_loop.py, contract: offline run loop with a wire event, one nudge after a silent stop, second silent stop ends no_tool_call, non-str done result is an observation}
   - {test: test_verify.py, contract: pending verify fold, sh -c exit/evidence/root, declaration and settle order, resume command, --verify argv, view lines}
   - {test: test_install.py, contract: "installer help, dry run, user default, prefix with spaces, idempotent install, uninstall, foreign-file refusal, checkout guard"}
   - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring, --skip-server token filtering}
