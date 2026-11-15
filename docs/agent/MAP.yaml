@@ -13,7 +13,7 @@ dispatch:
 
 entrypoints:
   - {id: api, module: harness.agent, network: true, verify: "--verify CMD runs after the terminal turn, before end", writes: [daemon queue, job, worker registry, record, lock, obs]}
-  - {id: server, module: harness.server, network: false, writes: [socket, pid, log, registry, queue, jobs, workers, reload, records and record locks through reconcile]}
+  - {id: server, module: harness.server, network: false, writes: [socket, pid, log, registry, queue, jobs, workers, reload, mobile token and listener, records and record locks through reconcile]}
   - {id: view, module: harness.view, network: false, writes: []}
   - {id: resume, module: harness.resume, network: true, writes: [existing record, lock, obs]}
   - {id: sim1, module: harness.sim1, network: false, writes: [".logs/sim1/<label>/"]}
@@ -41,9 +41,13 @@ runtime_flow: |
          -> agent.run_task()
               -> fold record -> messages
               -> api.call()           model
-              -> tools.dispatch()     exec/write/edit
+              -> turn.read_turn()     usage, message, text
+              -> turn.run_calls()     exec/write/edit; done settles without dispatch
               -> writer.append("turn")
-              -> repeat until done or no tool call
+              -> turn.stop()          continue | one nudge | done/no_tool_call
+              -> writer.append("nudge") only for the one silent-stop retry
+              -> repeat until done, no_tool_call or cancel
+         -> verifier.run()            only when the task declared a command
          -> writer.append("end")      the only completion marker
     -> client streams record events from disk until end/interrupted
 
@@ -77,7 +81,11 @@ modules:
     - {path: harness/srvctl.py, owns: "daemon spawn/probe/stop/clean-stale, log tail"}
     - {path: harness/srvdaemon.py, owns: "socket serve loop, registry entry, startup reconcile, supervisor thread"}
     - {path: harness/srvwork.py, owns: "supervisor: reap, promote queue, launch one worker"}
-    - {path: harness/srvconn.py, owns: "socket command handlers; cancel and force-stop interruption"}
+    - {path: harness/srvconn.py, owns: "socket command handlers; cancel and force-stop interruption; mobile_start/stop/status dispatch"}
+    - {path: harness/mobile.py, owns: "server mobile CLI: private host default, roots, token load, daemon request and status output"}
+    - {path: harness/mobserve.py, owns: "opt-in mobile HTTP listener: private bind and peer filter, bearer auth, request limits, lifecycle"}
+    - {path: harness/mobapi.py, owns: "mobile routes over existing functions: directory allowlist, enqueue, snapshot, runs, run log"}
+    - {path: harness/mobtoken.py, owns: "mobile bearer token: LOOP_MOBILE_TOKEN or .logs/mobile.token mode 0600"}
     - {path: harness/srvclient.py, owns: "client attach/stream/reconnect; api entry"}
     - {path: harness/srvrun.py, owns: "run targeting (always enqueue) and record tailing"}
     - {path: harness/srvsnap.py, owns: "snapshot/status views; current, queue, bounded done list, local_done"}
@@ -90,9 +98,22 @@ modules:
     - {path: harness/registry.py, owns: "state paths, socket path fallback, tree identity"}
     - {path: harness/regstore.py, owns: "locked, atomic JSON registry writes"}
     - {path: harness/regprobe.py, owns: "pid liveness, /proc start fingerprint, socket ping/probe"}
+  mobile_app:
+    - {path: mobile/lib/main.dart, owns: "Flutter entry point and app shell"}
+    - {path: mobile/lib/api.dart, owns: "private-address guard, bearer HTTP client, JSON error mapping"}
+    - {path: mobile/lib/models.dart, owns: "pure snapshot, task, log and directory models"}
+    - {path: mobile/lib/store.dart, owns: "client state derived from server polling; saved connection, submit, browse, watch run"}
+    - {path: mobile/lib/session.dart, owns: "last successful connection persisted with shared_preferences for auto-login"}
+    - {path: mobile/lib/home.dart, owns: "connection status, workspace picker, composer, running/queued/done lists"}
+    - {path: mobile/lib/dir_picker.dart, owns: "server-backed allowlisted directory navigation"}
+    - {path: mobile/lib/run_screen.dart, owns: "live call log and untruncated final summary"}
+    - {path: mobile/lib/connect_pane.dart, owns: "host, port and bearer token form"}
+    - {path: mobile/lib/theme.dart, owns: "terminal-like palette and state glyphs"}
+    - {path: mobile/lib/widgets.dart, owns: "shared status, section and task rows"}
+    - {path: mobile/README.md, owns: "Android build/run and local-network setup"}
   sims_checks_tui:
-    - {path: harness/sim1.py, owns: "offline v1 sim: exec only, head 600B + tail 400B"}
-    - {path: harness/sim2.py, owns: "offline v2 sim: shape-aware, 2000B inline, structured edit"}
+    - {path: harness/sim1.py, owns: "offline v1 sim: exec only, head 600B + tail 400B, cache cost through pricing"}
+    - {path: harness/sim2.py, owns: "offline v2 sim: shape-aware, 2000B inline, structured edit, cache cost through pricing"}
     - {path: harness/assets.py, owns: "scenario load/defaults and fresh fixture mount"}
     - {path: harness/checks.py, owns: "check lines (200-line audit), check tui layout contract"}
     - {path: harness/runlog.py, owns: "pure log projection: one entry per call plus full final result, interruption, error or pending tail"}
@@ -136,6 +157,7 @@ write_ownership:
   ".logs/jobs/<run_id>.json": the daemon through srvwork.launch
   ".logs/workers/<run_id>.json": the worker, plus daemon reconcile updates
   ".logs/reload.json": reload.bump from server reload (CLI or socket)
+  ".logs/mobile.token": mobile.load_token generated by server mobile start; read by the bridge, never by a worker
   ".logs/server.sock, .pid": the daemon
   ".logs/server.log": the daemon and workers
   ".logs/server.lock": srvctl.start
@@ -163,4 +185,5 @@ change_map:
   - {change: TUI redraw or live tail, start: [tui/frame.py, tui/app.py, tui/render.py, tui/loginput.py, tui/indicator.py], test: ["python3 run.py check tui", tests/test_tui_frame.py, tests/test_tui_live.py]}
   - {change: prompt over any view, start: [tui/input.py, tui/render.py, tui/prompt.py], test: [tests/test_tui_input.py, tests/test_tui_loginput.py, tests/test_tui_prompt.py]}
   - {change: offline scenario, start: [scenarios/, "manifest.scenarios[]"], test: ["python3 run.py sim1 <id>"]}
+  - {change: sim wire or cache projection, start: [harness/sim1.py, harness/sim2.py, harness/observe.py, harness/pricing.py], test: [tests/test_pricing.py, tests/test_observe.py]}
   - {change: new doc, start: [docs/agent/], test: ["manifest.files[]", docs/agent/index.yaml]}

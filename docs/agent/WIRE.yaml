@@ -2,8 +2,8 @@ schema: loop-agent-doc/1
 id: wire
 title: "Agent wire: tools, observations, cost"
 read_when: [change a tool, change observation bounding, change the stop condition, change verify behavior, reason about cost]
-source: [harness/api.py, harness/agent.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
-verify: ["python3 -m unittest tests.test_agent_context tests.test_verify tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
+source: [harness/api.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
+verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_verify tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
 
 messages:
   order: |
@@ -13,12 +13,12 @@ messages:
       assistant  turn.message         content is null; tool_calls carry the calls
       tool       one per call         keyed by call.id, content is call.observation
     for each nudge event:
-      user       nudge.text           only after a silent stop with prior work; at most one per run
+      user       nudge.text           only after a silent stop on turn > 1 with no earlier nudge; at most one per run
   rules:
     - reasoning is never re-sent; turn.usage.reasoning_c counts characters of reasoning_content, not tokens
     - assistant text is not stored in the message and is never re-sent; a terminal reply is kept only as end.result
     - "non-empty terminal reply -> finish=done with result=content.strip()"
-    - "empty terminal reply after prior work -> one nudge user message, then the next turn; a second empty reply -> finish=no_tool_call"
+    - "empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
     - a silent stop stores message.content="" so the following nudge has a valid assistant turn; the nudge itself is a separate event
     - the prompt tells the model to call done(result); a second silent stop still loses the result
     - done ends the run; it is recorded in turn.done and end, not as a tool observation
@@ -26,6 +26,12 @@ messages:
     - the system header is constant across runs; run_start.max_inline pins only the observation bound, so resume and soft reload keep a byte-identical observation wire
     - issue independent calls in one assistant message; the harness executes them in order
     - there is no text channel in the message list
+
+request:
+  endpoint: "LOOP_URL, default https://api.deepseek.com/chat/completions"
+  body: {model: LOOP_MODEL, messages: "the folded list", tools: "api.TOOLS", max_tokens: "LOOP_MAX_TOKENS, default 384000", thinking: {type: enabled, budget_tokens: 32768}}
+  auth: "Bearer LOOP_API_KEY, else LOOP_AUTH_FILE.deepseek.key"
+  timeout: "LOOP_HTTP_TIMEOUT_S, default 1800 s"
 
 tools:
   source: harness/api.py TOOLS; run_start.tools records the four names in order
@@ -37,9 +43,10 @@ tools:
       - cwd resolves against the run root (LOOP_ROOT for api, the recorded root on resume) when relative; default cwd is .
       - default timeout is 120000 ms in production; sims default to 10000 ms
       - a timeout kills the process group and reports code=TIMEOUT
-      - a spawn failure reports code=127 and TypeName: message on stderr
+      - "a spawn failure reports code=127 and TypeName: message on stderr"
       - stdin is encoded UTF-8; the runner starts a new session so the timeout can kill the group
       - bad or empty argv returns err bad_args exec requires argv:list[str], got <type>
+      - a standalone shell operator token or a shell keyword in argv[0] returns err shell_syntax <detail>; exec has no shell, so use ["sh","-c","..."]
       - output is always exit=<code> ms=<dur> followed by the bounded payload
   write:
     signature: "write(path: str, data: str, append?: bool)"
@@ -93,7 +100,7 @@ observation:
     - first15 and last5 show at most 15 and 5 source lines, each cut to 160 characters; a line appears once, so last5 starts after the head and is omitted when all lines fit in first15; full bytes are in the saved file
     - read a saved file by grepping the line you need or by a small range; the summary carries a note against a whole re-read, which would be summarized again
     - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set only when a large text file was saved
-    - why 8192: the median recorded observation is under 1KB, so most calls stay verbatim; above the bound the summary adds a fixed saved-file index instead of carrying the whole payload in every later turn
+    - "why 8192: the median recorded observation is under 1KB, so most calls stay verbatim; above the bound the summary adds a fixed saved-file index instead of carrying the whole payload in every later turn"
 
 failures:
   rule: tool errors are observations, not harness crashes; the model decides whether to retry
@@ -105,6 +112,7 @@ failures:
     - {trigger: "edit missing or non-str old or new", observation: "err bad_args edit requires old:str and new:str; <key> incorrect"}
     - {trigger: edit match count is not 1, observation: "err match=<n> expected=1 <path>"}
     - {trigger: "done result is not a str", observation: "err bad_args done requires result:str, got <Type>"}
+    - {trigger: "exec argv carries a standalone shell operator or a shell keyword at argv[0]", observation: "err shell_syntax <detail>; exec has no shell. Use [\"sh\",\"-c\",\"...\"]"}
     - {trigger: tool name is not exec, write, edit or done, observation: "err unknown_tool <name> expected one of exec, write, edit, done"}
     - {trigger: tool body raises, observation: "err harness <TypeName>: <detail>; exec argv, write path+data, edit path+old+new"}
     - {trigger: file open or write fails, observation: "err <TypeName>: <detail>"}
@@ -127,7 +135,7 @@ cost:
 
 header:
   function: api.header()
-  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, done and one-nudge stop semantics, parallel-call guidance, large-observation guidance, and the four tool signatures
+  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, done and one-nudge stop semantics, parallel-call and repeated-probe-script guidance, large-observation guidance, and the four tool signatures
   stability: constant bytes for every run; no max_inline, task, root or model value enters it, so the first system message is a reusable cache prefix
   migration: records written before this change replay with the current constant header because the prompt text is not stored; their turn messages are unchanged
   refresh: none needed; a soft reload re-imports the module, so the next fold picks up edited text while old turns stay untouched

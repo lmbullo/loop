@@ -7,8 +7,9 @@ table. Code wins over docs: fix the doc and, when the contract is affected,
 `manifest.json` in the same commit. Do not add human-facing prose.
 
 Bootstrap: `python3 run.py --json` prints one compact `loop-index/1` line
-(entrypoints, checks, scenarios, docs, invariants, env, layout, record, wire).
-It reads `manifest.json` only: no tree walk, no module import, no absolute paths.
+(purpose, runtime, entrypoints, checks, scenarios, docs, invariants, env, layout,
+record, wire). It reads `manifest.json` only: no tree walk, no module import, no
+absolute paths.
 
 ## What this tree is
 
@@ -54,8 +55,8 @@ as the only source of truth.
   after it, so the prefix is cacheable.
 - Output is metered and reported, never gated.
 - A terminal turn with no tool call and no text is not final on its own: after
-  prior work the loop records one `nudge` user message and retries; a second
-  silent stop ends with `finish=no_tool_call`.
+  turn 1 the loop records one `nudge` user message and retries; a second silent
+  stop ends with `finish=no_tool_call`.
 - `LOOP_ROOT` is the workspace identity: root, sandbox, daemon, socket, queue
   and registry all follow it; `LOOP_RUNS` selects the state directory.
 - One run per tree, enforced by `.logs/run.lock`; a second `api` queues a front
@@ -63,8 +64,8 @@ as the only source of truth.
 - The control plane never executes a run; workers survive daemon restart.
 - The TUI never owns a run or authoritative state; server code never imports
   `tui/`.
-- Fixtures and `records/` are read-only. Each sim run mounts a fresh fixture
-  copy under `.logs/<sim>/<label>/ws/`.
+- Fixtures and `records/` are read-only. Each sim run copies its fixture to
+  `.logs/<sim>/<label>/ws/`.
 - No absolute paths in tracked files; roots come from `__file__` or env.
 - `exec` argv is literal: no shell, globs, pipes or redirects unless the caller
   passes `sh -c` explicitly.
@@ -82,19 +83,28 @@ python3 run.py                      # usage and the manifest entry point list
 python3 run.py check lines          # 200-line source audit
 python3 run.py check tui            # resize/truncation contract
 python3 run.py view --list          # read records without executing anything
+python3 run.py view --list --json   # canonical loop-view/1 list
 python3 run.py view RUN_ID          # compact text form
 python3 run.py view RUN_ID --json   # canonical loop-view/1
 python3 run.py view --schema        # record schema for renderers
 python3 run.py sim1 task            # offline exec-only sim
 python3 run.py sim2 task2           # offline shape-aware sim
 python3 run.py probe                # headless TUI render of a snapshot
+python3 run.py tui                  # interactive renderer; no model calls
+python3 run.py server start         # start this tree's control plane (stop/restart/reload too)
 python3 run.py server status        # this tree's control plane
 python3 run.py server runs --json   # every record on disk, daemon if available
+python3 run.py server list --json   # machine-wide registry
+python3 run.py server logs -n 80    # daemon log tail
+python3 run.py server mobile start  # opt-in private-network bridge for mobile/ (stop/status too)
 python3 run.py api "task"           # real model call; costs money and network
 python3 run.py api --verify CMD "task"  # same, then record verify evidence
+make index                          # alias for python3 run.py --json
 make check                          # compile + line + tui checks
 make test                           # stdlib unittest suite
+make lint                           # ruff E4/E9/F when installed, otherwise skipped
 make verify                         # manifest-driven offline checks
+make sim                            # sim1 task + sim2 task2
 python3 scripts/check_manifest.py   # contract integrity
 python3 scripts/doctor.py           # local environment health
 python3 scripts/repo_map.py         # file/entrypoint map for agents
@@ -109,8 +119,9 @@ the `resume-usage` check exercises only the offline usage path.
 
 - `run.py` - dispatcher and `--json` index; reads `manifest.json`.
 - `install.sh` - user/global launcher installer; `--prefix`, `--bindir`, `--system`, `--uninstall`, `--force`, `--dry-run`.
-- `harness/` - loop, record, control plane, sims, offline checks.
+- `harness/` - loop (`agent`, `turn`, `fold`), record, control plane, sims, offline checks.
 - `tui/` - thin polling renderer over daemon snapshots.
+- `mobile/` - Android-first Flutter client for the opt-in local-network bridge.
 - `scenarios/` - offline sim transcripts.
 - `fixtures/` - read-only sandbox trees, copied per sim run.
 - `records/` - frozen historical artifacts; never written.

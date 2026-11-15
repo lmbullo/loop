@@ -2,7 +2,7 @@ schema: loop-agent-doc/1
 id: record
 title: Record and view
 read_when: [inspect a run, change event fields, resume a run, debug a corrupt record]
-source: [manifest.record, harness/recschema.py, harness/recread.py, harness/recwrite.py, harness/view.py]
+source: [manifest.record, harness/fold.py, harness/recschema.py, harness/recread.py, harness/recwrite.py, harness/view.py]
 verify: [python3 run.py view --schema, python3 run.py view --list, "python3 -m unittest tests.test_recread tests.test_recwrite tests.test_view"]
 
 paths:
@@ -52,7 +52,7 @@ event_notes:
   assistant_content: stored as null in the message; a silent stop stores "" so the next request has a valid assistant turn; terminal text is kept only in end.result
   done_call: appears on the assistant message but is not appended as a call; turn.done records it and the run ends
   non_str_done: "done.result must be str; a non-str result is an err bad_args observation and the run continues"
-  no_tool_call: "non-empty content -> finish=done with result=stripped content; empty content after prior work -> one nudge event and another turn; a second empty content -> finish=no_tool_call"
+  no_tool_call: "non-empty content -> finish=done with result=stripped content; empty content on turn 1 -> finish=no_tool_call; empty content after turn 1 with no earlier nudge -> one nudge event and another turn; a second empty content -> finish=no_tool_call"
   nudge: "one user message recorded after an empty terminal turn with turn > 1 and no earlier nudge; fold.context inserts it at its seq; it is not a turn"
   resume_event: records from_seq, turn and rebuilt message count; it does not replay old tool calls
   verify_declaration: {ran: false, exit: null, note: null, when: "before the first turn, only when the task carries a command"}
@@ -61,11 +61,12 @@ event_notes:
   verify_resume: fold.pending_verify returns the last declared command; a ran=true event clears it, so a recorded result is never rerun
 
 state:
-  record_state: {empty: no events, interrupted: "last event is not end", complete: "last event is end"}
+  record_state: {empty: "no events; resumable", interrupted: "last event is not end", complete: "last event is end"}
   terminal_marker: end is the only completion marker; a missing end is the interrupted marker
   interrupted_marker: "an interrupted event records who noticed and why: server_start, server_stop, worker_lost; it is not required for the state"
   kill_9: leaves no marker
   listing_state: "recread.live_state/scan report running when record_state=interrupted and a live worker registry entry holds the run; the record state itself stays interrupted"
+  run_log_state: "runlog.load uses recread.live_state, so the mobile and TUI run-detail state is running for a live worker; the entries still end with a pending summary row"
   view_text_note: "view RUN_ID renders record state, not listing state; a live run still shows [interrupted] reason=no_terminal_event until end or an interrupted event"
 
 derived_view_lines:
@@ -144,6 +145,6 @@ resume:
     - acquire the tree lock
     - open a Writer
     - append one resume event
-    - run the same loop and append turn* then end
+    - run the same loop and append turn*, any nudge*, then end
     - fall back to config.root() if the recorded root is missing; say so on stderr
   scope: resume is not part of the control plane

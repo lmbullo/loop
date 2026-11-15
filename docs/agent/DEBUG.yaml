@@ -33,7 +33,7 @@ symptoms:
   - {symptom: api exits 4, inspect: "record error event; server logs", action: "HTTP error; read the recorded body and the model/env settings before retrying"}
   - {symptom: api exits 5, inspect: "server logs; server status", action: "control plane unavailable; fix the daemon, then retry; do not assume the task ran"}
   - {symptom: api exits 130, inspect: "record interrupted event; server logs", action: "the run was cancelled or force-stopped; inspect the record, then decide whether to resume"}
-  - {symptom: run ends finish=no_tool_call, inspect: "view RUN_ID; the last turn has no tool_calls and empty content; a nudge event should precede a second turn", action: "after prior work the loop nudges once; a second silent stop is terminal; resume the run if the work is still usable"}
+  - {symptom: run ends finish=no_tool_call, inspect: "view RUN_ID; the last turn has no tool_calls and empty content; a nudge event should precede a second turn", action: "after turn 1 the loop nudges once; a second silent stop is terminal; resume the run if the work is still usable"}
   - {symptom: resume exits 5, inspect: "server status; lock holders; live worker", action: "a tree run or the record is held, or the run is live; wait; do not force"}
   - {symptom: resume exits 2, inspect: "view --list; record state", action: "the run is complete, corrupt or the id is wrong; nothing to resume"}
   - {symptom: record is corrupt, inspect: "view RUN_ID; raw lines", action: "never rewrite complete lines; preserve the file, find the first bad seq/field/JSON line and fix the producer/test"}
@@ -44,6 +44,10 @@ symptoms:
   - {symptom: "check_manifest.py: unregistered source", inspect: manifest.files, action: "add the file with a kind and role; every .py under harness/, tui/, tests/, scripts/ is checked"}
   - {symptom: "check_manifest.py: bad scenario/check/record", inspect: the manifest row, action: "make argv/expect_exit/network, scenarios[] steps or record types match the tree"}
   - {symptom: drag copy does nothing, inspect: "tui/mouse.py, tui/select.py, tui/clipboard.py, tui/frame.py; terminal OSC 52 support", action: "a click without motion copies nothing; OSC 52 or an installed wl-copy/xclip/xsel/pbcopy helper must accept the text; the reverse-video highlight is screen-only and clears on release"}
+  - {symptom: "mobile bridge 401 invalid token", inspect: ".logs/mobile.token; the start line; LOOP_MOBILE_TOKEN", action: "re-enter the printed token; start regenerates only when no token file or env override exists; stop/start with a new file if the token leaked"}
+  - {symptom: "mobile bridge connection refused", inspect: "server mobile status; server status; host IP", action: "start the bridge on the Wi-Fi IP with --host, confirm the phone is on the same network, and remember daemon stop/restart closes the listener"}
+  - {symptom: "mobile bridge 403/refused to bind", inspect: "server mobile status; --host", action: "bind only a literal private or loopback IP; 0.0.0.0, public, multicast and non-private peers are rejected by design"}
+  - {symptom: "mobile app has no roots", inspect: "server mobile status roots=; LOOP_MOBILE_ROOTS or --root", action: "restart the bridge with an existing allowlisted directory; the app never browses outside it"}
   - {symptom: check tui fails, inspect: "tui/panes.py, tui/nav.py, tui/prompt.py, tui/render.py, tui/logview.py, tui/indicator.py, tui/frame.py, tui/highlight.py", action: "fix fit/reflow/width/free-scroll/scroll-indicator/highlight geometry; do not weaken the audit"}
   - {symptom: sim fails, inspect: ".logs/<sim>/<label>/log.json; obs/; scenario JSON", action: "check the sim field, fixture, step schema, exit behavior and mounted workspace"}
   - {symptom: docs look stale, inspect: "manifest.json, owning module, tests", action: "code wins; update the doc and, if the contract changed, the manifest in the same commit"}
@@ -58,6 +62,7 @@ safe_commands:
   - python3 run.py server list [--json]
   - python3 run.py server runs [--json]
   - python3 run.py server logs -n 80
+  - python3 run.py server mobile status
   - python3 run.py probe [SNAPSHOT] [--size WxH] [--focus task|queue|prompt|log] [--qsel N]
   - python3 run.py check lines
   - python3 run.py check tui
@@ -95,7 +100,7 @@ recovery_order:
 
 escalation:
   - {layer: record bytes, read: docs/agent/RECORD.yaml, change: recwrite.py only through Writer}
-  - {layer: turn loop, read: docs/agent/WIRE.yaml, change: agent.py plus tests}
+  - {layer: turn loop, read: docs/agent/WIRE.yaml, change: agent.py, turn.py plus tests}
   - {layer: tools/observations, read: docs/agent/WIRE.yaml, change: tools.py, observe.py plus tests}
   - {layer: daemon/workers, read: docs/agent/SERVER.yaml, change: srv*.py, worker.py, queue.py plus tests}
   - {layer: contract, read: manifest.json, change: scripts/check_manifest.py must pass}

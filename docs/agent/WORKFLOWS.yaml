@@ -58,6 +58,8 @@ test_map:
   - {test: test_install.py, contract: "installer help, dry run, user default, prefix with spaces, idempotent install, uninstall, foreign-file refusal, checkout guard"}
   - {test: test_manifest.py, contract: contract integrity, entry imports, record/scenario checks, CLI wiring, --skip-server token filtering}
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
+  - {test: test_mobile_api.py, contract: mobile root allowlist, symlink containment, enqueue through queue, run log ids and routing}
+  - {test: test_mobile_http.py, contract: bearer auth, private bind and peer filter, dirs/snapshot/queue/run-log routes, token file mode}
   - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}
   - {test: test_tui_input.py, contract: arrow selection across running/queued/done, pane handoff, queued-row notice, shift+arrow reorder, delete drop, ctrl+x cancel, text prompt, SS3 arrows}
   - {test: test_tui_keys.py, contract: "raw parser: SS3 arrows, CSI/shifted arrows, ctrl+x, SGR and X10 wheel, left-button mouse events"}
@@ -111,6 +113,13 @@ recipes:
     - prefer pure functions; use run_py() for CLI coverage
     - keep it under 200 lines and register it with kind test
     - run the single test during development, then the full suite
+  mobile:
+    - keep app code under mobile/ and the server bridge in harness/mob*.py
+    - server route changes go in mobapi.py; HTTP/auth/lifecycle changes go in mobserve.py
+    - add a Python test for the server and a Flutter test for the protocol or widget state
+    - run "python3 -m unittest tests.test_mobile_api tests.test_mobile_http"
+    - run "cd mobile && flutter analyze --no-pub && flutter test --no-pub"
+    - build with "flutter build apk --release --target-platform android-arm64 --split-per-abi"
   scenario:
     - choose or add a fixture under fixtures/
     - "write scenarios/<id>.json with id, sim, label, fixture, purpose, expected, steps"
@@ -163,10 +172,11 @@ recipes:
     - server modules must not import tui/
   docs:
     - create docs/agent/NAME.yaml with schema, id, title, read_when, source, verify
-    - keep it dense: facts, tables and commands, not prose; prefer manifest references
+    - "keep it dense: facts, tables and commands, not prose; prefer manifest references"
     - add the file to the docs list and routes in docs/agent/index.yaml
     - register it in manifest.files[] with kind doc and a role
-    - cross-link the owning doc; fix stale links in the same commit
+    - mirror a new hard rule into manifest.invariants and index.yaml invariants
+    - cross-link the owning doc; fix stale links and stale claims in the same commit
     - run make verify
 
 manifest_registration:

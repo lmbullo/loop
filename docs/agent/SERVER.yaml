@@ -2,8 +2,8 @@ schema: loop-agent-doc/1
 id: server
 title: Server, queue and workers
 read_when: [operate the control plane, queue a task, diagnose a worker, change lifecycle]
-source: [manifest.server, harness/server.py, harness/srvcmd.py, harness/srvdaemon.py, harness/srvwork.py, harness/srvconn.py, harness/srvclient.py, harness/srvrun.py, harness/srvsnap.py, harness/srvlist.py, harness/srvwire.py, harness/srvctl.py, harness/worker.py, harness/workers.py, harness/queue.py, harness/job.py, harness/registry.py, harness/regstore.py, harness/regprobe.py]
-verify: [python3 run.py server status, python3 run.py server runs --json, "python3 -m unittest tests.test_queue tests.test_workers tests.test_regstore"]
+source: [manifest.server, harness/server.py, harness/srvcmd.py, harness/srvdaemon.py, harness/srvwork.py, harness/srvconn.py, harness/srvclient.py, harness/srvrun.py, harness/srvsnap.py, harness/srvlist.py, harness/srvwire.py, harness/srvctl.py, harness/mobile.py, harness/mobserve.py, harness/mobapi.py, harness/mobtoken.py, harness/worker.py, harness/workers.py, harness/queue.py, harness/job.py, harness/registry.py, harness/regstore.py, harness/regprobe.py]
+verify: [python3 run.py server status, python3 run.py server runs --json, "python3 -m unittest tests.test_queue tests.test_workers tests.test_regstore tests.test_mobile_api tests.test_mobile_http"]
 
 process_model: |
   one tree  = realpath of LOOP_ROOT (default: the checkout)
@@ -29,10 +29,11 @@ commands:
     - {cmd: list, usage: "[--json] [--prune]", effect: "probe every server in the machine registry; --prune removes dead rows", exit: "0"}
     - {cmd: runs, usage: "[--json]", effect: "every record with derived state; daemon if available, else disk", exit: "0 ok, 1 corrupt record"}
     - {cmd: logs, usage: "[-n N] [-f]", effect: "tail .logs/server.log; -f follows", exit: "0, 1 follow error"}
+    - {cmd: mobile, usage: "<start|status|stop> [--host IP] [--port N] [--root DIR ...]", effect: "manage the opt-in local-network HTTP bridge; start defaults to LOOP_MOBILE_ROOTS or LOOP_ROOT and prints addr plus the token", exit: "0 ok/stopped, 1 status down, 2 usage, 5 daemon or bind failure"}
     - {cmd: _stale, usage: "", effect: "remove dead socket/pid/registry entries", exit: "0"}
   internal:
-    - _daemon: used by srvctl
-    - _worker: used by srvwork
+    - "_daemon: used by srvctl"
+    - "_worker: used by srvwork"
   force_rule: stop and restart refuse while a worker is live unless --force; force first prints the run id, worker pid and task; stop --force interrupts workers (SIGTERM, then SIGKILL after 3 s); restart --force detaches the control plane and leaves workers running
 
 state_files:
@@ -47,6 +48,7 @@ state_files:
     - {path: .logs/jobs/<run_id>.json, owner: daemon, meaning: task/root/env/verify payload for one worker}
     - {path: .logs/workers/<run_id>.json, owner: worker/daemon, meaning: run_id, pid, proc_start, state, item_id, task, root, seq, turns, cost, exit}
     - {path: .logs/reload.json, owner: "reload.bump (CLI or socket)", meaning: soft-reload generation}
+    - {path: .logs/mobile.token, owner: "server mobile start", meaning: "bearer token for the opt-in mobile bridge; mode 0600; LOOP_MOBILE_TOKEN overrides"}
     - {path: .logs/run.lock, owner: worker/resume, meaning: one run per tree}
     - {path: .logs/runs/<run_id>/record.lock, owner: worker/resume, meaning: one executor per record}
     - {path: .logs/runs/<run_id>/record.jsonl, owner: worker/resume, meaning: durable run record}
@@ -86,7 +88,7 @@ worker_lifecycle:
   steps:
     - load .logs/jobs/<run_id>.json; missing job exits 2
     - acquire .logs/run.lock; busy exits 5
-    - open recwrite.Writer(run_id); write workers/<run_id>.json with pid, /proc start fingerprint, state running, item_id, task, root, seq, turns
+    - open recwrite.Writer(run_id); write workers/<run_id>.json with pid, /proc start fingerprint, state running, item_id, task, root, started_at, started_ts, seq, turns, cost
     - install SIGTERM/SIGINT handlers; a stop request appends interrupted (reason=server_stop, by=server), marks the worker interrupted with exit 130, releases locks, removes the job and exits 130
     - apply only srvwire.ENV_KEYS from the job payload, then run agent.run_task()
     - on normal completion update the worker entry to done or interrupted, close the record, release the tree lock and remove the job
@@ -126,6 +128,23 @@ socket_protocol:
   snapshot: "daemon, current, last, done, queue, costs, tree, waiting, workers_live, version, reconciled; done is a bounded newest-first list of terminal runs (current excluded)"
   fallback: when the daemon is down or old and omits done, the TUI calls srvsnap.local_done() to derive the same list from record bytes, skipping live runs
 
+mobile_bridge:
+  purpose: "Android-first app can choose an allowlisted directory, enqueue through the queue, read snapshots and poll one run's projected log"
+  process: "a thread inside the daemon; it is not a second control plane and it never executes a run"
+  bind: "one literal private or loopback IP; 0.0.0.0, unspecified, multicast and public addresses are refused; non-private peers get 403"
+  auth: "every /v1 request needs Authorization: Bearer <token>; token = LOOP_MOBILE_TOKEN or .logs/mobile.token mode 0600; compare is constant-time"
+  roots: "LOOP_MOBILE_ROOTS (os.pathsep) or repeated --root; normalize to realpath and reject any path outside the allowlist; omit hidden dirs and symlinks that escape"
+  routes:
+    - {method: GET, path: "/v1/health", result: "tree, pid, roots"}
+    - {method: GET, path: "/v1/dirs?path=", result: "roots plus allowlisted child directories; absent path lists roots only"}
+    - {method: GET, path: "/v1/snapshot", result: "srvsnap.snapshot plus schema and mobile roots"}
+    - {method: GET, path: "/v1/runs", result: "recread.scan rows"}
+    - {method: GET, path: "/v1/runs/<run_id>", result: "runlog.load: tool calls plus full final summary, interruption, error or pending tail"}
+    - {method: POST, path: "/v1/tasks", body: "{task,root}", result: "queue.add at the back; returns the queue item"}
+  limits: "task <= 20000 chars; body <= 64 KiB; one directory listing <= 500 children"
+  lifecycle: "server mobile start|status|stop; daemon stop/restart closes the listener; workers are unaffected; the app holds no authoritative state"
+  client: "the Flutter app stores the last successful host, port and token with shared_preferences and auto-connects on launch; failed auto-connect keeps the form populated; no queue or run state is stored"
+
 env_to_worker:
   keys: [LOOP_API_KEY, LOOP_AUTH_FILE, LOOP_MODEL, LOOP_URL, LOOP_MAX_TOKENS, LOOP_MAX_INLINE, LOOP_HTTP_TIMEOUT_S, LOOP_ROOT]
   rule: the worker removes any of these keys not present in the job payload; LOOP_RUNS and LOOP_REGISTRY are daemon process settings, not per-run settings
@@ -145,3 +164,5 @@ guards:
   - server restart is not a run restart; use resume for an interrupted run
   - a stopped daemon does not stop workers; check server status or workers.live_entries()
   - server status exits 1 when the daemon is down even if records are healthy; view and server runs still work
+  - the mobile bridge is opt-in and local-only: never bind 0.0.0.0 or a public address, never accept a non-private peer, never omit the bearer check
+  - the mobile app must not own a queue, run id or log row; it renders only responses from the daemon
