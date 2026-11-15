@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 
 import 'home.dart';
 import 'models.dart';
@@ -8,8 +9,22 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: LoopColors.background,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   final saved = await Session.load();
-  runApp(LoopApp(store: LoopStore(saved: saved), saved: saved));
+  runApp(
+    LoopApp(
+      store: LoopStore(saved: saved),
+      saved: saved,
+    ),
+  );
 }
 
 class LoopApp extends StatelessWidget {
@@ -24,6 +39,8 @@ class LoopApp extends StatelessWidget {
       title: 'loop',
       debugShowCheckedModeBanner: false,
       theme: loopTheme(),
+      darkTheme: loopTheme(),
+      themeMode: ThemeMode.dark,
       home: HomeScreen(store: store, saved: saved),
     );
   }

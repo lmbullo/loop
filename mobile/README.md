@@ -81,17 +81,26 @@ the bridge is started again. There is no generated runtime service.
 
 ## Layout
 
-The connected screen has one scrollable task list and one fixed prompt dock at
-the bottom. There are no tabs or activity view. Structure comes from one
-hairline system, ruled section labels and state colour, never from nested cards:
-the prompt is a single sharp surface with a borderless field and one top
-hairline, the connection form uses underline fields under labelled rules, the
-directory picker adds a path bar with hairline rows and a footer action, and run
-logs use terminal rows with one ruled result callout. The prompt keeps a 0px
-corner radius, floats above the system inset and reflows above the keyboard;
-long task text scrolls in the list and truncates in a row. Rows open with a
-status glyph, then task text and a status label; ids, turns, cost and finish
-stay in the run log.
+The client is a Gruvbox dark phone surface: espresso backgrounds, cream text
+and one orange accent, with a warm radial bloom behind the shell. Three
+floating surfaces carry the structure: a rounded composer above the keyboard,
+a rounded navigation rail above the system inset, and rounded task/activity
+cards on the scrollable canvas. The rail switches between `tasks`, `activity`
+and `workspace` with an animated accent pill.
+
+The tasks tab combines a workspace strip, running/queued/cost metrics and
+active/queued/done cards. The activity tab is a timeline of current, queued and
+recent runs with a spend summary and tappable rows. The workspace tab exposes
+the active root, the allowlisted roots, bridge details, connection settings and
+disconnect. The composer is hidden outside tasks; the rail hides while the
+keyboard is open so the composer stays above the inset without crowding a
+small phone. Long task text truncates in a card, while ids, turns, cost and
+finish stay in the run log.
+
+The connection screen is a rounded login card over the same backdrop. The
+directory picker keeps a floating path bar and footer action over rounded
+folder rows. Run logs use rounded call cards, a terminal summary line and one
+result callout tinted by state.
 
 ## Protocol
 
@@ -115,5 +124,6 @@ omitted.
 
 `python3 -m unittest tests.test_mobile_api tests.test_mobile_http` covers the
 server bridge. `flutter test --no-pub` covers the client protocol, store, widget
-flows, the fixed bottom-prompt/task-row layout and the shared hairline chrome
-with in-memory fixtures. No test submits a real agent task or calls a model.
+flows, the Gruvbox palette, the floating composer and nav rail, the activity
+timeline, task-card hierarchy and keyboard/inset layout with in-memory
+fixtures. No test submits a real agent task or calls a model.

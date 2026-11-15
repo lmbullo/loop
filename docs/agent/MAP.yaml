@@ -104,15 +104,18 @@ modules:
     - {path: mobile/lib/models.dart, owns: "pure snapshot, task, log and directory models"}
     - {path: mobile/lib/store.dart, owns: "client state derived from server polling; saved connection, submit, browse, watch run"}
     - {path: mobile/lib/session.dart, owns: "last successful connection persisted with shared_preferences for auto-login"}
-    - {path: mobile/lib/home.dart, owns: "connection status, one scrollable task list and fixed bottom prompt placement; no tab or activity shell"}
-    - {path: mobile/lib/task_list.dart, owns: "workspace header and active/queued/done groups in one scrollable list"}
-    - {path: mobile/lib/task_rows.dart, owns: "task and queue rows; task text and useful state lead, metadata defers to run detail"}
-    - {path: mobile/lib/prompt_box.dart, owns: "fixed bottom task prompt: one docked surface with a single hairline edge, borderless multiline field, compact queue action, safe-area and keyboard spacing"}
-    - {path: mobile/lib/dir_picker.dart, owns: "server-backed allowlisted directory navigation with a path bar, hairline rows and footer action"}
-    - {path: mobile/lib/run_screen.dart, owns: "live call log and untruncated final summary; terminal rows and a ruled result callout"}
-    - {path: mobile/lib/connect_pane.dart, owns: "terminal-style host, port and bearer token form with underline fields"}
-    - {path: mobile/lib/theme.dart, owns: "terminal-like palette, spacing and type roles, state glyphs and Material theme"}
-    - {path: mobile/lib/widgets.dart, owns: "shared status line, hairline, ruled section headers, error and empty-state rows"}
+    - {path: mobile/lib/home.dart, owns: "app shell: Gruvbox header, tasks/activity/workspace tabs, floating composer and nav rail; keyboard-aware"}
+    - {path: mobile/lib/navigation.dart, owns: "floating Gruvbox nav rail: animated destinations, haptics and safe-area inset"}
+    - {path: mobile/lib/task_list.dart, owns: "task board: workspace strip, summary metrics and active/queued/done cards in one scrollable list"}
+    - {path: mobile/lib/activity_view.dart, owns: "activity tab: run metrics and current/queued/recent timeline"}
+    - {path: mobile/lib/workspace_view.dart, owns: "workspace tab: active root, allowlisted roots, bridge details, config and disconnect"}
+    - {path: mobile/lib/task_rows.dart, owns: "rounded task and queue cards; task text and state lead, metadata defers to run detail"}
+    - {path: mobile/lib/prompt_box.dart, owns: "floating task composer: rounded Gruvbox surface, borderless multiline field, queue action, keyboard spacing"}
+    - {path: mobile/lib/dir_picker.dart, owns: "server-backed allowlisted directory navigation with a floating path bar, rounded rows and footer action"}
+    - {path: mobile/lib/run_screen.dart, owns: "live call log and untruncated final summary; rounded call cards and a result callout"}
+    - {path: mobile/lib/connect_pane.dart, owns: "Gruvbox host, port and bearer token card with token visibility and bridge hint"}
+    - {path: mobile/lib/theme.dart, owns: "Gruvbox dark palette, spacing, radii, type roles, state icons and Material theme"}
+    - {path: mobile/lib/widgets.dart, owns: "shared backdrop, header, connection chip, cards, pills, hairlines, error and empty states"}
     - {path: mobile/README.md, owns: "Android build/run and local-network setup"}
   sims_checks_tui:
     - {path: harness/sim1.py, owns: "offline v1 sim: exec only, head 600B + tail 400B, cache cost through pricing"}
@@ -189,6 +192,6 @@ change_map:
   - {change: prompt over any view, start: [tui/input.py, tui/render.py, tui/prompt.py], test: [tests/test_tui_input.py, tests/test_tui_loginput.py, tests/test_tui_prompt.py]}
   - {change: offline scenario, start: [scenarios/, "manifest.scenarios[]"], test: ["python3 run.py sim1 <id>"]}
   - {change: sim wire or cache projection, start: [harness/sim1.py, harness/sim2.py, harness/observe.py, harness/pricing.py], test: [tests/test_pricing.py, tests/test_observe.py]}
-  - {change: mobile task list, prompt, run detail or shared chrome, start: [mobile/lib/home.dart, mobile/lib/task_list.dart, mobile/lib/task_rows.dart, mobile/lib/prompt_box.dart, mobile/lib/run_screen.dart, mobile/lib/connect_pane.dart, mobile/lib/dir_picker.dart, mobile/lib/theme.dart, mobile/lib/widgets.dart], test: [mobile/test/layout_test.dart, mobile/test/widget_test.dart]}
+  - {change: mobile task list, activity, workspace, prompt, run detail or shared chrome, start: [mobile/lib/home.dart, mobile/lib/navigation.dart, mobile/lib/task_list.dart, mobile/lib/activity_view.dart, mobile/lib/workspace_view.dart, mobile/lib/task_rows.dart, mobile/lib/prompt_box.dart, mobile/lib/run_screen.dart, mobile/lib/connect_pane.dart, mobile/lib/dir_picker.dart, mobile/lib/theme.dart, mobile/lib/widgets.dart], test: [mobile/test/layout_test.dart, mobile/test/widget_test.dart]}
   - {change: mobile bridge route, token or lifecycle, start: [harness/mobile.py, harness/mobapi.py, harness/mobserve.py, harness/mobtoken.py], test: [tests/test_mobile_api.py, tests/test_mobile_http.py]}
   - {change: new doc, start: [docs/agent/], test: ["manifest.files[]", docs/agent/index.yaml]}

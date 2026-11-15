@@ -44,7 +44,7 @@ class _RunScreenState extends State<RunScreen> {
       if (!_scroll.hasClients) return;
       _scroll.animateTo(
         _scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 120),
+        duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
       );
     });
@@ -64,19 +64,32 @@ class _RunScreenState extends State<RunScreen> {
         final calls = log?.callCount ?? 0;
         _follow(log?.entries.length ?? 0);
         return Scaffold(
-          appBar: AppBar(title: Text('log · ${_short(id)}')),
-          body: Column(
-            children: [
-              _MetaBar(
-                state: state,
-                text:
-                    'id=${_short(id)} · state=$state · '
-                    'turns=${log?.turns ?? 0} · calls=$calls',
-                terminal: log?.terminal == true,
+          appBar: AppBar(
+            title: const Text('run log'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: LoopSpace.lg),
+                child: StateChip(state: state),
               ),
-              if (store.error != null) ErrorBanner(text: store.error!),
-              Expanded(child: _entries(store, log)),
             ],
+          ),
+          body: LoopBackdrop(
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  _MetaBar(
+                    state: state,
+                    text:
+                        'id=${_short(id)} · state=$state · '
+                        'turns=${log?.turns ?? 0} · calls=$calls',
+                    terminal: log?.terminal == true,
+                  ),
+                  if (store.error != null) ErrorBanner(text: store.error!),
+                  Expanded(child: _entries(store, log)),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -93,18 +106,24 @@ class _RunScreenState extends State<RunScreen> {
       );
     }
     if (log.entries.isEmpty) {
-      return Center(
-        child: Text(
-          'waiting for events…',
-          style: LoopType.meta.copyWith(color: LoopColors.faint),
+      return const Center(
+        child: EmptyState(
+          icon: Icons.hourglass_empty_rounded,
+          title: 'waiting for events',
+          body: 'The agent will stream tool calls here as soon as it starts.',
         ),
       );
     }
-    return ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.only(top: 6, bottom: LoopSpace.xl),
-      itemCount: log.entries.length,
-      itemBuilder: (context, index) => _EntryView(entry: log.entries[index]),
+    return SelectionArea(
+      child: ListView.builder(
+        controller: _scroll,
+        padding: const EdgeInsets.only(
+          top: LoopSpace.sm,
+          bottom: LoopSpace.xxl,
+        ),
+        itemCount: log.entries.length,
+        itemBuilder: (context, index) => _EntryView(entry: log.entries[index]),
+      ),
     );
   }
 
@@ -125,22 +144,32 @@ class _MetaBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tone = statusColor(state);
     return Container(
-      padding: const EdgeInsets.fromLTRB(LoopSpace.lg, 10, LoopSpace.lg, 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: LoopColors.line)),
+      margin: const EdgeInsets.fromLTRB(
+        LoopSpace.lg,
+        LoopSpace.xs,
+        LoopSpace.lg,
+        LoopSpace.xs,
+      ),
+      padding: const EdgeInsets.fromLTRB(13, 11, 12, 11),
+      decoration: BoxDecoration(
+        color: LoopColors.surface,
+        borderRadius: BorderRadius.circular(LoopRadius.md),
+        border: Border.all(color: tone.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
-          Text(
-            statusGlyph(state),
-            style: TextStyle(
-              color: statusColor(state),
-              fontSize: 12,
-              height: 1,
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: tone.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(LoopRadius.sm),
             ),
+            child: Icon(statusIcon(state), color: tone, size: 16),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: LoopSpace.sm),
           Expanded(
             child: Text(
               text,
@@ -149,14 +178,19 @@ class _MetaBar extends StatelessWidget {
             ),
           ),
           if (terminal)
-            const Padding(
-              padding: EdgeInsets.only(left: LoopSpace.sm),
-              child: Text(
+            Container(
+              padding: const EdgeInsets.fromLTRB(7, 4, 8, 4),
+              decoration: BoxDecoration(
+                color: LoopColors.ok.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(LoopRadius.pill),
+              ),
+              child: const Text(
                 'terminal',
                 style: TextStyle(
                   color: LoopColors.ok,
-                  fontSize: 10,
-                  letterSpacing: 0.8,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
                 ),
               ),
             ),
@@ -176,67 +210,118 @@ class _EntryView extends StatelessWidget {
     if (entry.isCall) return _call();
     if (entry.isResult) return _result();
     if (entry.kind == 'interrupted') {
-      return _message('■ interrupted', LoopColors.warn, entry.reason);
+      return _message(
+        'interrupted',
+        LoopColors.warn,
+        entry.reason,
+        Icons.pause_circle_filled_rounded,
+      );
     }
     if (entry.kind == 'error') {
       return _message(
-        '✕ error',
+        'error',
         LoopColors.error,
         entry.text.isEmpty ? entry.finish : entry.text,
+        Icons.error_rounded,
       );
     }
     if (entry.kind == 'torn') {
-      return _message('■ torn', LoopColors.warn, entry.text);
+      return _message(
+        'torn',
+        LoopColors.warn,
+        entry.text,
+        Icons.warning_amber_rounded,
+      );
     }
     return _message(
-      '○ pending',
-      LoopColors.muted,
+      'pending',
+      LoopColors.info,
       entry.text.isEmpty ? 'summary pending' : entry.text,
+      Icons.schedule_rounded,
     );
   }
 
   Widget _call() {
     final args = entry.args.isEmpty ? '' : ' — ${entry.args}';
-    final obsColor = entry.failed ? LoopColors.error : LoopColors.muted;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
+    final tone = entry.failed ? LoopColors.error : LoopColors.aqua;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
         LoopSpace.lg,
-        LoopSpace.sm,
+        LoopSpace.xs,
         LoopSpace.lg,
-        LoopSpace.sm,
+        LoopSpace.xs,
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: LoopColors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(LoopRadius.md),
+        border: Border.all(color: LoopColors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text.rich(
-            TextSpan(
-              style: LoopType.body.copyWith(fontSize: 12.5, height: 1.45),
-              children: [
-                const TextSpan(
-                  text: '▸ ',
-                  style: TextStyle(color: LoopColors.faint),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.terminal_rounded, size: 15, color: tone),
+              const SizedBox(width: LoopSpace.sm),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    style: LoopType.body.copyWith(fontSize: 12.5, height: 1.45),
+                    children: [
+                      const TextSpan(
+                        text: '▸ ',
+                        style: TextStyle(color: LoopColors.faint),
+                      ),
+                      TextSpan(
+                        text: 't${entry.turn} ',
+                        style: const TextStyle(color: LoopColors.faint),
+                      ),
+                      TextSpan(
+                        text: entry.name.isEmpty ? '?' : entry.name,
+                        style: const TextStyle(
+                          color: LoopColors.strong,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      TextSpan(
+                        text: args,
+                        style: const TextStyle(color: LoopColors.body),
+                      ),
+                    ],
+                  ),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                TextSpan(
-                  text: 't${entry.turn} ',
-                  style: const TextStyle(color: LoopColors.faint),
-                ),
-                TextSpan(
-                  text: entry.name.isEmpty ? '?' : entry.name,
-                  style: const TextStyle(color: LoopColors.strong),
-                ),
-                TextSpan(
-                  text: args,
-                  style: const TextStyle(color: LoopColors.body),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           if (entry.obs.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 3, left: 14),
-              child: Text(
-                '→ ${entry.obs}',
-                style: TextStyle(color: obsColor, fontSize: 11.5, height: 1.4),
+              padding: const EdgeInsets.only(top: 6, left: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.subdirectory_arrow_right_rounded,
+                    size: 14,
+                    color: entry.failed ? LoopColors.error : LoopColors.faint,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      entry.obs,
+                      style: TextStyle(
+                        color: entry.failed
+                            ? LoopColors.error
+                            : LoopColors.muted,
+                        fontSize: 11.5,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -248,26 +333,29 @@ class _EntryView extends StatelessWidget {
     final body = entry.result.isEmpty ? 'finish=${entry.finish}' : entry.result;
     return _Callout(
       color: LoopColors.ok,
+      icon: Icons.check_circle_rounded,
       head: '✓ result',
       note: entry.finish,
       body: body,
     );
   }
 
-  Widget _message(String head, Color color, String body) {
-    return _Callout(color: color, head: head, body: body);
+  Widget _message(String head, Color color, String body, IconData icon) {
+    return _Callout(color: color, icon: icon, head: head, body: body);
   }
 }
 
 class _Callout extends StatelessWidget {
   const _Callout({
     required this.color,
+    required this.icon,
     required this.head,
     this.note = '',
     this.body = '',
   });
 
   final Color color;
+  final IconData icon;
   final String head;
   final String note;
   final String body;
@@ -279,38 +367,35 @@ class _Callout extends StatelessWidget {
         LoopSpace.lg,
         LoopSpace.sm,
         LoopSpace.lg,
-        LoopSpace.md,
+        LoopSpace.sm,
       ),
-      padding: const EdgeInsets.fromLTRB(
-        LoopSpace.md,
-        10,
-        LoopSpace.md,
-        LoopSpace.md,
-      ),
+      padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        border: Border(
-          left: BorderSide(color: color.withValues(alpha: 0.65), width: 2),
-        ),
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(LoopRadius.lg),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Icon(icon, color: color, size: 17),
+              const SizedBox(width: 6),
               Text(
                 head,
-                style: TextStyle(color: color, fontSize: 12.5, height: 1.2),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
               ),
               if (note.isNotEmpty) ...[
-                const SizedBox(width: LoopSpace.sm),
+                const Spacer(),
                 Text(
                   note,
-                  style: const TextStyle(
-                    color: LoopColors.muted,
-                    fontSize: 10.5,
-                    letterSpacing: 0.6,
-                  ),
+                  style: LoopType.caption.copyWith(color: LoopColors.muted),
                 ),
               ],
             ],
@@ -319,7 +404,7 @@ class _Callout extends StatelessWidget {
             const SizedBox(height: LoopSpace.sm),
             Text(
               body,
-              style: LoopType.body.copyWith(fontSize: 13, height: 1.5),
+              style: LoopType.body.copyWith(fontSize: 13, height: 1.55),
             ),
           ],
         ],

@@ -1,5 +1,5 @@
 name: loop_mobile
-description: Minimal local-network launcher and monitor for loop agent tasks.
+description: Gruvbox local-network launcher and monitor for loop agent tasks.
 publish_to: none
 version: 0.1.0+1
 

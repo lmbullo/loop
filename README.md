@@ -170,9 +170,10 @@ renders one frame without a terminal.
 
 ## Android client
 
-`mobile/` is an Android-first Flutter client for the same tree. The bridge is
-opt-in, binds only a literal private or loopback address, and requires a bearer
-token on every `/v1` request.
+`mobile/` is a Gruvbox-styled, Android-first Flutter client for the same tree.
+It uses a floating composer, a floating tasks/activity/workspace nav rail and
+rounded state cards. The bridge is opt-in, binds only a literal private or
+loopback address, and requires a bearer token on every `/v1` request.
 
 ```sh
 python3 run.py server mobile start --host 192.168.1.10 --root ~/project

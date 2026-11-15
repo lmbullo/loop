@@ -1,7 +1,5 @@
-/// Fixed bottom prompt: a single docked surface with one hairline edge.
-///
-/// The field is borderless and transparent; the only box is the prompt surface
-/// itself, so there is no panel inside a panel.
+/// Floating task composer: one rounded Gruvbox surface that clears the
+/// keyboard and sits above the floating navigation rail.
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -15,16 +13,18 @@ class PromptBox extends StatefulWidget {
     required this.canSubmit,
     required this.submitting,
     required this.onSubmit,
+    this.workspace,
   });
 
-  static const sideGap = 12.0;
+  static const sideGap = 16.0;
   static const topGap = 8.0;
-  static const bottomGap = 12.0;
+  static const bottomGap = 10.0;
 
   final TextEditingController controller;
   final bool canSubmit;
   final bool submitting;
   final VoidCallback onSubmit;
+  final String? workspace;
 
   @override
   State<PromptBox> createState() => _PromptBoxState();
@@ -56,56 +56,85 @@ class _PromptBoxState extends State<PromptBox> {
   String get _hint {
     if (widget.submitting) return 'queueing';
     if (!widget.canSubmit) return 'select workspace';
-    return 'queue';
+    return 'enter to queue';
   }
 
   @override
   Widget build(BuildContext context) {
-    final inset = MediaQuery.paddingOf(context).bottom;
-    final hintColor = _focused && widget.canSubmit
-        ? LoopColors.accent
-        : LoopColors.faint;
+    final accent = _focused && widget.canSubmit;
+    final hintColor = accent ? LoopColors.accent : LoopColors.faint;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
+      padding: const EdgeInsets.fromLTRB(
         PromptBox.sideGap,
         PromptBox.topGap,
         PromptBox.sideGap,
-        PromptBox.bottomGap + inset,
+        PromptBox.bottomGap,
       ),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
         key: const Key('prompt-box'),
-        decoration: const BoxDecoration(
-          color: LoopColors.panel,
-          borderRadius: BorderRadius.zero,
+        decoration: BoxDecoration(
+          color: LoopColors.surface,
+          borderRadius: BorderRadius.circular(LoopRadius.xl),
+          border: Border.all(
+            color: accent ? LoopColors.accent : LoopColors.lineStrong,
+            width: accent ? 1.4 : 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Color(0x40000000),
-              blurRadius: 20,
-              offset: Offset(0, -4),
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
             ),
+            if (accent)
+              BoxShadow(
+                color: LoopColors.accent.withValues(alpha: 0.12),
+                blurRadius: 26,
+                offset: const Offset(0, 2),
+              ),
           ],
         ),
-        foregroundDecoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: _focused ? LoopColors.accent : LoopColors.lineStrong,
-            ),
-          ),
-        ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 7, LoopSpace.sm, 7),
+          padding: const EdgeInsets.fromLTRB(14, 9, 10, 10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
-                  const Text('prompt', style: LoopType.label),
-                  const Spacer(),
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 13,
+                    color: accent ? LoopColors.accent : LoopColors.faint,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    _hint,
+                    'compose',
                     style: LoopType.label.copyWith(
-                      color: hintColor,
-                      fontSize: 10,
+                      fontSize: 9.5,
+                      color: accent ? LoopColors.accent : LoopColors.muted,
+                    ),
+                  ),
+                  const SizedBox(width: LoopSpace.sm),
+                  Expanded(
+                    child: Text(
+                      widget.workspace == null
+                          ? ''
+                          : _basename(widget.workspace!),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: LoopType.caption.copyWith(
+                        color: LoopColors.faint,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      _hint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: LoopType.caption.copyWith(color: hintColor),
                     ),
                   ),
                   const SizedBox(width: LoopSpace.sm),
@@ -128,12 +157,13 @@ class _PromptBoxState extends State<PromptBox> {
                       cursorColor: LoopColors.accent,
                       style: LoopType.task.copyWith(fontSize: 14),
                       decoration: const InputDecoration(
-                        hintText: 'describe a task',
+                        hintText: 'describe a task…',
+                        filled: false,
                         isDense: true,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: EdgeInsets.only(top: 8, bottom: 6),
                         hintStyle: TextStyle(
                           color: LoopColors.faint,
                           fontSize: 14,
@@ -144,31 +174,38 @@ class _PromptBoxState extends State<PromptBox> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: LoopSpace.sm),
                   Semantics(
                     button: true,
                     label: widget.submitting ? 'queueing task' : 'queue task',
                     child: SizedBox(
-                      width: 44,
-                      height: 40,
-                      child: TextButton(
+                      width: 46,
+                      height: 46,
+                      child: FilledButton(
                         key: const Key('queue-button'),
                         onPressed: widget.canSubmit ? widget.onSubmit : null,
-                        style: TextButton.styleFrom(
+                        style: FilledButton.styleFrom(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(44, 40),
+                          minimumSize: const Size(46, 46),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: LoopColors.accent,
+                          backgroundColor: LoopColors.accent,
+                          foregroundColor: LoopColors.bg0Hard,
+                          disabledBackgroundColor: LoopColors.line,
                           disabledForegroundColor: LoopColors.faint,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LoopRadius.md),
                           ),
                         ),
-                        child: Text(
-                          widget.submitting ? '…' : '↵',
-                          style: const TextStyle(fontSize: 18, height: 1),
-                        ),
+                        child: widget.submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: LoopColors.bg0Hard,
+                                ),
+                              )
+                            : const Icon(Icons.arrow_upward_rounded, size: 21),
                       ),
                     ),
                   ),
@@ -179,5 +216,13 @@ class _PromptBoxState extends State<PromptBox> {
         ),
       ),
     );
+  }
+
+  static String _basename(String path) {
+    final clean = path.endsWith('/')
+        ? path.substring(0, path.length - 1)
+        : path;
+    final index = clean.lastIndexOf('/');
+    return index < 0 ? clean : clean.substring(index + 1);
   }
 }

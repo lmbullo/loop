@@ -15,7 +15,7 @@ FakeApi fixtureApi() {
     'parent': null,
     'roots': api.dirsData['roots'],
     'dirs': [
-      {'name': 'src', 'path': '/tmp/ws/src'}
+      {'name': 'src', 'path': '/tmp/ws/src'},
     ],
   };
   api.listings['/tmp/ws/src'] = {
@@ -34,7 +34,7 @@ FakeApi fixtureApi() {
       'cost': 0.25,
     },
     'queue': [
-      {'id': 'q000001', 'text': 'queued work', 'state': 'queued'}
+      {'id': 'q000001', 'text': 'queued work', 'state': 'queued'},
     ],
     'done': [
       {
@@ -43,8 +43,8 @@ FakeApi fixtureApi() {
         'state': 'complete',
         'turns': 4,
         'cost': 1.5,
-        'finish': 'done'
-      }
+        'finish': 'done',
+      },
     ],
     'costs': {'total': 1.75},
   };
@@ -54,8 +54,14 @@ FakeApi fixtureApi() {
     'turns': 1,
     'terminal': true,
     'entries': [
-      {'kind': 'call', 'turn': 1, 'name': 'exec', 'args': '["ls"]', 'obs': 'ok'},
-      {'kind': 'result', 'result': 'the final summary', 'finish': 'done'}
+      {
+        'kind': 'call',
+        'turn': 1,
+        'name': 'exec',
+        'args': '["ls"]',
+        'obs': 'ok',
+      },
+      {'kind': 'result', 'result': 'the final summary', 'finish': 'done'},
     ],
   };
   return api;
@@ -74,12 +80,16 @@ void main() {
 
   testWidgets('saved connection auto-logs in on launch', (tester) async {
     final api = fixtureApi();
-    const saved =
-        ConnectionSettings(host: '127.0.0.1', port: 8787, token: 't0ken');
+    const saved = ConnectionSettings(
+      host: '127.0.0.1',
+      port: 8787,
+      token: 't0ken',
+    );
     final store = LoopStore(
-        apiFactory: (_) => api,
-        pollInterval: const Duration(hours: 1),
-        saved: saved);
+      apiFactory: (_) => api,
+      pollInterval: const Duration(hours: 1),
+      saved: saved,
+    );
     addTearDown(store.dispose);
     await tester.pumpWidget(LoopApp(store: store, saved: saved));
     await tester.pumpAndSettle();
@@ -88,9 +98,14 @@ void main() {
     expect(store.online, isTrue);
   });
 
-  testWidgets('connect, choose a directory, submit, and open live logs', (tester) async {
+  testWidgets('connect, choose a directory, submit, and open live logs', (
+    tester,
+  ) async {
     final api = fixtureApi();
-    final store = LoopStore(apiFactory: (_) => api, pollInterval: const Duration(hours: 1));
+    final store = LoopStore(
+      apiFactory: (_) => api,
+      pollInterval: const Duration(hours: 1),
+    );
     addTearDown(store.dispose);
     await tester.pumpWidget(LoopApp(store: store));
     expect(find.text('connect'), findsOneWidget);
@@ -99,13 +114,21 @@ void main() {
     expect(find.text('daemon running'), findsOneWidget);
     expect(find.text('running task'), findsOneWidget);
     expect(find.text('queued work'), findsOneWidget);
-    expect(find.text('done work'), findsOneWidget);
-    expect(find.text('queued · 1'), findsOneWidget);
-    expect(find.text('done · 1'), findsOneWidget);
+    expect(find.text('ACTIVE'), findsOneWidget);
+    expect(find.text('QUEUED'), findsWidgets);
     expect(find.byKey(const Key('prompt-box')), findsOneWidget);
-    expect(find.byKey(const Key('bottom-nav')), findsNothing);
+    expect(find.byKey(const Key('bottom-nav')), findsOneWidget);
     expect(find.byKey(const Key('activity-list')), findsNothing);
     expect(find.text('recent tasks'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('nav-activity')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('activity-list')), findsOneWidget);
+    expect(find.text('recent tasks'), findsOneWidget);
+    expect(find.text('done work'), findsWidgets);
+    await tester.tap(find.byKey(const Key('nav-tasks')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('prompt-box')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('browse-button')));
     await tester.pumpAndSettle();
@@ -131,7 +154,39 @@ void main() {
     expect(find.textContaining('t1 exec', findRichText: true), findsOneWidget);
   });
 
-  testWidgets('current run state wins over a stale interrupted log', (tester) async {
+  testWidgets('workspace tab exposes roots and connection controls', (
+    tester,
+  ) async {
+    final api = fixtureApi();
+    final store = LoopStore(
+      apiFactory: (_) => api,
+      pollInterval: const Duration(hours: 1),
+    );
+    addTearDown(store.dispose);
+    await tester.pumpWidget(LoopApp(store: store));
+    await connect(tester);
+
+    await tester.tap(find.byKey(const Key('nav-workspace')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workspace-list')), findsOneWidget);
+    expect(find.text('active root'), findsOneWidget);
+    expect(find.text('/tmp/ws'), findsWidgets);
+    expect(find.byKey(const Key('workspace-browse')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('workspace-config')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workspace-config')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('workspace-config')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('host-field')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('cancel-connect')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workspace-list')), findsOneWidget);
+  });
+
+  testWidgets('current run state wins over a stale interrupted log', (
+    tester,
+  ) async {
     final api = fixtureApi();
     api.logData = {
       'id': 'run-1',
@@ -139,10 +194,13 @@ void main() {
       'turns': 2,
       'terminal': false,
       'entries': [
-        {'kind': 'pending', 'text': 'summary pending'}
+        {'kind': 'pending', 'text': 'summary pending'},
       ],
     };
-    final store = LoopStore(apiFactory: (_) => api, pollInterval: const Duration(hours: 1));
+    final store = LoopStore(
+      apiFactory: (_) => api,
+      pollInterval: const Duration(hours: 1),
+    );
     addTearDown(store.dispose);
     await tester.pumpWidget(LoopApp(store: store));
     await connect(tester);
@@ -152,15 +210,23 @@ void main() {
     expect(find.textContaining('state=interrupted'), findsNothing);
   });
 
-  testWidgets('connection failure is visible and does not invent a task', (tester) async {
+  testWidgets('connection failure is visible and does not invent a task', (
+    tester,
+  ) async {
     final api = fixtureApi()
-      ..failWith = const LoopApiException(ApiFailure.network, 'connection refused');
-    final store = LoopStore(apiFactory: (_) => api, pollInterval: const Duration(hours: 1));
+      ..failWith = const LoopApiException(
+        ApiFailure.network,
+        'connection refused',
+      );
+    final store = LoopStore(
+      apiFactory: (_) => api,
+      pollInterval: const Duration(hours: 1),
+    );
     addTearDown(store.dispose);
     await tester.pumpWidget(LoopApp(store: store));
     await connect(tester);
     expect(find.text('daemon offline'), findsOneWidget);
-    expect(find.text('✕ connection refused'), findsOneWidget);
+    expect(find.text('connection refused'), findsOneWidget);
     expect(find.text('running task'), findsNothing);
   });
 }

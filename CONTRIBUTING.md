@@ -63,7 +63,8 @@ flutter test --no-pub
 
 The mobile bridge is local-network only. Do not add public-internet, tunnel or
 VPN modes. Keep the bind check, bearer-token requirement and directory
-allowlist intact.
+allowlist intact. The client is Gruvbox dark with floating composer and nav
+surfaces; keep state colour semantic and the keyboard/system insets clear.
 
 ## Commit protocol
 

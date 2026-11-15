@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loop_mobile/main.dart';
 import 'package:loop_mobile/store.dart';
+import 'package:loop_mobile/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_api.dart';
@@ -53,9 +54,16 @@ Future<LoopStore> pumpHome(WidgetTester tester, {FakeApi? api}) async {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('bottom prompt is sharp and clears the system inset', (
-    tester,
-  ) async {
+  test('the palette is Gruvbox dark', () {
+    expect(LoopColors.background, const Color(0xFF1D2021));
+    expect(LoopColors.surface, const Color(0xFF282828));
+    expect(LoopColors.strong, const Color(0xFFEBDBB2));
+    expect(LoopColors.accent, const Color(0xFFFE8019));
+    expect(LoopColors.ok, const Color(0xFFB8BB26));
+    expect(LoopColors.error, const Color(0xFFFB4934));
+  });
+
+  testWidgets('floating prompt and nav clear the system inset', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1.0;
     tester.view.padding = const FakeViewPadding(bottom: 24);
@@ -63,21 +71,21 @@ void main() {
 
     await pumpHome(tester);
 
-    expect(find.byKey(const Key('bottom-nav')), findsNothing);
-    expect(find.byKey(const Key('nav-tasks')), findsNothing);
-    expect(find.byKey(const Key('nav-activity')), findsNothing);
+    expect(find.byKey(const Key('bottom-nav')), findsOneWidget);
+    expect(find.byKey(const Key('nav-tasks')), findsOneWidget);
+    expect(find.byKey(const Key('nav-activity')), findsOneWidget);
+    expect(find.byKey(const Key('nav-workspace')), findsOneWidget);
     expect(find.byKey(const Key('activity-list')), findsNothing);
 
     final prompt = find.byKey(const Key('prompt-box'));
     expect(prompt, findsOneWidget);
-    final decoration =
-        tester.widget<Container>(prompt).decoration! as BoxDecoration;
-    expect(decoration.borderRadius, BorderRadius.zero);
+    final promptShell = tester.widget<AnimatedContainer>(prompt);
+    final promptDecoration = promptShell.decoration! as BoxDecoration;
+    expect(promptDecoration.borderRadius, BorderRadius.circular(24));
 
     final promptRect = tester.getRect(prompt);
-    expect(promptRect.left, 12);
-    expect(promptRect.right, 348);
-    expect(promptRect.bottom, moreOrLessEquals(800 - 24 - 12));
+    expect(promptRect.left, 16);
+    expect(promptRect.right, 344);
     expect(
       find.descendant(
         of: prompt,
@@ -93,8 +101,35 @@ void main() {
       findsOneWidget,
     );
 
+    final nav = find.byKey(const Key('bottom-nav'));
+    final navShell = tester.widget<Container>(nav);
+    final navDecoration = navShell.decoration! as BoxDecoration;
+    expect(navDecoration.borderRadius, BorderRadius.circular(24));
+    expect(tester.getSize(nav).height, 68);
+    final navRect = tester.getRect(nav);
+    expect(navRect.left, 16);
+    expect(navRect.right, 344);
+    expect(navRect.bottom, lessThanOrEqualTo(800 - 24));
+    expect(promptRect.bottom, lessThan(navRect.top));
+
     final listRect = tester.getRect(find.byKey(const Key('task-list')));
     expect(listRect.bottom, lessThanOrEqualTo(promptRect.top));
+  });
+
+  testWidgets('floating nav switches to the activity timeline', (tester) async {
+    await pumpHome(tester);
+
+    await tester.tap(find.byKey(const Key('nav-activity')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('activity-list')), findsOneWidget);
+    expect(find.text('recent tasks'), findsOneWidget);
+    expect(find.text('done work'), findsOneWidget);
+    expect(find.byKey(const Key('prompt-box')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('nav-tasks')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('prompt-box')), findsOneWidget);
+    expect(find.byKey(const Key('activity-list')), findsNothing);
   });
 
   testWidgets('bottom prompt stays above the keyboard on a small phone', (
@@ -109,6 +144,7 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: 200);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('bottom-nav')), findsNothing);
     final promptRect = tester.getRect(find.byKey(const Key('prompt-box')));
     expect(promptRect.top, greaterThan(0));
     expect(promptRect.bottom, lessThanOrEqualTo(480 - 200));
@@ -132,6 +168,11 @@ void main() {
     await pumpHome(tester);
 
     final row = find.byKey(const Key('task-run-1'));
+    await tester.dragUntilVisible(
+      row,
+      find.byKey(const Key('task-list')),
+      const Offset(0, -120),
+    );
     expect(row, findsOneWidget);
     expect(
       find.descendant(of: row, matching: find.text('running task')),
@@ -150,12 +191,15 @@ void main() {
     expect(find.textContaining('cost='), findsNothing);
     expect(find.textContaining('roots='), findsNothing);
 
-    final doneRow = find.byKey(const Key('task-run-2'));
-    expect(
-      find.descendant(of: doneRow, matching: find.text('done')),
-      findsNothing,
-    );
     expect(tester.getSize(row).height, greaterThanOrEqualTo(64));
+
+    final doneRow = find.byKey(const Key('task-run-2'));
+    await tester.dragUntilVisible(
+      doneRow,
+      find.byKey(const Key('task-list')),
+      const Offset(0, -160),
+    );
+    expect(doneRow, findsOneWidget);
   });
 
   testWidgets(
@@ -181,8 +225,13 @@ void main() {
       await pumpHome(tester, api: api);
 
       final row = find.byKey(const Key('task-run-1'));
+      await tester.dragUntilVisible(
+        row,
+        find.byKey(const Key('task-list')),
+        const Offset(0, -120),
+      );
       expect(row, findsOneWidget);
-      expect(tester.getSize(row).height, lessThan(100));
+      expect(tester.getSize(row).height, lessThan(120));
       expect(tester.takeException(), isNull);
 
       await tester.drag(

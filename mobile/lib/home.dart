@@ -1,18 +1,20 @@
-/// Main screen: connection status, one scrollable task list and the fixed
-/// bottom prompt. There is no tab or activity navigation.
+/// App shell: Gruvbox header, tab views, floating composer and nav rail.
 library;
 
 import 'package:material_ui/material_ui.dart';
 
+import 'activity_view.dart';
 import 'connect_pane.dart';
 import 'dir_picker.dart';
 import 'models.dart';
+import 'navigation.dart';
 import 'prompt_box.dart';
 import 'run_screen.dart';
 import 'session.dart';
 import 'store.dart';
 import 'task_list.dart';
 import 'widgets.dart';
+import 'workspace_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.store, this.saved});
@@ -27,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _task = TextEditingController();
   bool _editingConnection = false;
+  LoopTab _tab = LoopTab.tasks;
 
   @override
   void initState() {
@@ -77,6 +80,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _disconnect() async {
+    await Session.clear();
+    widget.store.disconnect();
+    if (mounted) setState(() => _editingConnection = true);
+  }
+
+  void _selectTab(LoopTab tab) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _tab = tab);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -84,48 +98,100 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, _) {
         final store = widget.store;
         final form = _editingConnection || !store.connected;
-        return Scaffold(
-          body: SafeArea(
-            bottom: form,
-            child: form
-                ? ConnectPane(
-                    initial: store.settings,
-                    error: store.error,
-                    onConnect: _connect,
-                    onCancel: store.connected
-                        ? () => setState(() => _editingConnection = false)
-                        : null,
-                  )
-                : _body(store),
-          ),
-        );
+        if (form) {
+          return Scaffold(
+            body: SafeArea(
+              child: LoopBackdrop(
+                child: ConnectPane(
+                  initial: store.settings,
+                  error: store.error,
+                  onConnect: _connect,
+                  onCancel: store.connected
+                      ? () => setState(() => _editingConnection = false)
+                      : null,
+                ),
+              ),
+            ),
+          );
+        }
+        return _connected(store);
       },
     );
   }
 
-  Widget _body(LoopStore store) {
-    return Column(
-      children: [
-        StatusBar(
-          state: store.statusState,
-          detail: store.statusDetail,
-          trailing: TextButton(
-            key: const Key('config-button'),
-            onPressed: () => setState(() => _editingConnection = true),
-            child: const Text('config'),
+  Widget _connected(LoopStore store) {
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final onTasks = _tab == LoopTab.tasks;
+    return Scaffold(
+      body: LoopBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              if (!keyboard)
+                LoopHeader(
+                  state: store.statusState,
+                  detail: store.statusDetail,
+                  host: store.settings?.label,
+                  onConfig: () => setState(() => _editingConnection = true),
+                ),
+              if (store.error != null) ErrorBanner(text: store.error!),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final offset = Tween<Offset>(
+                      begin: const Offset(0.04, 0),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(position: offset, child: child),
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey(_tab),
+                    child: switch (_tab) {
+                      LoopTab.tasks => TaskList(
+                        store: store,
+                        onBrowse: _browse,
+                        onOpenRun: _openRun,
+                      ),
+                      LoopTab.activity => ActivityView(
+                        store: store,
+                        onOpenRun: _openRun,
+                      ),
+                      LoopTab.workspace => WorkspaceView(
+                        store: store,
+                        onBrowse: _browse,
+                        onConfig: () =>
+                            setState(() => _editingConnection = true),
+                        onDisconnect: _disconnect,
+                      ),
+                    },
+                  ),
+                ),
+              ),
+              if (onTasks)
+                PromptBox(
+                  controller: _task,
+                  canSubmit: store.canSubmit,
+                  submitting: store.submitting,
+                  onSubmit: _submit,
+                  workspace: store.selectedRoot,
+                ),
+              if (!keyboard)
+                FloatingNav(
+                  active: _tab,
+                  onSelect: _selectTab,
+                  bottomInset: MediaQuery.paddingOf(context).bottom,
+                ),
+            ],
           ),
         ),
-        if (store.error != null) ErrorBanner(text: store.error!),
-        Expanded(
-          child: TaskList(store: store, onBrowse: _browse, onOpenRun: _openRun),
-        ),
-        PromptBox(
-          controller: _task,
-          canSubmit: store.canSubmit,
-          submitting: store.submitting,
-          onSubmit: _submit,
-        ),
-      ],
+      ),
     );
   }
 }
