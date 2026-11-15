@@ -100,8 +100,12 @@ void main() {
     expect(find.text('running task'), findsOneWidget);
     expect(find.text('queued work'), findsOneWidget);
     expect(find.text('done work'), findsOneWidget);
-    expect(find.text('queued: 1'), findsOneWidget);
-    expect(find.text('done: 1'), findsOneWidget);
+    expect(find.text('queued · 1'), findsOneWidget);
+    expect(find.text('done · 1'), findsOneWidget);
+    expect(find.byKey(const Key('prompt-box')), findsOneWidget);
+    expect(find.byKey(const Key('bottom-nav')), findsNothing);
+    expect(find.byKey(const Key('activity-list')), findsNothing);
+    expect(find.text('recent tasks'), findsNothing);
 
     await tester.tap(find.byKey(const Key('browse-button')));
     await tester.pumpAndSettle();

@@ -77,6 +77,14 @@ form stays populated with the saved values so only the stale field needs
 changing. A daemon restart keeps the token file, so the saved login works after
 the bridge is started again. There is no generated runtime service.
 
+## Layout
+
+The connected screen has one scrollable task list and one fixed prompt box at
+the bottom. There are no tabs or activity view. The prompt has 0px corner
+radius, floats above the system inset and reflows above the keyboard; long task
+text scrolls in the list and truncates in a row. Rows lead with task text and a
+status glyph/label; ids, turns, cost and finish stay in the run log.
+
 ## Protocol
 
 All routes are JSON, require `Authorization: Bearer <token>`, and are served by
@@ -98,6 +106,6 @@ omitted.
 ## Verification scope
 
 `python3 -m unittest tests.test_mobile_api tests.test_mobile_http` covers the
-server bridge. `flutter test --no-pub` covers the client protocol, store and
-widget flows with in-memory fixtures. No test submits a real agent task or calls
-a model.
+server bridge. `flutter test --no-pub` covers the client protocol, store, widget
+flows and the fixed bottom-prompt/task-row layout with in-memory fixtures. No
+test submits a real agent task or calls a model.

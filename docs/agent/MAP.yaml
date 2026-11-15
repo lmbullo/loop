@@ -104,12 +104,15 @@ modules:
     - {path: mobile/lib/models.dart, owns: "pure snapshot, task, log and directory models"}
     - {path: mobile/lib/store.dart, owns: "client state derived from server polling; saved connection, submit, browse, watch run"}
     - {path: mobile/lib/session.dart, owns: "last successful connection persisted with shared_preferences for auto-login"}
-    - {path: mobile/lib/home.dart, owns: "connection status, workspace picker, composer, running/queued/done lists"}
+    - {path: mobile/lib/home.dart, owns: "connection status, one scrollable task list and fixed bottom prompt placement; no tab or activity shell"}
+    - {path: mobile/lib/task_list.dart, owns: "workspace header and running/queued/done groups in one scrollable list"}
+    - {path: mobile/lib/task_rows.dart, owns: "task and queue rows; task text and useful state lead, metadata defers to run detail"}
+    - {path: mobile/lib/prompt_box.dart, owns: "fixed sharp bottom task prompt with multiline field, queue action, safe-area and keyboard spacing"}
     - {path: mobile/lib/dir_picker.dart, owns: "server-backed allowlisted directory navigation"}
     - {path: mobile/lib/run_screen.dart, owns: "live call log and untruncated final summary"}
     - {path: mobile/lib/connect_pane.dart, owns: "host, port and bearer token form"}
     - {path: mobile/lib/theme.dart, owns: "terminal-like palette and state glyphs"}
-    - {path: mobile/lib/widgets.dart, owns: "shared status, section and task rows"}
+    - {path: mobile/lib/widgets.dart, owns: "shared status, error, section and empty-state rows"}
     - {path: mobile/README.md, owns: "Android build/run and local-network setup"}
   sims_checks_tui:
     - {path: harness/sim1.py, owns: "offline v1 sim: exec only, head 600B + tail 400B, cache cost through pricing"}
