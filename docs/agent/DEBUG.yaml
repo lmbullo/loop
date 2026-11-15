@@ -22,6 +22,8 @@ symptoms:
   - {symptom: "Busy: tree lock held by pid=N; one run per tree", inspect: "server status; .logs/run.lock", action: "wait for the live worker; the daemon reconciles a dead one on the next start/tick; do not delete the lock file"}
   - {symptom: "run ... is held by a live executor", inspect: "server status; .logs/runs/<id>/record.lock", action: "wait or resume later; never append by hand"}
   - {symptom: run has no end, inspect: "python3 run.py view RUN_ID", action: "it is interrupted; use resume if you want to continue; view is enough to inspect"}
+  - {symptom: "a turn's cache miss dwarfs the bytes it appended", inspect: "make audit RUN=<id>", action: "prefix_ok=False or a suspected break means the static prefix changed or was reordered; check api.header, the tool schema, call-id/argument canonicalization and the observation renderer; a fixed tail is never cached, so short turns cannot reach a high ratio"}
+  - {symptom: "cache audit cannot resolve or read a record", inspect: "python3 run.py view --list; record.jsonl", action: "the audit exits 2 on a missing or corrupt record; use view to confirm bytes, and never hand-repair a complete line"}
   - {symptom: server status exits 1, inspect: "server logs -n 80; registry", action: "python3 run.py server start; the daemon can be down while records are healthy"}
   - {symptom: daemon will not start, inspect: "server logs -n 40; server _stale", action: "run _stale then start; a too-long socket path falls back to $TMPDIR/loop-<hash>.sock; read the registry, do not guess"}
   - {symptom: server stop/restart refused, inspect: "server status; live worker entry", action: "a worker is live; let it finish, or use --force knowing it names and interrupts/detaches the run"}

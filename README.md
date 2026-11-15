@@ -57,6 +57,7 @@ python3 run.py tui           # interactive TUI over local records
 
 make test                    # stdlib unittest suite
 make verify                  # every offline check declared in manifest.json
+make audit                   # offline cache audit for the newest record
 ```
 
 Install the `loop` launcher on `PATH` if you want to run it from anywhere:
@@ -127,6 +128,12 @@ python3 run.py view RUN_ID --json
 python3 run.py view --schema
 ```
 
+`python3 scripts/cache_audit.py RUN_ID` (or `make audit RUN=RUN_ID`) replays
+one record offline: it rebuilds each request prefix, confirms the prefix only
+grows, and reports the hit/miss/out cost split, reuse references, peak context
+and any turn whose cache miss dwarfs the bytes it appended. It never calls the
+model.
+
 Records live under `.logs/runs/<run_id>/record.jsonl`. The `records/` directory
 holds frozen sample and historical records and is never written. `view` never
 reads the clock, cwd, network or server; it is a pure function over record
@@ -193,8 +200,8 @@ connection and build details.
 
 `loop` is a pre-1.0 research harness, not a hosted product or a general-purpose
 agent framework. The wire and record formats are versioned (`loop-index/1`,
-`loop-record/1`, `loop-view/1`); other interfaces may change. The offline suite
-and CI are the compatibility gate.
+`loop-record/1`, `loop-wire/1`, `loop-view/1`); other interfaces may change.
+The offline suite and CI are the compatibility gate.
 
 The repository is one tree, one run at a time. There is no multi-user
 authentication, no filesystem confinement, and no public-internet mode for the

@@ -111,10 +111,12 @@ make check                          # compile + line + tui checks
 make test                           # stdlib unittest suite
 make lint                           # ruff E4/E9/F when installed, otherwise skipped
 make verify                         # manifest-driven offline checks
+make audit                          # offline cache audit for RUN (newest by default)
 make sim                            # sim1 task + sim2 task2
 python3 scripts/check_manifest.py   # contract integrity
 python3 scripts/doctor.py           # local environment health
 python3 scripts/repo_map.py         # file/entrypoint map for agents
+python3 scripts/cache_audit.py RUN_ID  # prefix growth, hit/miss/out/cost, suspected breaks
 ```
 
 Never run a real `api` call or `resume RUN_ID` in an offline verification. They
@@ -153,6 +155,9 @@ the `resume-usage` check exercises only the offline usage path.
 7. Update `docs/agent/*.yaml` and `docs/agent/index.yaml` when public behavior,
    commands, paths or the contract changes.
 8. Run `make verify` (or `scripts/verify.py --skip-server`) before committing.
+   When the wire prefix, observation rendering or record schema changes, also
+   run `make audit RUN_ID` and require `prefix_ok=True` with no suspected
+   cache breaks.
 
 ## Commit protocol
 
@@ -181,6 +186,8 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 - `python3 -m unittest discover -s tests -t .` exits 0.
 - `python3 scripts/check_manifest.py` exits 0.
 - `python3 scripts/verify.py --skip-server` exits 0.
+- Prefix or observation changes: `make audit RUN_ID` reports `prefix_ok=True`
+  and no suspected cache breaks.
 - `git status --short` is empty except for intended files.
 - The commit subject/body pass `scripts/commit_check.py`.
 - Any changed public behavior is reflected in `manifest.json` and `docs/agent/`

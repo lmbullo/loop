@@ -45,7 +45,9 @@ git status --short
 ```
 
 `make check`, `make test` and `make verify` wrap the same checks. `make lint`
-runs Ruff when it is installed; it is optional.
+runs Ruff when it is installed; it is optional. `make audit RUN=RUN_ID` (or
+`scripts/cache_audit.py`) replays one record offline and is the check to run
+after changing the wire prefix or the observation renderer.
 
 Never run `run.py api` or `run.py resume RUN_ID` in offline verification. They
 need credentials and a network, and they cost real tokens.

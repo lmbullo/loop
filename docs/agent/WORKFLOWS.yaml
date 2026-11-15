@@ -26,6 +26,8 @@ shortcuts:
   - {cmd: make test, effect: "stdlib unittest, verbose"}
   - {cmd: make lint, effect: "ruff E4/E9/F when installed; skips otherwise"}
   - {cmd: make verify, effect: "scripts/verify.py --skip-server"}
+  - {cmd: "make audit RUN=<id>", effect: "offline cache audit for one record; RUN defaults to the newest"}
+  - {cmd: "python3 scripts/cache_audit.py [RUN_ID] [--json]", effect: "prefix growth, hit/miss/out/cost, reuse references and suspected cache breaks; no model call"}
   - {cmd: make sim, effect: "sim1 task + sim2 task2"}
   - {cmd: make clean, effect: "bytecode and tool caches; never .logs"}
   - {cmd: "python3 scripts/verify.py --list", effect: list selected checks}
@@ -46,6 +48,7 @@ test_map:
   - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
   - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, compact head/tail/stderr shape, saved bytes, exact-repeat same=obs-N ledger}
+  - {test: test_audit.py, contract: "offline cache audit projection: prefix growth, reuse references, wire sha"}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
   - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}
@@ -165,6 +168,11 @@ recipes:
     - update manifest.wire shape/threshold text
     - update docs/agent/WIRE.yaml
     - exercise python3 run.py sim1 edge and python3 run.py sim2 edge2
+  cache_prefix:
+    - keep api.header(), the tool schema and the observation rendering byte-identical on replay; run-specific values enter after the wire event
+    - update harness/api.py, harness/observe.py, harness/ledger.py or harness/turn.py and the matching tests
+    - update the wire event in manifest.record and docs/agent/RECORD.yaml when its payload changes
+    - "run make audit RUN=<id>: require prefix_ok=True and no suspected cache breaks on a real record"
   tui:
     - keep it a renderer over daemon snapshots; never add queue or run authority
     - "define every color role in tui/theme.py: grey scale (muted, body, strong) plus muted state hues (accent, ok, warn, err); keep -1 background; no bold; reverse video is reserved for the drag-copy highlight in tui/frame.py; use the selection marker and key glyphs"
@@ -217,6 +225,7 @@ definition_of_done:
   - python3 -m unittest discover -s tests -t . exits 0
   - python3 scripts/check_manifest.py exits 0
   - python3 scripts/verify.py --skip-server exits 0
+  - "when the wire prefix, observation rendering or record schema changed: make audit RUN=<id> reports prefix_ok=True with no suspected cache breaks"
   - git status --short is clean except intended files
   - commit subject and body pass scripts/commit_check.py
   - any changed public behavior is reflected in manifest.json and docs/agent/ in the same commit

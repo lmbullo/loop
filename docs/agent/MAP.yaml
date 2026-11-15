@@ -39,7 +39,9 @@ runtime_flow: |
          -> recwrite.acquire_tree()   .logs/run.lock
          -> recwrite.Writer(run_id)   .logs/runs/<run_id>/record.lock
          -> agent.run_task()
-              -> fold record -> messages
+              -> fold record -> state
+              -> writer.append("wire") once, before the first turn
+              -> fold.context()       wire + turns + nudges -> messages
               -> api.call()           model
               -> turn.read_turn()     usage, message, text
               -> turn.run_calls()     exec/write/edit; done settles without dispatch
@@ -151,6 +153,7 @@ modules:
     - {path: scripts/verify.py, owns: "run manifest.checks[] offline; --skip-server, --only, --json, --list"}
     - {path: scripts/check_manifest.py, owns: "registered files, importable entries, record/check/scenario integrity"}
     - {path: scripts/repo_map.py, owns: "generated manifest map with line counts"}
+    - {path: scripts/cache_audit.py, owns: "offline cache audit: rebuilds request prefixes from record bytes, reports hit/miss/out/cost, reuse references and suspected cache breaks"}
     - {path: scripts/doctor.py, owns: "local health; never starts the daemon"}
     - {path: scripts/commit_check.py, owns: "conventional subject plus why and check lines"}
     - {path: tests/support.py, owns: "sandbox env, fixed ids, event builders, CLI helper"}
