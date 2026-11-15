@@ -97,8 +97,9 @@ self-contained patches are easiest to verify and land.
 
 ## Reporting bugs and proposing features
 
-Use the issue templates. For security issues, follow
-[`SECURITY.md`](SECURITY.md) instead of opening a public issue.
+Use the issue templates. For usage questions and design discussion, use
+[GitHub Discussions](https://github.com/lmbullo/loop/discussions). For security
+issues, follow [`SECURITY.md`](SECURITY.md) instead of opening a public issue.
 
 ## License
 

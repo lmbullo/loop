@@ -142,7 +142,7 @@
   {"kind":"doc","path":".github/PULL_REQUEST_TEMPLATE.md","role":"pull request checklist: verification, manifest registration, secrets and line limit"},
   {"kind":"config","path":".github/ISSUE_TEMPLATE/bug_report.yml","role":"bug report form: reproduction, expected/actual, environment, redaction checks"},
   {"kind":"config","path":".github/ISSUE_TEMPLATE/feature_request.yml","role":"feature request form: problem, proposal, cost and contract impact"},
-  {"kind":"config","path":".github/ISSUE_TEMPLATE/config.yml","role":"issue chooser: security advisory link and agent docs contact"},
+  {"kind":"config","path":".github/ISSUE_TEMPLATE/config.yml","role":"issue chooser: discussions, security advisory link and agent docs contact"},
   {"kind":"doc","path":"docs/agent/index.yaml","role":"agent docs entry and machine index: fast facts, routes, commands, paths, exit codes and traps"},
   {"kind":"doc","path":"docs/agent/MAP.yaml","role":"tree map: entry points, subsystem ownership, runtime flow, write ownership, import rules"},
   {"kind":"doc","path":"docs/agent/RECORD.yaml","role":"record contract: paths, line format, event fields, state, fold, writer, reconcile, view, resume"},

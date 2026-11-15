@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Questions and design discussion
+    url: https://github.com/lmbullo/loop/discussions
+    about: Ask usage questions, share a run or discuss a design that is not yet an issue.
   - name: Security vulnerability
     url: https://github.com/lmbullo/loop/security/advisories/new
     about: Report a vulnerability privately. Do not open a public issue for a live secret or exploit.

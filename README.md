@@ -210,6 +210,10 @@ size and cost. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 new tracked files in `manifest.json`, run the offline ladder, and never commit
 credentials, `.logs/` or generated artifacts.
 
+Usage questions and design discussion belong in
+[GitHub Discussions](https://github.com/lmbullo/loop/discussions); bugs and
+concrete proposals belong in issues.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
