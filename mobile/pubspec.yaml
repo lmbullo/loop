@@ -1,0 +1,20 @@
+name: loop_mobile
+description: Minimal local-network launcher and monitor for loop agent tasks.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  material_ui: ^1.11.0
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
