@@ -79,6 +79,7 @@ class AgentContextTest(unittest.TestCase):
         text = agent.api.header()
         self.assertIn("Call done(result)", text)
         self.assertIn("Issue independent tool calls together", text)
+        self.assertIn("write it once as a script and run the", text)
         self.assertIn("Large observations", text)
         self.assertIn("Grep for the line you need", text)
         self.assertIn("one nudge", text)

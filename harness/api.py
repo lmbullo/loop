@@ -55,7 +55,9 @@ call done or continue; a second empty reply finishes it as no_tool_call.
 
 Issue independent tool calls together in one assistant message; they run in the
 order given. Chain only calls whose arguments depend on an earlier result, and do
-not re-run a call whose result is already in the message list.
+not re-run a call whose result is already in the message list. When the same
+probe or probe pair is about to repeat, write it once as a script and run the
+script; repeated single-step probing costs a turn each time.
 
 Large observations are replaced by a shape summary; the raw bytes are saved
 under the run's obs directory. Grep for the line you need or read a small range;
