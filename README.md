@@ -193,8 +193,9 @@ agent framework. The wire and record formats are versioned (`loop-index/1`,
 and CI are the compatibility gate.
 
 The repository is one tree, one run at a time. There is no multi-user
-authentication, no sandbox beyond the workspace root, and no public-internet
-mode for the mobile bridge.
+authentication, no filesystem confinement, and no public-internet mode for the
+mobile bridge. The workspace root is the default cwd and the base for relative
+tool paths, not an OS sandbox.
 
 ## Security
 
