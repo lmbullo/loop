@@ -26,7 +26,8 @@ affected, `manifest.json` in the same change.
   a `role`. New checks and scenarios belong in `manifest.checks[]` and
   `manifest.scenarios[]`.
 - Human-facing prose belongs in `README.md`, `LICENSE`, `CONTRIBUTING.md`,
-  `SECURITY.md` and `CODE_OF_CONDUCT.md`. Keep agent docs dense and factual.
+  `SECURITY.md`, `CODE_OF_CONDUCT.md` and the GitHub issue/PR templates. Keep
+  agent docs dense and factual.
 
 ## Offline verification ladder
 

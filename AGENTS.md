@@ -5,8 +5,8 @@ audience: agents. Read before changing the tree.
 `manifest.json` is the machine contract. `docs/agent/index.yaml` is the route
 table. Code wins over docs: fix the doc and, when the contract is affected,
 `manifest.json` in the same commit. Keep machine text machine-first: human-facing
-prose belongs only in `README.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`
-and `CODE_OF_CONDUCT.md`.
+prose belongs only in `README.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`,
+`CODE_OF_CONDUCT.md` and the GitHub issue/PR templates.
 
 Bootstrap: `python3 run.py --json` prints one compact `loop-index/1` line
 (purpose, runtime, entrypoints, checks, scenarios, docs, invariants, env, layout,

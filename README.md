@@ -13,8 +13,9 @@ is to measure tool and observation designs by token cost and correctness.
 
 The repository is intentionally agent-first: source, contracts and most docs are
 optimized for machine readers. This README, [`LICENSE`](LICENSE),
-[`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md) and
-[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) are the human-facing layer.
+[`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md),
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) and the GitHub issue/PR templates are
+the human-facing layer.
 
 ## Design
 
