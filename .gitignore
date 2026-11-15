@@ -17,6 +17,22 @@ dist/
 venv/
 .DS_Store
 
+# Dart and Flutter residue, wherever the client lives. The mobile/ project
+# carries the same rules; these catch a stray app or tool run outside it.
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec_overrides.yaml
+*.iml
+.idea/
+
+# Android build residue and the local SDK path. The Gradle wrapper stays
+# ignored too: flutter injects it from the SDK template on the first build.
+local.properties
+key.properties
+*.jks
+*.keystore
+
 # Credentials: never tracked, even by an explicit git add.
 .env
 .env.*
