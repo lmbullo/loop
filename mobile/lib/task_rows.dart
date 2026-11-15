@@ -23,14 +23,17 @@ class TaskRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              statusGlyph(item.state),
-              style: TextStyle(color: color),
+          SizedBox(
+            width: 18,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                statusGlyph(item.state),
+                style: TextStyle(color: color, fontSize: 13, height: 1.2),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,20 +42,17 @@ class TaskRow extends StatelessWidget {
                   task,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: LoopColors.strong,
-                    fontSize: 15,
-                    height: 1.35,
-                  ),
+                  style: LoopType.task,
                 ),
                 if (label != 'done') ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: LoopSpace.xs),
                   Text(
                     label,
                     style: TextStyle(
                       color: color,
-                      fontSize: 11,
-                      letterSpacing: 0.7,
+                      fontSize: 10.5,
+                      height: 1.1,
+                      letterSpacing: 0.9,
                     ),
                   ),
                 ],
@@ -61,8 +61,15 @@ class TaskRow extends StatelessWidget {
           ),
           if (onTap != null)
             const Padding(
-              padding: EdgeInsets.only(left: 8, top: 2),
-              child: Text('›', style: TextStyle(color: LoopColors.muted)),
+              padding: EdgeInsets.only(left: LoopSpace.sm, top: 1),
+              child: Text(
+                '›',
+                style: TextStyle(
+                  color: LoopColors.faint,
+                  fontSize: 16,
+                  height: 1,
+                ),
+              ),
             ),
         ],
       ),
@@ -82,21 +89,27 @@ class QueueRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
-            child: Text('○', style: TextStyle(color: LoopColors.muted)),
+          const SizedBox(
+            width: 18,
+            child: Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Text(
+                '○',
+                style: TextStyle(
+                  color: LoopColors.muted,
+                  fontSize: 13,
+                  height: 1.2,
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               task,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: LoopColors.strong,
-                fontSize: 15,
-                height: 1.35,
-              ),
+              style: LoopType.task.copyWith(color: LoopColors.body),
             ),
           ),
         ],
@@ -123,12 +136,16 @@ class _RowShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final body = Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(14, 15, LoopSpace.lg, 15),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: LoopColors.line)),
       ),
       child: child,
     );
-    return onTap == null ? body : InkWell(onTap: onTap, child: body);
+    if (onTap == null) return body;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, child: body),
+    );
   }
 }

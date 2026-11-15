@@ -53,17 +53,7 @@ class _DirPickerScreenState extends State<DirPickerScreen> {
           appBar: AppBar(title: Text('workspace · $title')),
           body: Column(
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: LoopColors.line)),
-                ),
-                child: Text(
-                  _path ?? 'choose an allowed root',
-                  style: const TextStyle(color: LoopColors.muted, fontSize: 11),
-                ),
-              ),
+              _PathBar(path: _path),
               if (store.error != null) ErrorBanner(text: store.error!),
               Expanded(
                 child: ListView(
@@ -86,30 +76,7 @@ class _DirPickerScreenState extends State<DirPickerScreen> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: LoopColors.line)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        listing.path == null
-                            ? 'select a root first'
-                            : 'use ${_basename(listing.path!)}',
-                        style: const TextStyle(color: LoopColors.muted, fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    FilledButton(
-                      key: const Key('use-directory-button'),
-                      onPressed: listing.path == null ? null : _use,
-                      child: const Text('use directory'),
-                    ),
-                  ],
-                ),
-              ),
+              _footer(listing),
             ],
           ),
         );
@@ -117,24 +84,88 @@ class _DirPickerScreenState extends State<DirPickerScreen> {
     );
   }
 
+  Widget _footer(DirListing listing) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(LoopSpace.lg, 10, LoopSpace.lg, 10),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: LoopColors.line)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              listing.path == null
+                  ? 'select a root first'
+                  : 'use ${_basename(listing.path!)}',
+              style: LoopType.meta.copyWith(fontSize: 11),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: LoopSpace.sm),
+          FilledButton(
+            key: const Key('use-directory-button'),
+            onPressed: listing.path == null ? null : _use,
+            child: const Text('use directory'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _rootRow(DirEntry entry) => _DirRow(
-        name: entry.name,
-        path: entry.path,
-        label: entry.path,
-        onTap: () => _open(entry.path),
-      );
+    name: entry.name,
+    path: entry.path,
+    label: entry.path,
+    onTap: () => _open(entry.path),
+  );
 
   Widget _dirRow(DirEntry entry) => _DirRow(
-        name: entry.name,
-        path: entry.path,
-        label: entry.path,
-        onTap: () => _open(entry.path),
-      );
+    name: entry.name,
+    path: entry.path,
+    label: entry.path,
+    onTap: () => _open(entry.path),
+  );
 
   static String _basename(String path) {
-    final clean = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+    final clean = path.endsWith('/')
+        ? path.substring(0, path.length - 1)
+        : path;
     final index = clean.lastIndexOf('/');
     return index < 0 ? clean : clean.substring(index + 1);
+  }
+}
+
+class _PathBar extends StatelessWidget {
+  const _PathBar({required this.path});
+
+  final String? path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(LoopSpace.lg, 10, LoopSpace.lg, 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: LoopColors.line)),
+      ),
+      child: Row(
+        children: [
+          const Text('path', style: LoopType.label),
+          const SizedBox(width: LoopSpace.md),
+          Expanded(
+            child: Text(
+              path ?? 'choose an allowed root',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: path == null ? LoopColors.faint : LoopColors.body,
+                fontSize: 11.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -153,20 +184,76 @@ class _DirRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: LoopColors.line)),
-      ),
-      child: ListTile(
-        key: ValueKey('dir:$path'),
+    return Material(
+      key: ValueKey('dir:$path'),
+      color: Colors.transparent,
+      child: InkWell(
         onTap: onTap,
-        leading: const Text('▸', style: TextStyle(color: LoopColors.muted)),
-        title: Text(name, style: const TextStyle(color: LoopColors.body)),
-        subtitle: Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: LoopColors.muted, fontSize: 11)),
-        trailing: const Text('›', style: TextStyle(color: LoopColors.muted)),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(
+            LoopSpace.lg,
+            11,
+            LoopSpace.md,
+            11,
+          ),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: LoopColors.line)),
+          ),
+          child: Row(
+            children: [
+              Text(
+                name == '..' ? '↑' : '▸',
+                style: const TextStyle(
+                  color: LoopColors.faint,
+                  fontSize: 12,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(width: LoopSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: name == '..'
+                          ? const TextStyle(
+                              color: LoopColors.muted,
+                              fontSize: 13,
+                            )
+                          : LoopType.task.copyWith(fontSize: 14),
+                    ),
+                    if (label != name) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: LoopColors.faint,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: LoopSpace.sm),
+                child: Text(
+                  '›',
+                  style: TextStyle(
+                    color: LoopColors.faint,
+                    fontSize: 16,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

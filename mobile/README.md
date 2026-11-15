@@ -79,11 +79,15 @@ the bridge is started again. There is no generated runtime service.
 
 ## Layout
 
-The connected screen has one scrollable task list and one fixed prompt box at
-the bottom. There are no tabs or activity view. The prompt has 0px corner
-radius, floats above the system inset and reflows above the keyboard; long task
-text scrolls in the list and truncates in a row. Rows lead with task text and a
-status glyph/label; ids, turns, cost and finish stay in the run log.
+The connected screen has one scrollable task list and one fixed prompt dock at
+the bottom. There are no tabs or activity view. Structure comes from one
+hairline system, ruled section labels and state colour, never from nested cards:
+the prompt is a single sharp surface with a borderless field and one top
+hairline, forms use underline fields, and run logs use terminal rows with one
+ruled result callout. The prompt keeps a 0px corner radius, floats above the
+system inset and reflows above the keyboard; long task text scrolls in the list
+and truncates in a row. Rows lead with task text and a status glyph/label; ids,
+turns, cost and finish stay in the run log.
 
 ## Protocol
 

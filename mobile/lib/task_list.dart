@@ -29,6 +29,7 @@ class TaskList extends StatelessWidget {
     return RefreshIndicator(
       color: LoopColors.accent,
       backgroundColor: LoopColors.panel,
+      displacement: 24,
       onRefresh: store.refresh,
       child: ListView(
         key: const Key('task-list'),
@@ -86,19 +87,25 @@ class _Workspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final root = store.selectedRoot;
+    final unset = root == null || root.isEmpty;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+      padding: const EdgeInsets.fromLTRB(
+        LoopSpace.lg,
+        LoopSpace.md,
+        LoopSpace.sm,
+        LoopSpace.xs,
+      ),
       child: Row(
         children: [
-          const Text('workspace', style: TextStyle(color: LoopColors.muted)),
-          const SizedBox(width: 10),
+          const Text('workspace', style: LoopType.label),
+          const SizedBox(width: LoopSpace.md),
           Expanded(
             child: Text(
-              root == null || root.isEmpty ? 'not selected' : root,
+              unset ? 'not selected' : root,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: root == null ? LoopColors.warn : LoopColors.strong,
+                color: unset ? LoopColors.warn : LoopColors.body,
                 fontSize: 12,
               ),
             ),
