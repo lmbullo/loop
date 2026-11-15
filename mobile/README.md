@@ -61,14 +61,16 @@ mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 Install and launch on the connected Android device:
 
 ```sh
-adb -s RFGL42N54DK install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-adb -s RFGL42N54DK shell am start -n dev.loop.loop_mobile/.MainActivity
+adb devices                                   # copy the serial shown
+DEVICE=<serial>
+adb -s "$DEVICE" install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+adb -s "$DEVICE" shell am start -n dev.loop.loop_mobile/.MainActivity
 ```
 
 Or run directly:
 
 ```sh
-flutter run -d RFGL42N54DK --release
+flutter run -d "$DEVICE" --release
 ```
 
 The app stores the last successful host, port and token in Android

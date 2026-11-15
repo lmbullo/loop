@@ -4,7 +4,9 @@ audience: agents. Read before changing the tree.
 
 `manifest.json` is the machine contract. `docs/agent/index.yaml` is the route
 table. Code wins over docs: fix the doc and, when the contract is affected,
-`manifest.json` in the same commit. Do not add human-facing prose.
+`manifest.json` in the same commit. Keep machine text machine-first: human-facing
+prose belongs only in `README.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`
+and `CODE_OF_CONDUCT.md`.
 
 Bootstrap: `python3 run.py --json` prints one compact `loop-index/1` line
 (purpose, runtime, entrypoints, checks, scenarios, docs, invariants, env, layout,
@@ -66,7 +68,9 @@ as the only source of truth.
   `tui/`.
 - Fixtures and `records/` are read-only. Each sim run copies its fixture to
   `.logs/<sim>/<label>/ws/`.
-- No absolute paths in tracked files; roots come from `__file__` or env.
+- No absolute paths in code or config; roots come from `__file__` or env. Frozen
+  `records/` artifacts may carry historical `/home/...` strings as data; they are
+  never inputs.
 - `exec` argv is literal: no shell, globs, pipes or redirects unless the caller
   passes `sh -c` explicitly.
 - Source modules stay under 200 lines. Split, do not grow.

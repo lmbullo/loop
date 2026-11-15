@@ -8,6 +8,8 @@ rule: code is truth; manifest.json is the machine contract; fix docs and manifes
 
 facts:
   runtime: python >=3.8, stdlib only, tested on 3.12
+  human_entry: "README.md; public support and policy docs: CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md, LICENSE"
+  machine_rule: "human-facing prose only in the human layer; AGENTS.md, docs/agent/*.yaml and manifest.json stay machine-first"
   bootstrap: "python3 run.py --json -> one compact loop-index/1 line derived from manifest.json; no tree walk, no absolute paths"
   entry: "python3 run.py <command>; modules are import-only"
   root: dirname(run.py), overridable with LOOP_ROOT
@@ -36,6 +38,7 @@ docs:
 
 routes:
   - {task: bootstrap, route and enumerate the contract in one call, read: [manifest.json], run: [python3, run.py, --json]}
+  - {task: orient a human contributor, read: [README.md, CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md], run: [make, verify]}
   - {task: find the owner of a behavior, read: [docs/agent/MAP.yaml], run: [python3, scripts/repo_map.py]}
   - {task: inspect a run without executing, read: [docs/agent/RECORD.yaml], run: [python3, run.py, view, RUN_ID]}
   - {task: change a tool or observation rule, read: [docs/agent/WIRE.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, sim1, edge]}
@@ -108,6 +111,8 @@ commands:
 
 paths:
   entrypoint: run.py
+  human_entry: README.md
+  human_policy: [LICENSE, CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md]
   installer: install.sh
   user_command: "$HOME/.local/bin/loop"
   system_command: /usr/local/bin/loop

@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a change to the tool surface, observation design, record format, TUI or mobile client.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project measures tool and observation designs by token cost and
+        correctness. The strongest proposals name the invariant they preserve
+        or change and the cost they expect to save.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard, expensive or incorrect today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The smallest change that addresses the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Cost and contract impact
+      description: Tool surface, observation bytes, cache prefix, record schema, manifest or mobile protocol.
+      render: text
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include the option of doing nothing.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I read AGENTS.md and the relevant docs/agent file.
+          required: true
+        - label: I searched existing issues and discussions.
+          required: true

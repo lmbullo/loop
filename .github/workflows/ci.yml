@@ -9,15 +9,26 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   offline:
-    runs-on: ubuntu-latest
+    name: offline (python ${{ matrix.python-version }})
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: setup python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
       - name: compile
         run: python -m compileall -q harness tui run.py
       - name: line and tui audits
@@ -32,7 +43,7 @@ jobs:
         run: python scripts/verify.py --skip-server
       - name: secret hygiene
         run: |
-          pattern='sk-[A-Za-z0-9_-]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY'
+          pattern='sk-[A-Za-z0-9_-]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|pypi-[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY'
           matches="$(git grep -nIE "$pattern" -- . || true)"
           if [ -n "$matches" ]; then
             printf '%s\n' "$matches"
@@ -42,3 +53,26 @@ jobs:
       - name: git hygiene
         run: |
           test -z "$(git status --porcelain)"
+
+  mobile:
+    name: mobile (flutter stable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: setup flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.50.0"
+          channel: stable
+          cache: true
+      - name: resolve dependencies
+        working-directory: mobile
+        run: flutter pub get
+      - name: analyze
+        working-directory: mobile
+        run: flutter analyze --no-pub
+      - name: test
+        working-directory: mobile
+        run: flutter test --no-pub

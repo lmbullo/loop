@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible defect in the harness, TUI, scripts or mobile client.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository is agent-first. A maintainer may replay your report
+        through the loop. Do not include API keys, bearer tokens, private run
+        records or workspace contents. For security issues use the private
+        advisory link on the previous screen.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences. What is broken?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Exact commands, scenario name or record id. Keep it minimal.
+      render: sh
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the error, exit code or record excerpt. Redact secrets.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Revision
+      description: Commit id, tag or `main` plus date.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Flutter version for mobile, and whether the daemon was running.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and discussions.
+          required: true
+        - label: I removed credentials, tokens and private data from this report.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

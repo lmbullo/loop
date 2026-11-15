@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/lmbullo/loop/security/advisories/new
+    about: Report a vulnerability privately. Do not open a public issue for a live secret or exploit.
+  - name: Agent contract and documentation
+    url: https://github.com/lmbullo/loop/blob/main/docs/agent/index.yaml
+    about: Read the task routes, invariants and command contract before filing.

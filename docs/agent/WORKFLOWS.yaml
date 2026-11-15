@@ -2,7 +2,7 @@ schema: loop-agent-doc/1
 id: workflows
 title: Change, test and verification workflows
 read_when: [change code, add a test, add a scenario, add a check, add a doc, commit]
-source: [AGENTS.md, manifest.files, manifest.checks, Makefile, .github/workflows/ci.yml]
+source: [AGENTS.md, manifest.files, manifest.checks, Makefile, .github/workflows/ci.yml, CONTRIBUTING.md]
 verify: [make verify, python3 scripts/check_manifest.py, "python3 scripts/commit_check.py --range HEAD~1..HEAD"]
 
 ladder:
