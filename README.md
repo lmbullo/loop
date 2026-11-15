@@ -97,7 +97,7 @@ including one inside `sh -c`, exactly equal to `server` or `api`. The
 | Record events, nudge, fold, view, resume | `docs/agent/RECORD.yaml` |
 | Tools, observations, stop/nudge, verify, request, cost | `docs/agent/WIRE.yaml` |
 | Daemon, queue, workers, locks | `docs/agent/SERVER.yaml` |
-| Android app build, local-network bridge, directory allowlist | `mobile/README.md`, `docs/agent/SERVER.yaml` |
+| Android app build, local-network bridge, directory allowlist, task list and prompt layout | `mobile/README.md`, `docs/agent/SERVER.yaml` |
 | Change/test/verify/commit recipes | `docs/agent/WORKFLOWS.yaml` |
 | Symptom matrix and recovery order | `docs/agent/DEBUG.yaml` |
 
@@ -105,6 +105,6 @@ including one inside `sh -c`, exactly equal to `server` or `api`. The
 
 `run.py` dispatcher; `install.sh` user/global launcher installer; `harness/`
 loop (`agent`, `turn`, `fold`), record, control plane, sims and checks; `tui/`
-thin renderer; `mobile/` Android-first Flutter client; `scenarios/` transcripts; `fixtures/` sandboxes; `records/`
+thin renderer; `mobile/` Android-first Flutter client with one scrollable task list and one fixed bottom prompt; `scenarios/` transcripts; `fixtures/` sandboxes; `records/`
 frozen artifacts; `tests/`, `scripts/`, `docs/agent/`. Runtime state is generated
 under `.logs/` and git-ignored.

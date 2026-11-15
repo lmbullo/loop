@@ -105,7 +105,7 @@ modules:
     - {path: mobile/lib/store.dart, owns: "client state derived from server polling; saved connection, submit, browse, watch run"}
     - {path: mobile/lib/session.dart, owns: "last successful connection persisted with shared_preferences for auto-login"}
     - {path: mobile/lib/home.dart, owns: "connection status, one scrollable task list and fixed bottom prompt placement; no tab or activity shell"}
-    - {path: mobile/lib/task_list.dart, owns: "workspace header and running/queued/done groups in one scrollable list"}
+    - {path: mobile/lib/task_list.dart, owns: "workspace header and active/queued/done groups in one scrollable list"}
     - {path: mobile/lib/task_rows.dart, owns: "task and queue rows; task text and useful state lead, metadata defers to run detail"}
     - {path: mobile/lib/prompt_box.dart, owns: "fixed bottom task prompt: one docked surface with a single hairline edge, borderless multiline field, compact queue action, safe-area and keyboard spacing"}
     - {path: mobile/lib/dir_picker.dart, owns: "server-backed allowlisted directory navigation with a path bar, hairline rows and footer action"}
@@ -189,4 +189,6 @@ change_map:
   - {change: prompt over any view, start: [tui/input.py, tui/render.py, tui/prompt.py], test: [tests/test_tui_input.py, tests/test_tui_loginput.py, tests/test_tui_prompt.py]}
   - {change: offline scenario, start: [scenarios/, "manifest.scenarios[]"], test: ["python3 run.py sim1 <id>"]}
   - {change: sim wire or cache projection, start: [harness/sim1.py, harness/sim2.py, harness/observe.py, harness/pricing.py], test: [tests/test_pricing.py, tests/test_observe.py]}
+  - {change: mobile task list, prompt, run detail or shared chrome, start: [mobile/lib/home.dart, mobile/lib/task_list.dart, mobile/lib/task_rows.dart, mobile/lib/prompt_box.dart, mobile/lib/run_screen.dart, mobile/lib/connect_pane.dart, mobile/lib/dir_picker.dart, mobile/lib/theme.dart, mobile/lib/widgets.dart], test: [mobile/test/layout_test.dart, mobile/test/widget_test.dart]}
+  - {change: mobile bridge route, token or lifecycle, start: [harness/mobile.py, harness/mobapi.py, harness/mobserve.py, harness/mobtoken.py], test: [tests/test_mobile_api.py, tests/test_mobile_http.py]}
   - {change: new doc, start: [docs/agent/], test: ["manifest.files[]", docs/agent/index.yaml]}

@@ -60,6 +60,11 @@ test_map:
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
   - {test: test_mobile_api.py, contract: mobile root allowlist, symlink containment, enqueue through queue, run log ids and routing}
   - {test: test_mobile_http.py, contract: bearer auth, private bind and peer filter, dirs/snapshot/queue/run-log routes, token file mode}
+  - {test: mobile/test/api_test.dart, contract: private-host guard, JSON mapping, bearer header and HTTP error mapping}
+  - {test: mobile/test/store_test.dart, contract: saved settings, connect, root selection, submit, run watch, failure, disconnect}
+  - {test: mobile/test/session_test.dart, contract: load, save, clear and incomplete saved connection settings}
+  - {test: mobile/test/widget_test.dart, contract: connect, directory pick, bottom-prompt submit, live log/summary, connection failure}
+  - {test: mobile/test/layout_test.dart, contract: fixed bottom prompt with safe/keyboard insets, no tabs or activity view, task-row hierarchy and overflow}
   - {test: test_tui_layout.py, contract: fit, selection marker, state glyphs, one-line task rows, prompt reflow/editing, exact status width, theme palette}
   - {test: test_tui_input.py, contract: arrow selection across running/queued/done, pane handoff, queued-row notice, shift+arrow reorder, delete drop, ctrl+x cancel, text prompt, SS3 arrows}
   - {test: test_tui_keys.py, contract: "raw parser: SS3 arrows, CSI/shifted arrows, ctrl+x, SGR and X10 wheel, left-button mouse events"}
@@ -115,8 +120,10 @@ recipes:
     - run the single test during development, then the full suite
   mobile:
     - keep app code under mobile/ and the server bridge in harness/mob*.py
+    - "the connected screen is home.dart over task_list.dart, task_rows.dart and prompt_box.dart: one scrollable task list, one fixed bottom prompt, no tabs or activity view"
+    - "keep one hairline system: shared chrome in widgets.dart, spacing and type roles in theme.dart, underline fields in connect_pane.dart, and terminal call rows plus one ruled result callout in run_screen.dart"
     - server route changes go in mobapi.py; HTTP/auth/lifecycle changes go in mobserve.py
-    - add a Python test for the server and a Flutter test for the protocol or widget state
+    - add a Python test for the server and a Flutter test for the protocol, widget state or layout
     - run "python3 -m unittest tests.test_mobile_api tests.test_mobile_http"
     - run "cd mobile && flutter analyze --no-pub && flutter test --no-pub"
     - build with "flutter build apk --release --target-platform android-arm64 --split-per-abi"

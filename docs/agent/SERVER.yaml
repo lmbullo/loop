@@ -29,7 +29,7 @@ commands:
     - {cmd: list, usage: "[--json] [--prune]", effect: "probe every server in the machine registry; --prune removes dead rows", exit: "0"}
     - {cmd: runs, usage: "[--json]", effect: "every record with derived state; daemon if available, else disk", exit: "0 ok, 1 corrupt record"}
     - {cmd: logs, usage: "[-n N] [-f]", effect: "tail .logs/server.log; -f follows", exit: "0, 1 follow error"}
-    - {cmd: mobile, usage: "<start|status|stop> [--host IP] [--port N] [--root DIR ...]", effect: "manage the opt-in local-network HTTP bridge; start defaults to LOOP_MOBILE_ROOTS or LOOP_ROOT and prints addr plus the token", exit: "0 ok/stopped, 1 status down, 2 usage, 5 daemon or bind failure"}
+    - {cmd: mobile, usage: "<start|status|stop> [--host IP] [--port N] [--root DIR ...]; status also takes --json", effect: "manage the opt-in local-network HTTP bridge; start defaults to LOOP_MOBILE_ROOTS or LOOP_ROOT and prints addr plus the token", exit: "0 ok/stopped, 1 status down, 2 usage, 5 daemon or bind failure"}
     - {cmd: _stale, usage: "", effect: "remove dead socket/pid/registry entries", exit: "0"}
   internal:
     - "_daemon: used by srvctl"

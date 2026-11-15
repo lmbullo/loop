@@ -83,11 +83,13 @@ The connected screen has one scrollable task list and one fixed prompt dock at
 the bottom. There are no tabs or activity view. Structure comes from one
 hairline system, ruled section labels and state colour, never from nested cards:
 the prompt is a single sharp surface with a borderless field and one top
-hairline, forms use underline fields, and run logs use terminal rows with one
-ruled result callout. The prompt keeps a 0px corner radius, floats above the
-system inset and reflows above the keyboard; long task text scrolls in the list
-and truncates in a row. Rows lead with task text and a status glyph/label; ids,
-turns, cost and finish stay in the run log.
+hairline, the connection form uses underline fields under labelled rules, the
+directory picker adds a path bar with hairline rows and a footer action, and run
+logs use terminal rows with one ruled result callout. The prompt keeps a 0px
+corner radius, floats above the system inset and reflows above the keyboard;
+long task text scrolls in the list and truncates in a row. Rows open with a
+status glyph, then task text and a status label; ids, turns, cost and finish
+stay in the run log.
 
 ## Protocol
 
@@ -111,5 +113,5 @@ omitted.
 
 `python3 -m unittest tests.test_mobile_api tests.test_mobile_http` covers the
 server bridge. `flutter test --no-pub` covers the client protocol, store, widget
-flows and the fixed bottom-prompt/task-row layout with in-memory fixtures. No
-test submits a real agent task or calls a model.
+flows, the fixed bottom-prompt/task-row layout and the shared hairline chrome
+with in-memory fixtures. No test submits a real agent task or calls a model.
