@@ -125,8 +125,9 @@ python3 run.py view --schema
 ```
 
 Records live under `.logs/runs/<run_id>/record.jsonl`. The `records/` directory
-holds frozen sample records used by the tests and sims. `view` never reads the
-clock, cwd, network or server; it is a pure function over record bytes.
+holds frozen sample and historical records and is never written. `view` never
+reads the clock, cwd, network or server; it is a pure function over record
+bytes.
 
 ## Tools
 
