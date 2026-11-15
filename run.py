@@ -4,6 +4,7 @@ import sys
 
 MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json")
 INDEX_SCHEMA = "loop-index/1"
+VERSION_FLAGS = ("-v", "--v", "--version")
 
 
 def load():
@@ -72,6 +73,7 @@ def usage(manifest):
             lines.append(f"         {e['id']} {s['id']:<9}{s['usage']:<14} {s['role']}")
     lines += ["", "scenarios: " + ", ".join(manifest_scenarios(manifest))]
     lines += ["", "index: python3 run.py --json  (" + INDEX_SCHEMA + ", one compact line)"]
+    lines += ["", "version: python3 run.py --version  (-v, --v)"]
     lines += ["", "contract: manifest.json"]
     return "\n".join(lines)
 
@@ -86,6 +88,12 @@ def main(argv):
     if not argv:
         print(usage(manifest), file=sys.stderr)
         return 2
+    if argv[0] in VERSION_FLAGS:
+        if len(argv) > 1:
+            print(f"err {argv[0]} takes no arguments", file=sys.stderr)
+            return 2
+        print(f"loop {manifest.get('version') or 'unknown'}")
+        return 0
     if argv[0] == "--json":
         if len(argv) > 1:
             print("err --json takes no arguments", file=sys.stderr)

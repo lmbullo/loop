@@ -20,8 +20,9 @@ observation designs by token cost and correctness, using an append-only record
 as the only source of truth.
 
 - One exec waist: `exec`, `write`, `edit`, `done`.
-- Bounded observations: inline while small, shape summary plus saved bytes when
-  large; binary output is a digest.
+- Bounded observations: inline while small; larger text becomes a budget-filling
+  head/tail/stderr shape with a byte-sized `next:` slice and saved raw bytes;
+  binary output is a digest.
 - Cache-aware accounting: the unchanged prefix is a cache hit, only the appended
   suffix is a miss.
 - Durable runs: one JSONL record per run; `view` is a pure function over bytes;
@@ -51,7 +52,7 @@ as the only source of truth.
 - The message list is append-only; never edit, reorder or re-send old entries.
 - The record is append-only; one event per fsynced line; `end` is the only
   completion marker. A missing `end` is the interrupted marker.
-- Observations are verbatim except for the bounding rule in `harness/observe.py`;
+- Observations are verbatim except for the bounding rule in `harness/observe.py` and `harness/bound.py`;
   text over the run's bound is summarized and its raw bytes are saved.
 - The system header, tool schema, model, `max_tokens`, thinking budget and
   renderer are constant per run and snapshotted in the `wire` event at run
@@ -126,7 +127,7 @@ the `resume-usage` check exercises only the offline usage path.
 
 ## Layout
 
-- `run.py` - dispatcher and `--json` index; reads `manifest.json`.
+- `run.py` - dispatcher, `--json` index and `--version`; reads `manifest.json`.
 - `install.sh` - user/global launcher installer; `--prefix`, `--bindir`, `--system`, `--uninstall`, `--force`, `--dry-run`.
 - `harness/` - loop (`agent`, `turn`, `fold`), record, control plane, sims, offline checks.
 - `tui/` - thin polling renderer over daemon snapshots.

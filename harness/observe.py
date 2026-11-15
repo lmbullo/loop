@@ -2,17 +2,14 @@ import hashlib
 import os
 import re
 
-from . import config
+from . import bound, config
 
 V1_HEAD = 600
 V1_TAIL = 400
 V2_MAX_TEXT = 2000
 V2_MAX_LINES = 40
 ANSI_RE = re.compile(rb"\x1b\[[0-9;]*[A-Za-z]")
-HEAD_LINES = 6
-TAIL_LINES = 3
-LINE_WIDTH = 120
-STDERR_SEP = b"\n--stderr--\n"
+STDERR_SEP = bound.STDERR_SEP
 
 
 def is_binary(b, sample=4096, threshold=0.20):
@@ -52,49 +49,12 @@ def digest(raw):
     return f"kind=binary bytes={len(raw)} sha256={hashlib.sha256(raw).hexdigest()[:16]} head_hex={raw[:24].hex()}"
 
 
-def _cut(line, width=LINE_WIDTH):
-    text = line[:width * 4].decode("utf-8", "replace")[:width]
-    return text.replace("\t", " ").rstrip()
-
-
-def _stderr(raw):
-    if STDERR_SEP not in raw:
-        return b""
-    return raw.rsplit(STDERR_SEP, 1)[1]
-
-
-def _summary(raw, path):
-    lines = raw.split(b"\n")
-    if lines and lines[-1] == b"":
-        lines = lines[:-1]
-    sha = hashlib.sha256(raw).hexdigest()[:12]
-    out = [f"obs bytes={len(raw)} lines={len(lines)} sha={sha} saved={path}"]
-    if len(lines) <= HEAD_LINES + TAIL_LINES + 2:
-        mid = (len(lines) + 1) // 2
-        head, tail = lines[:mid], lines[mid:]
-    else:
-        head = lines[:HEAD_LINES]
-        tail = lines[max(len(head), len(lines) - TAIL_LINES):]
-    if head:
-        out.append("head:")
-        out.extend(" " + _cut(line) for line in head)
-    if tail:
-        out.append("tail:")
-        out.extend(" " + _cut(line) for line in tail)
-    err = _stderr(raw)
-    if err:
-        shown = b"\n".join(head + tail)
-        if err not in shown:
-            rows = [r for r in err.rstrip(b"\n").split(b"\n") if r][-2:]
-            out.append("stderr_tail:")
-            out.extend(" " + _cut(row) for row in rows)
-    return "\n".join(out)
-
-
 def same(entry):
     text = f"same={entry['id']} bytes={entry['bytes']}"
     if entry.get("saved"):
         text += f" saved={entry['saved']}"
+    if entry.get("next"):
+        text += f" next: {entry['next']}"
     return text
 
 
@@ -126,10 +86,11 @@ def render_api(raw, obs_dir, name, max_inline=None, saved=None, rel_base=None,
         path = save(raw, obs_dir, f"{name}.txt", rel_base)
         if saved is not None:
             saved.append(path)
-        text = _summary(raw, path)
+        text = bound.summary(raw, path, max_inline)
     if ledger is not None:
+        nxt = next((l[6:] for l in text.split("\n") if l.startswith("next: ")), None)
         ledger.add(raw, obs_id or name, saved[-1] if saved else None,
-                   inline=len(raw) <= max_inline)
+                   inline=len(raw) <= max_inline, next=nxt)
     return text
 
 

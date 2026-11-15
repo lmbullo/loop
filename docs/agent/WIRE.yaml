@@ -75,7 +75,7 @@ tools:
     dispatch: not dispatched; harness/turn.py sets turn.done and breaks the call list; any other name returns err unknown_tool <name> expected one of exec, write, edit, done
 
 verify:
-  entry: "run.py api --verify CMD [TASK|-]"
+  entry: "run.py api --verify CMD [--] [TASK|-]"
   transport: task request field verify -> queue item -> job -> worker spec -> agent.run_task
   root: run root (run_start.root); not the client cwd
   shell: sh -c CMD with a 120000 ms timeout and process-group kill
@@ -92,8 +92,8 @@ observation:
   cases:
     - {when: binary sample, output: "kind=binary bytes=<n> sha256=<16 hex> head_hex=<24 bytes>"}
     - {when: "len(raw) <= run max_inline", output: raw UTF-8 text, verbatim}
-    - {when: larger text, output: "obs bytes=<n> lines=<n> sha=<12 hex> saved=<root-relative path>; then head: up to 6 lines, tail: up to 3 lines, and stderr_tail: up to 2 lines when stderr was not already shown"}
-    - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>]"}
+    - {when: larger text, output: "obs bytes=<n> lines=<n> sha=<12 hex> saved=<root-relative path>; then shown 1-<a> of <n>[; elided <a+1>-<b>], head:/tail: whole lines filling the byte bound, stderr_tail: up to 2 lines when stderr was not already shown, and next: sed -n <a+1>,<c>p <path> when lines are elided; that slice renders verbatim"}
+    - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>] [next: sed -n <a>,<b>p <path>]"}; next is present when the earlier copy was summarized so a repeat can advance instead of dead-ending on the old summary
     - {when: no output, output: empty string}
   bounding:
     - valid UTF-8 text is never binary: only control bytes (<9, 14..31, 127) count, so non-ASCII characters stay readable; an invalid sample falls back to the byte rule (>20% of the first 4096 bytes outside printable ASCII)
@@ -105,7 +105,7 @@ observation:
     - the ledger is derived from record events plus saved artifacts, so resume rebuilds the same sha->obs map; an exact repeat becomes a one-line reference because the earlier payload is already in the append-only message list
     - read a saved file by grepping the line you need or by a small range; re-reading it whole is summarized again
     - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set when a large text file was saved, including a reference to an earlier archive
-    - "why 2048: recorded observations have p75 ~2.3KB and p90 ~6KB; the 2KB bound keeps ordinary calls verbatim while turning large outputs into a fixed ~150-250 token index, a ~60% reduction in re-sent prompt tokens on the recorded corpus"
+    - "why 2048: recorded observations have p75 ~2.3KB and p90 ~6KB; the 2KB bound keeps ordinary calls verbatim, and the summary now spends that bound on whole head/tail lines (median ~40 visible lines, ~56% of a saved payload) plus a byte-sized next slice, so one read replaces several chunked probes"
 
 failures:
   rule: tool errors are observations, not harness crashes; the model decides whether to retry

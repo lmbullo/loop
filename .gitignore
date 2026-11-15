@@ -43,3 +43,6 @@ credentials*
 *.p12
 *.pfx
 id_rsa*
+
+# Local loop analysis, not part of the repo contract.
+loop.md

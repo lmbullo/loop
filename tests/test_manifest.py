@@ -1,6 +1,7 @@
 import importlib
 import json
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -23,6 +24,12 @@ class ManifestTest(unittest.TestCase):
                     "env", "scenarios", "agent_index"):
             self.assertIn(key, m)
         self.assertEqual(m["agent_index"]["schema"], "loop-index/1")
+
+    def test_manifest_version_matches_pyproject(self):
+        with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as f:
+            match = re.search(r'(?m)^version = "([^"]+)"', f.read())
+        self.assertIsNotNone(match)
+        self.assertEqual(self.manifest["version"], match.group(1))
 
     def test_files_exist_and_are_unique(self):
         paths = [entry["path"] for entry in self.manifest["files"]]
@@ -70,6 +77,11 @@ class ManifestTest(unittest.TestCase):
         proc = run_py()
         self.assertEqual(proc.returncode, 2)
         self.assertIn("usage:", proc.stderr)
+        for flag in ("-v", "--v", "--version"):
+            proc = run_py(flag)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(proc.stdout.strip(), "loop " + self.manifest["version"])
+        self.assertEqual(run_py("--version", "extra").returncode, 2)
         proc = run_py("view", "--schema")
         self.assertEqual(proc.returncode, 0)
         self.assertEqual(json.loads(proc.stdout)["schema"], "loop-record/1")

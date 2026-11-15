@@ -130,6 +130,33 @@ class MainArgTest(unittest.TestCase):
             self.assertEqual(agent.main(["--verify"]), 2)
         self.assertIn("--verify", err.getvalue())
 
+    def test_unknown_option_is_usage_error(self):
+        with unittest.mock.patch("harness.srvclient.run_local", return_value=7) as run:
+            with unittest.mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+                self.assertEqual(agent.main(["--v"]), 2)
+        run.assert_not_called()
+        self.assertIn("unknown option '--v'", err.getvalue())
+        self.assertIn("--verify", err.getvalue())
+
+    def test_help_short_circuits(self):
+        with unittest.mock.patch("harness.srvclient.run_local", return_value=7) as run:
+            with unittest.mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                self.assertEqual(agent.main(["--help"]), 0)
+        run.assert_not_called()
+        self.assertIn("usage:", out.getvalue())
+
+    def test_double_dash_allows_dash_task(self):
+        with unittest.mock.patch("harness.srvclient.run_local", return_value=7) as run:
+            self.assertEqual(agent.main(["--", "--v"]), 7)
+        run.assert_called_once_with("--v", False, None)
+
+    def test_extra_positional_is_rejected(self):
+        with unittest.mock.patch("harness.srvclient.run_local", return_value=7) as run:
+            with unittest.mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+                self.assertEqual(agent.main(["task", "extra"]), 2)
+        run.assert_not_called()
+        self.assertIn("unexpected argument 'extra'", err.getvalue())
+
 
 class ViewVerifyTest(unittest.TestCase):
     def test_pending_and_ran(self):

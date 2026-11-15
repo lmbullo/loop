@@ -129,21 +129,39 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         return settle(writer, emit, events, turn, cmd, root, kind, result, 0)
 
 
+USAGE = "usage: python3 run.py api [--verify CMD] [--json] [--] [TASK|-]"
+
+
+def _api_error(message):
+    print(f"err {message}\n{USAGE}", file=sys.stderr)
+    return 2
+
+
 def main(argv):
-    as_json, verify, args, i = False, None, [], 0
+    as_json, verify, args, i, options = False, None, [], 0, True
     while i < len(argv):
         arg = argv[i]
-        if arg == "--json":
+        if options and arg == "--":
+            options = False
+        elif options and arg in ("-h", "--help"):
+            print(USAGE)
+            return 0
+        elif options and arg == "--json":
             as_json = True
-        elif arg == "--verify" and i + 1 < len(argv):
+        elif options and arg == "--verify":
+            if i + 1 >= len(argv):
+                return _api_error("--verify needs a command string")
             verify = argv[i + 1]
             i += 1
-        elif arg == "--verify":
-            print("err --verify needs a command string", file=sys.stderr)
-            return 2
+        elif options and arg.startswith("-") and arg != "-":
+            hint = (" (did you mean --verify? top-level --version prints the release)"
+                    if "--verify".startswith(arg) else "")
+            return _api_error(f"unknown option {arg!r}{hint}")
         else:
             args.append(arg)
         i += 1
+    if len(args) > 1:
+        return _api_error(f"unexpected argument {args[1]!r}")
     task = args[0] if args else "No task."
     if task == "-":
         task = sys.stdin.read()

@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import unittest
 
@@ -87,6 +88,23 @@ class ObserveTest(unittest.TestCase):
         self.assertEqual(saved, ["obs/o1.txt"])
         with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
             self.assertEqual(f.read(), raw)
+
+    def test_summary_fills_bound_and_repeat_keeps_next(self):
+        raw = b"\n".join([b"row-%03d unique" % i for i in range(200)])
+        led, saved = ledger.Ledger(), []
+        out = observe.render_api(raw, self.obs, "o1", max_inline=2048,
+                                 saved=saved, rel_base=self.tmp.name,
+                                 ledger=led, obs_id="obs-1")
+        self.assertLessEqual(len(out.encode()), 2048)
+        m = re.search(r"next: sed -n (\d+),(\d+)p (\S+)", out)
+        lines = raw.split(b"\n")
+        part = b"\n".join(lines[int(m.group(1)) - 1:int(m.group(2))])
+        self.assertEqual(observe.render_api(part, self.obs, "o2",
+                                           max_inline=2048), part.decode())
+        again = observe.render_api(raw, self.obs, "o3", max_inline=2048,
+                                   ledger=led, obs_id="obs-2", rel_base=self.tmp.name)
+        self.assertTrue(again.startswith("same=obs-1 bytes="))
+        self.assertIn("next: sed -n", again)
 
     def test_render_api_head_tail_do_not_repeat_lines(self):
         raw = b"\n".join([b"unique-%02d" % i for i in range(20)])

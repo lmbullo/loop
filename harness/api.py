@@ -63,10 +63,12 @@ probe or probe pair is about to repeat, write it once as a script and run the
 script; repeated single-step probing costs a turn each time.
 
 Large observations are replaced by a shape summary; the raw bytes are saved
-under the run's obs directory. Grep for the line you need or read a small range;
-do not dump the whole file again. An observation marked same=obs-N is byte
-identical to that earlier observation; use the earlier copy instead of probing
-again.
+under the run's obs directory. A summary reports `shown a-b of N` and, when it
+elides lines, a ready `next: sed -n a,bp <path>` command; pass those argv tokens
+as-is (exec argv is literal, so no quoting) to get the next slice verbatim. Do
+not re-read a file you already have; an observation marked same=obs-N is byte
+identical to that earlier observation. Prefer one read of the range you need
+over many small probes.
 
 Paths are relative to the working directory.
 

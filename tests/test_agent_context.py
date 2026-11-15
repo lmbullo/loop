@@ -81,7 +81,8 @@ class AgentContextTest(unittest.TestCase):
         self.assertIn("Issue independent tool calls together", text)
         self.assertIn("write it once as a script and run the", text)
         self.assertIn("Large observations", text)
-        self.assertIn("Grep for the line you need", text)
+        self.assertIn("shown a-b of N", text)
+        self.assertIn("next: sed -n a,bp", text)
         self.assertIn("one nudge", text)
         self.assertNotIn("{max_inline}", text)
 

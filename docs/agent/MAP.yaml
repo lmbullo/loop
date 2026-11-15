@@ -9,6 +9,8 @@ dispatch:
   entry: run.py
   rule: argv[1] -> manifest.entrypoints[] -> import module.function (default main); no second top-level script
   usage: run.py prints manifest purpose and entrypoint rows on no args or unknown command
+  version: "-v, --v and --version print loop <manifest.version>; --help prints the top-level flags"
+  options: "api parses options until --: -h/--help prints api usage, an unknown -option or a second positional exits 2 before any run is queued, and -- allows a task that starts with -"
   index: "--json prints one compact loop-index/1 line from manifest.agent_index; no module import, no tree walk, no absolute paths"
 
 entrypoints:
@@ -65,7 +67,8 @@ modules:
     - {path: harness/verifier.py, owns: "run the verify command through sh -c at the run root; exit code plus one evidence line"}
     - {path: harness/api.py, owns: "tool schemas, system header, per-run wire snapshot, model id, HTTP call"}
     - {path: harness/tools.py, owns: "exec, write, edit bodies and dispatch; exec forwards the bounded ledgered renderer"}
-    - {path: harness/observe.py, owns: "2048-byte render_api compact head/tail/stderr shape, same=obs-N references, render_v1, render_v2"}
+    - {path: harness/observe.py, owns: "2048-byte render_api bound, same=obs-N references, render_v1, render_v2"}
+    - {path: harness/bound.py, owns: "inline shape for a bounded observation: whole head/tail lines filling the byte allowance, shown/elided ranges, byte-sized next sed slice"}
     - {path: harness/ledger.py, owns: "content-addressed observation memory derived from record events and saved artifacts"}
     - {path: harness/spawn.py, owns: "one literal-argv subprocess; timeout and OSError mapping"}
     - {path: harness/pricing.py, owns: "manifest rates, cost formula, hot reload by mtime"}

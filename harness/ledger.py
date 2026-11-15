@@ -28,6 +28,16 @@ def _saved(raw, root):
         return None
 
 
+def continuation(call):
+    """The byte-sized `next:` slice a summary recorded for this call."""
+    if not call.get("saved"):
+        return None
+    for line in (call.get("observation") or "").split("\n"):
+        if line.startswith("next: "):
+            return line[6:]
+    return None
+
+
 def call_raw(call, root=None):
     """Recover the pre-render payload for a recorded call, if available."""
     saved = call.get("saved")
@@ -53,14 +63,17 @@ class Ledger:
                 continue
             for call in ev["data"].get("calls") or []:
                 n += 1
+                if "same=obs-" in (call.get("observation") or ""):
+                    continue
                 raw = call_raw(call, root)
                 if raw is not None:
-                    led.add(raw, f"obs-{n}", call.get("saved"), call.get("saved") is None)
+                    led.add(raw, f"obs-{n}", call.get("saved"),
+                            call.get("saved") is None, continuation(call))
         return led
 
-    def add(self, raw, obs_id, saved=None, inline=False):
+    def add(self, raw, obs_id, saved=None, inline=False, next=None):
         entry = {"id": obs_id, "saved": saved, "inline": bool(inline),
-                 "bytes": len(raw or b"")}
+                 "bytes": len(raw or b""), "next": next}
         self.by_sha[sha(raw)] = entry
         return entry
 

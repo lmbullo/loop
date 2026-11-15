@@ -23,8 +23,8 @@ the human-facing layer.
   act on the world. Editing a file means writing a program that edits it. This
   keeps the wire small and makes every action reproducible.
 - **Bounded observations.** Small results stay inline. Text over the run's
-  bound becomes a compact head/tail/stderr index with the raw bytes saved under
-  the run's `obs/` directory; binary output becomes a digest, and an exact repeat
+  bound becomes a budget-filling head/tail/stderr index with a byte-sized `next:`
+  slice and the raw bytes saved under the run's `obs/` directory; binary output becomes a digest, and an exact repeat
   becomes a one-line `same=obs-N` reference. Context growth is predictable.
 - **Cache-aware accounting.** The system header, tool schema, model and thinking
   settings are snapshotted at run start and the message list is append-only, so
@@ -49,6 +49,7 @@ There are no Python dependencies to install.
 git clone https://github.com/lmbullo/loop.git
 cd loop
 
+python3 run.py --version    # release declared in manifest.json
 python3 run.py --json        # one compact loop-index/1 contract line
 python3 run.py sim1 task     # deterministic exec-only simulation
 python3 run.py sim2 task2    # deterministic shape-aware simulation

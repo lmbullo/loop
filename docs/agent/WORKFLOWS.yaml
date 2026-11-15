@@ -47,7 +47,7 @@ test_map:
   - {test: test_recwrite.py, contract: append/fsync, per-run and tree locks, seal, reconcile, torn-tail repair}
   - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
-  - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, compact head/tail/stderr shape, saved bytes, exact-repeat same=obs-N ledger}
+  - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, budget-filling head/tail/stderr shape, byte-sized next slice, saved bytes, exact-repeat same=obs-N ledger}
   - {test: test_audit.py, contract: "offline cache audit projection: prefix growth, reuse references, wire sha"}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
