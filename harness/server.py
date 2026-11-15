@@ -14,6 +14,8 @@ usage: python3 run.py server <command>
   list [--json]      every server in the machine-wide registry
   runs [--json]      every run record on disk, read without executing anything
   logs [-n N] [-f]   tail .logs/server.log
+  mobile <cmd>       opt-in local-network bridge for the mobile app; see
+                     python3 run.py server mobile --help
 """
 
 
@@ -45,6 +47,9 @@ def main(argv):
         return srvcmd.runs(rest)
     if cmd == "logs":
         return srvcmd.logs(rest)
+    if cmd == "mobile":
+        from . import mobile
+        return mobile.main(rest)
     if cmd == "_stale":
         return srvcmd.stale()
     print(f"err unknown server command {cmd!r}\n{USAGE}", file=sys.stderr)

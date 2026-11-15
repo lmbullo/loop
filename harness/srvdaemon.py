@@ -18,6 +18,7 @@ class Daemon:
         self.stop_event = threading.Event()
         self.wake = None
         self.children = []
+        self.mobile = None
 
     def entry(self):
         return {
@@ -124,6 +125,9 @@ class Daemon:
 
     def shutdown(self):
         self.stop_event.set()
+        if self.mobile is not None:
+            self.mobile.stop()
+            self.mobile = None
         try:
             self.srv.close()
         except (OSError, AttributeError):

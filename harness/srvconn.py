@@ -80,6 +80,24 @@ def handle(daemon, conn):
             srvwire.send_line(conn, daemon.snapshot_dict())
         elif cmd == "runs":
             srvwire.send_line(conn, {"k": "runs", "runs": recread.scan()})
+        elif cmd == "mobile_start":
+            from . import mobserve
+            try:
+                reply = mobserve.start(daemon, request.get("host"),
+                                       int(request.get("port") or 0),
+                                       request.get("token"),
+                                       request.get("roots") or [])
+            except (OSError, ValueError, TypeError) as e:
+                srvwire.send_line(conn, {"k": "error", "code": 5,
+                                         "text": f"mobile start: {type(e).__name__}: {e}"})
+                return
+            srvwire.send_line(conn, reply)
+        elif cmd == "mobile_stop":
+            from . import mobserve
+            srvwire.send_line(conn, mobserve.stop(daemon))
+        elif cmd == "mobile_status":
+            from . import mobserve
+            srvwire.send_line(conn, mobserve.status(daemon))
         elif cmd == "enqueue":
             task = request.get("task")
             task = "No task." if not isinstance(task, str) or not task else task
