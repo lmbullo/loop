@@ -93,7 +93,7 @@ def load(run_id):
         return {"id": run_id, "state": "corrupt", "turns": 0, "terminal": True,
                 "entries": [{"kind": "error", "text": one(e, TEXT_LIMIT)}]}
     events = rec["events"]
-    state = recread.state(events)
+    state = recread.live_state(rec)
     last = events[-1]["type"] if events else ""
     return {"id": run_id, "state": state, "turns": recread.turns(events),
             "terminal": state == "complete" or last in TAIL_KINDS,
