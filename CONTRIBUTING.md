@@ -63,10 +63,11 @@ flutter analyze --no-pub
 flutter test --no-pub
 ```
 
-The mobile bridge is local-network only. Do not add public-internet, tunnel or
-VPN modes. Keep the bind check, bearer-token requirement and directory
-allowlist intact. The client is Gruvbox dark with floating composer and nav
-surfaces; keep state colour semantic and the keyboard/system insets clear.
+The mobile bridge is private-network only: loopback, LAN or Tailscale. Do not
+add public-internet, Tailscale Funnel or public tunnel modes. Keep the bind
+check, bearer-token requirement and directory allowlist intact. The client is
+Gruvbox dark with floating composer and nav surfaces; keep state colour
+semantic and the keyboard/system insets clear.
 
 ## Commit protocol
 

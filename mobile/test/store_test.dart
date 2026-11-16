@@ -103,6 +103,6 @@ void main() {
     addTearDown(store.dispose);
     expect(await store.connect('8.8.8.8', 8787, 'token'), isFalse);
     expect(created, 0);
-    expect(store.error, contains('private or loopback'));
+    expect(store.error, contains('private, loopback or Tailscale'));
   });
 }

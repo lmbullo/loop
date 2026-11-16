@@ -122,7 +122,7 @@ modules:
     - {path: mobile/lib/connect_pane.dart, owns: "Gruvbox host, port and bearer token card with token visibility and bridge hint"}
     - {path: mobile/lib/theme.dart, owns: "Gruvbox dark palette, spacing, radii, type roles, state icons and Material theme"}
     - {path: mobile/lib/widgets.dart, owns: "shared backdrop, header, connection chip, cards, pills, hairlines, error and empty states"}
-    - {path: mobile/README.md, owns: "Android build/run and local-network setup"}
+    - {path: mobile/README.md, owns: "Android build/run and private-network setup"}
   sims_checks_tui:
     - {path: harness/sim1.py, owns: "offline v1 sim: exec only, head 600B + tail 400B, cache cost through pricing"}
     - {path: harness/sim2.py, owns: "offline v2 sim: shape-aware, 2000B inline, structured edit, cache cost through pricing"}

@@ -2,8 +2,9 @@ import http.client
 import json
 import os
 import unittest
+from unittest import mock
 
-from harness import mobserve, mobtoken, queue
+from harness import mobile, mobserve, mobtoken, queue
 from tests.support import RUN_ID, minimal_events, sandbox, write_record
 
 TOKEN = "test-token-0123456789"
@@ -90,11 +91,13 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(data["entries"][-1]["result"], "ok")
 
     def test_rejects_non_local_hosts_and_short_tokens(self):
-        for bad in ("0.0.0.0", "8.8.8.8", "example.com"):
+        for bad in ("0.0.0.0", "8.8.8.8", "example.com", "100.128.0.1"):
             with self.assertRaises(ValueError):
                 mobserve.validate_host(bad)
         self.assertEqual(mobserve.validate_host("127.0.0.1"), "127.0.0.1")
         self.assertEqual(mobserve.validate_host("192.168.1.2"), "192.168.1.2")
+        self.assertEqual(mobserve.validate_host("100.83.10.68"), "100.83.10.68")
+        self.assertEqual(mobserve.validate_host("100.64.0.1"), "100.64.0.1")
         with self.assertRaises(ValueError):
             mobserve.MobileServer(FakeDaemon(), "127.0.0.1", 0, "short", [self.root])
         with self.assertRaises(ValueError):
@@ -103,8 +106,10 @@ class HttpTest(unittest.TestCase):
     def test_private_peer_filter(self):
         self.assertTrue(mobserve._private_peer("127.0.0.1"))
         self.assertTrue(mobserve._private_peer("192.168.1.4"))
+        self.assertTrue(mobserve._private_peer("100.80.54.61"))
         self.assertTrue(mobserve._private_peer("::1"))
         self.assertFalse(mobserve._private_peer("8.8.8.8"))
+        self.assertFalse(mobserve._private_peer("100.128.0.1"))
 
     def test_token_is_persisted_with_owner_only_mode(self):
         token = mobtoken.load()
@@ -113,6 +118,21 @@ class HttpTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(path))
         self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
         self.assertEqual(mobtoken.load(), token)
+
+    def test_private_host_prefers_the_tailnet_address(self):
+        reply = mock.Mock(returncode=0, stdout="100.80.54.61\n")
+        with mock.patch("harness.mobile.subprocess.run", return_value=reply):
+            self.assertEqual(mobile.tailscale_host(), "100.80.54.61")
+            self.assertEqual(mobile.private_host(), "100.80.54.61")
+        with mock.patch("harness.mobile.subprocess.run",
+                        side_effect=OSError("missing")):
+            self.assertIsNone(mobile.tailscale_host())
+        reply = mock.Mock(returncode=0, stdout="192.168.1.4\nnot-an-ip\n")
+        with mock.patch("harness.mobile.subprocess.run", return_value=reply):
+            self.assertIsNone(mobile.tailscale_host())
+        reply = mock.Mock(returncode=1, stdout="100.80.54.61\n")
+        with mock.patch("harness.mobile.subprocess.run", return_value=reply):
+            self.assertIsNone(mobile.tailscale_host())
 
     def test_bad_route_and_bad_json_are_errors(self):
         status, data = self.call("GET", "/v1/nope")

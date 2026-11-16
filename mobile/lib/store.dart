@@ -48,7 +48,7 @@ class LoopStore extends ChangeNotifier {
   bool get canSubmit =>
       connected && !submitting && selectedRoot != null && selectedRoot!.isNotEmpty;
   String get statusState => online ? 'running' : (connected ? 'offline' : 'detached');
-  String get statusDetail => error ?? (online ? 'local network' : 'not connected');
+  String get statusDetail => error ?? (online ? 'private network' : 'not connected');
 
   void _notify() {
     if (!_disposed) notifyListeners();

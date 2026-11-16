@@ -182,8 +182,10 @@ renders one frame without a terminal.
 
 `mobile/` is a Gruvbox-styled, Android-first Flutter client for the same tree.
 It uses a floating composer, a floating tasks/activity/workspace nav rail and
-rounded state cards. The bridge is opt-in, binds only a literal private or
-loopback address, and requires a bearer token on every `/v1` request.
+rounded state cards. The bridge is opt-in, binds one literal private, loopback
+or Tailscale address, and requires a bearer token on every `/v1` request. With
+Tailscale up it defaults to this node's `100.x.y.z` tailnet address, so the
+phone can reach it from any network.
 
 ```sh
 python3 run.py server mobile start --host 192.168.1.10 --root ~/project

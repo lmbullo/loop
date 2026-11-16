@@ -1,8 +1,9 @@
 /// The mobile client protocol: private-network HTTP with a bearer token.
 ///
 /// The client is deliberately thin.  It validates that the configured host is
-/// loopback or RFC1918/ULA/link-local before opening a socket, then asks the
-/// server for snapshots, directories, queue submissions and run logs.
+/// loopback, RFC1918/ULA/link-local or a Tailscale 100.64.0.0/10 address before
+/// opening a socket, then asks the server for snapshots, directories, queue
+/// submissions and run logs.
 library;
 
 import 'dart:async';
@@ -39,12 +40,14 @@ bool isLocalAddress(InternetAddress address) {
     final b = bytes[1];
     return a == 10 ||
         a == 127 ||
+        (a == 100 && b >= 64 && b <= 127) ||
         (a == 169 && b == 254) ||
         (a == 172 && b >= 16 && b <= 31) ||
         (a == 192 && b == 168);
   }
   if (address.type == InternetAddressType.IPv6 && bytes.length == 16) {
-    final loopback = bytes.take(15).every((value) => value == 0) && bytes[15] == 1;
+    final loopback =
+        bytes.take(15).every((value) => value == 0) && bytes[15] == 1;
     final linkLocal = bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80;
     final ula = (bytes[0] & 0xfe) == 0xfc;
     return loopback || linkLocal || ula;
@@ -64,7 +67,9 @@ Future<String> validateLocalHost(String host) async {
   if (literal != null) {
     if (!isLocalAddress(literal)) {
       throw const LoopApiException(
-          ApiFailure.local, 'host must be a private or loopback address');
+        ApiFailure.local,
+        'host must be a private, loopback or Tailscale address',
+      );
     }
     return value;
   }
@@ -77,14 +82,16 @@ Future<String> validateLocalHost(String host) async {
   }
   if (addresses.isEmpty || !addresses.every(isLocalAddress)) {
     throw const LoopApiException(
-        ApiFailure.local, 'host must resolve to private or loopback addresses');
+      ApiFailure.local,
+      'host must resolve to private, loopback or Tailscale addresses',
+    );
   }
   return value;
 }
 
 class HttpLoopApi implements LoopApi {
   HttpLoopApi(this.settings, {HttpClient? client})
-      : _client = client ?? HttpClient() {
+    : _client = client ?? HttpClient() {
     _client.connectionTimeout = const Duration(seconds: 5);
   }
 
@@ -93,12 +100,12 @@ class HttpLoopApi implements LoopApi {
   static const _timeout = Duration(seconds: 12);
 
   Uri _uri(String path, [Map<String, String>? query]) => Uri(
-        scheme: 'http',
-        host: settings.host,
-        port: settings.port,
-        path: path,
-        queryParameters: query,
-      );
+    scheme: 'http',
+    host: settings.host,
+    port: settings.port,
+    path: path,
+    queryParameters: query,
+  );
 
   Future<Map<String, dynamic>> _request(
     String method,
@@ -110,8 +117,13 @@ class HttpLoopApi implements LoopApi {
     HttpClientResponse response;
     String text;
     try {
-      request = await _client.openUrl(method, _uri(path, query)).timeout(_timeout);
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${settings.token}');
+      request = await _client
+          .openUrl(method, _uri(path, query))
+          .timeout(_timeout);
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${settings.token}',
+      );
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       if (body != null) {
         final raw = utf8.encode(jsonEncode(body));
@@ -130,10 +142,14 @@ class HttpLoopApi implements LoopApi {
     }
     Map<String, dynamic> data;
     try {
-      data = text.trim().isEmpty ? <String, dynamic>{} : asMap(jsonDecode(text));
+      data = text.trim().isEmpty
+          ? <String, dynamic>{}
+          : asMap(jsonDecode(text));
     } on FormatException {
       throw const LoopApiException(
-          ApiFailure.protocol, 'server returned non-JSON data');
+        ApiFailure.protocol,
+        'server returned non-JSON data',
+      );
     }
     if (response.statusCode == HttpStatus.unauthorized) {
       throw const LoopApiException(ApiFailure.auth, 'invalid token');
@@ -144,7 +160,9 @@ class HttpLoopApi implements LoopApi {
     }
     if (data['ok'] == false) {
       throw LoopApiException(
-          ApiFailure.server, asString(data['text'], 'server rejected request'));
+        ApiFailure.server,
+        asString(data['text'], 'server rejected request'),
+      );
     }
     return data;
   }
@@ -154,10 +172,10 @@ class HttpLoopApi implements LoopApi {
 
   @override
   Future<Map<String, dynamic>> dirs([String? path]) => _request(
-        'GET',
-        '/v1/dirs',
-        query: path == null || path.isEmpty ? null : {'path': path},
-      );
+    'GET',
+    '/v1/dirs',
+    query: path == null || path.isEmpty ? null : {'path': path},
+  );
 
   @override
   Future<Map<String, dynamic>> snapshot() => _request('GET', '/v1/snapshot');

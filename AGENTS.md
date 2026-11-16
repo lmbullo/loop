@@ -131,7 +131,7 @@ the `resume-usage` check exercises only the offline usage path.
 - `install.sh` - user/global launcher installer; `--prefix`, `--bindir`, `--system`, `--uninstall`, `--force`, `--dry-run`.
 - `harness/` - loop (`agent`, `turn`, `fold`), record, control plane, sims, offline checks.
 - `tui/` - thin polling renderer over daemon snapshots.
-- `mobile/` - Android-first Flutter client for the opt-in local-network bridge: one scrollable task list, one fixed bottom prompt and one hairline surface system.
+- `mobile/` - Android-first Flutter client for the opt-in private-network bridge (LAN or Tailscale): one scrollable task list, one fixed bottom prompt and one hairline surface system.
 - `scenarios/` - offline sim transcripts.
 - `fixtures/` - read-only sandbox trees, copied per sim run.
 - `records/` - frozen historical artifacts; never written.

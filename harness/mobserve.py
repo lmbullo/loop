@@ -1,16 +1,14 @@
-"""Opt-in HTTP bridge for the local-network mobile client.
+"""Opt-in HTTP bridge for the private-network mobile client.
 
-The bridge lives inside the daemon process, so it uses the same queue,
-snapshot and record functions as the Unix socket.  It binds one explicit
-private or loopback address, rejects non-private peers, and requires a bearer
-token for every request.  It is not a second control plane.
+It lives inside the daemon, uses the same queue, snapshot and record functions
+as the Unix socket, binds one explicit private, loopback or Tailscale address,
+rejects peers outside those ranges and requires a bearer token per request.
 """
 
 import hmac
 import http.server
 import ipaddress
 import json
-import os
 import socket
 import threading
 import time
@@ -21,21 +19,30 @@ from . import mobapi, srvwire
 DEFAULT_PORT = 8787
 MAX_BODY = 64 * 1024
 TOKEN_MIN = 16
+TAILSCALE_V4 = ipaddress.ip_network("100.64.0.0/10")
 
 
 def authority(host, port):
     return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
 
 
+def is_tailnet(ip):
+    return isinstance(ip, ipaddress.IPv4Address) and ip in TAILSCALE_V4
+
+
+def _reachable(ip):
+    return ip.is_private or ip.is_loopback or is_tailnet(ip)
+
+
 def validate_host(host):
     try:
         ip = ipaddress.ip_address(str(host))
     except ValueError as exc:
-        raise ValueError("host must be a literal private or loopback IP") from exc
-    if not (ip.is_private or ip.is_loopback):
-        raise ValueError("host is not private or loopback")
-    if ip.is_unspecified or ip.is_multicast:
-        raise ValueError("host is not a unicast private or loopback IP")
+        raise ValueError(
+            "host must be a literal private, loopback or Tailscale IP") from exc
+    if not _reachable(ip) or ip.is_unspecified or ip.is_multicast:
+        raise ValueError(
+            "host is not a unicast private, loopback or Tailscale IP")
     return str(ip)
 
 
@@ -46,7 +53,7 @@ def _private_peer(value):
         return False
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
-    return not ip.is_unspecified and (ip.is_private or ip.is_loopback)
+    return not ip.is_unspecified and _reachable(ip)
 
 
 def _decode(raw):
@@ -86,12 +93,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def _handle(self, method):
         if not _private_peer(self.client_address[0]):
-            self._send(403, {"schema": mobapi.SCHEMA, "ok": False,
-                             "text": "local network only"})
+            self._send(403, {"schema": mobapi.SCHEMA, "ok": False, "text": "private network only"})
             return
         if not self._authorized():
-            self._send(401, {"schema": mobapi.SCHEMA, "ok": False,
-                             "text": "unauthorized"},
+            self._send(401, {"schema": mobapi.SCHEMA, "ok": False, "text": "unauthorized"},
                        {"WWW-Authenticate": "Bearer"})
             return
         try:
@@ -99,15 +104,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         except ValueError:
             length = -1
         if length < 0 or length > MAX_BODY:
-            self._send(413, {"schema": mobapi.SCHEMA, "ok": False,
-                             "text": "request too large"})
+            self._send(413, {"schema": mobapi.SCHEMA, "ok": False, "text": "request too large"})
             return
         raw = self.rfile.read(length) if length else b""
         url = urlsplit(self.path)
         parts = [unquote(piece) for piece in url.path.split("/") if piece]
         if not parts or parts[0] != "v1":
-            self._send(404, {"schema": mobapi.SCHEMA, "ok": False,
-                             "text": "unknown route"})
+            self._send(404, {"schema": mobapi.SCHEMA, "ok": False, "text": "unknown route"})
             return
         try:
             body = _decode(raw)
@@ -116,12 +119,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                                    self.server.roots)
             self._send(200, data)
         except mobapi.ApiError as exc:
-            self._send(exc.status, {"schema": mobapi.SCHEMA, "ok": False,
-                                    "text": exc.text})
+            self._send(exc.status, {"schema": mobapi.SCHEMA, "ok": False, "text": exc.text})
         except Exception as exc:
             srvwire.log("mobile", f"request failed {type(exc).__name__}: {exc}")
-            self._send(500, {"schema": mobapi.SCHEMA, "ok": False,
-                             "text": "internal error"})
+            self._send(500, {"schema": mobapi.SCHEMA, "ok": False, "text": "internal error"})
 
     def do_GET(self):
         self._handle("GET")
@@ -172,11 +173,9 @@ class MobileServer:
 
     def info(self):
         return {"k": "mobile", "state": "running", "tree": self.daemon.tree,
-                "host": self.host, "port": self.port,
+                "host": self.host, "port": self.port, "roots": list(self.roots),
                 "address": f"http://{authority(self.host, self.port)}",
-                "roots": list(self.roots),
-                "started_at": time.strftime("%Y-%m-%dT%H:%M:%S",
-                                            time.localtime(self.started))}
+                "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(self.started))}
 
 
 def start(daemon, host, port, token, roots):

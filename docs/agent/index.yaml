@@ -192,7 +192,7 @@ invariants:
   - one run per tree via .logs/run.lock
   - the daemon never executes a run; workers survive daemon restart
   - server code never imports tui/
-  - the mobile bridge is opt-in, binds one private/loopback IP, and requires a bearer token
+  - the mobile bridge is opt-in, binds one private, loopback or Tailscale IP, and requires a bearer token
 
 traps:
   - a second api queues a front item and streams that run; it does not attach to the in-flight run

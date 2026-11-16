@@ -8,20 +8,25 @@ it has no queue, run engine or authoritative state.
 ## Local bridge
 
 The bridge is opt-in and lives inside the tree's daemon. It binds one literal
-private or loopback address and requires a bearer token on every `/v1` request.
-`0.0.0.0`, public addresses and non-private peers are refused.
+private, loopback or Tailscale address and requires a bearer token on every
+`/v1` request. `0.0.0.0`, public addresses and peers outside RFC1918, IPv6
+ULA/link-local, loopback or the Tailscale `100.64.0.0/10` range are refused.
+
+When Tailscale is up, `server mobile start` defaults to this node's `100.x.y.z`
+tailnet address, so the phone can connect from any network with Tailscale
+running. Pass `--host` to bind a LAN address instead.
 
 ```sh
-# the private IPv4 of this machine on the same Wi-Fi as the phone
-ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p'
+# this node's tailnet address (falls back to the LAN IPv4 when Tailscale is off)
+tailscale ip -4
 
 # one or more allowlisted workspace roots
-python3 run.py server mobile start --host 192.168.1.10 --port 8787 \
+python3 run.py server mobile start --port 8787 \
   --root /home/me/project-a --root /home/me/project-b
 
 # equivalent allowlist via environment
 LOOP_MOBILE_ROOTS=/home/me/project-a:/home/me/project-b \
-  python3 run.py server mobile start --host 192.168.1.10
+  python3 run.py server mobile start
 ```
 
 The `start` line prints `addr=`, `roots=` and `token=`. The token is also stored
@@ -31,10 +36,30 @@ token in the app. `server mobile status` shows the address without the token;
 running. A daemon stop/restart also closes the listener; start it again after.
 `LOOP_MOBILE_TOKEN` overrides the stored token.
 
-The app accepts only a private/loopback host: RFC1918 IPv4, IPv6 ULA/link-local,
-or loopback. It uses cleartext HTTP because this is local Wi-Fi only; do not
-forward the port, expose it through a tunnel, or use it across the public
-internet. There is no public-internet or VPN mode.
+The app accepts a private, loopback or Tailscale host: RFC1918 IPv4, IPv6
+ULA/link-local, loopback, or a `100.64.0.0/10` address (including a MagicDNS
+name that resolves into it). It uses cleartext HTTP because the traffic stays
+inside the private network or the Tailscale WireGuard tunnel; do not expose the
+port with Tailscale Funnel or a public port-forward. There is no public-internet
+mode.
+
+## Tailscale setup
+
+1. Install Tailscale on this machine and on the Android device and sign both
+   into the same tailnet. `tailscale status` lists both nodes.
+2. Keep `tailscaled` running on this machine and the Tailscale VPN connected on
+   the phone. On Android, allow Tailscale to stay in the background and disable
+   battery optimization for it; an always-on VPN is optional.
+3. Start the bridge (it defaults to the `100.x.y.z` tailnet address). In the app
+   use that host or, when Tailscale DNS is enabled on Android, the MagicDNS
+   name; port `8787` and the bearer token from `.logs/mobile.token`.
+4. `tailscale ping <phone>` proves the tunnel; `curl` the bridge `/v1/health`
+   with the bearer token to prove the listener.
+5. Node keys expire by default. Disable key expiry for the server and phone in
+   the Tailscale admin console so the connection survives past the expiry date.
+
+The bridge is not a system service: a daemon restart closes it, so run
+`python3 run.py server mobile start` again after restarting the daemon.
 
 ## Build and run
 
@@ -47,7 +72,7 @@ flutter build apk --release --target-platform android-arm64 --split-per-abi
 ```
 
 The resource-conscious Gradle settings cap the build JVM at 1.5 GiB and use at
-most two workers. The app pins Gradle 8.12, AGP 8.9.1 and Kotlin 2.1.0; those
+most two workers. The app pins Gradle 9.5, AGP 9.3.1 and Kotlin 2.4.20; those
 are in the local Gradle cache. Flutter 3.50's own Gradle plugin resolves its
 build-time Kotlin dependencies separately on the first invocation, so seed that
 cache once when the build machine is offline.

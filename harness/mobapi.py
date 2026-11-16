@@ -1,4 +1,4 @@
-"""Transport-neutral API for the local-network mobile client.
+"""Transport-neutral API for the private-network mobile client.
 
 mobserve owns HTTP and authentication.  This module owns the allowlist of
 workspace directories and maps requests onto the existing queue, record and

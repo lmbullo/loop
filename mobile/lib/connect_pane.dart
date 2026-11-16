@@ -140,7 +140,7 @@ class _ConnectPaneState extends State<ConnectPane> {
                   ),
                   SizedBox(width: 5),
                   Text(
-                    'private network only',
+                    'private or tailnet',
                     style: TextStyle(
                       color: LoopColors.aqua,
                       fontSize: 10,
@@ -175,7 +175,7 @@ class _ConnectPaneState extends State<ConnectPane> {
                 autocorrect: false,
                 decoration: const InputDecoration(
                   labelText: 'host',
-                  hintText: '192.168.1.10',
+                  hintText: '100.x.y.z',
                   prefixIcon: Icon(Icons.dns_outlined, size: 18),
                 ),
                 onSubmitted: (_) => FocusScope.of(context).nextFocus(),
@@ -298,7 +298,7 @@ class _ConnectPaneState extends State<ConnectPane> {
               const SizedBox(height: LoopSpace.xs),
               Text(
                 'use the addr and token it prints. the bridge binds one private '
-                'IP and requires the bearer token for every request.',
+                'or Tailscale IP and requires the bearer token for every request.',
                 style: LoopType.caption.copyWith(
                   color: LoopColors.faint,
                   height: 1.6,
@@ -309,7 +309,7 @@ class _ConnectPaneState extends State<ConnectPane> {
         ),
         const SizedBox(height: LoopSpace.lg),
         const Center(
-          child: Text('gruvbox · local only', style: LoopType.caption),
+          child: Text('gruvbox · private network', style: LoopType.caption),
         ),
       ],
     );

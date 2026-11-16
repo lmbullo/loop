@@ -4,15 +4,17 @@
     python3 run.py server mobile status [--json]
     python3 run.py server mobile stop
 
-The bridge binds only a private or loopback address and requires the token in
-.logs/mobile.token.  Stop the daemon, restart it, or run `mobile stop` to close
-the listener; no worker is interrupted.
+The bridge binds a private, loopback or Tailscale address and needs the token
+in .logs/mobile.token.  With Tailscale up the default is this node's 100.x.y.z
+tailnet address, so the phone can connect from any network.  A daemon restart
+closes the listener; no worker is interrupted.
 """
 
 import ipaddress
 import json
 import os
 import socket
+import subprocess
 import sys
 
 from . import config, mobapi, mobserve, mobtoken, regprobe, regstore, registry, srvctl
@@ -21,21 +23,39 @@ USAGE = """\
 usage: python3 run.py server mobile <start|status|stop> [options]
 
   start [--host IP] [--port N] [--root DIR ...]
-                     start the opt-in local-network bridge; roots default to
-                     LOOP_MOBILE_ROOTS (os.pathsep separated) or LOOP_ROOT
-  status [--json]    bridge address, private host, roots and token file
+                     start the bridge; roots default to LOOP_MOBILE_ROOTS
+                     (os.pathsep separated) or LOOP_ROOT
+  status [--json]    bridge address, private/tailnet host, roots, token file
   stop               close the bridge; the daemon and workers stay up
 """
 
 
-def token_path():
-    return mobtoken.path()
+def tailscale_host():
+    """Return this node's Tailscale IPv4 address, or None when unavailable."""
+    try:
+        result = subprocess.run(["tailscale", "ip", "-4"], capture_output=True,
+                                check=False, text=True, timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        value = line.strip()
+        try:
+            ip = ipaddress.ip_address(value)
+        except ValueError:
+            continue
+        if mobserve.is_tailnet(ip):
+            return value
+    return None
 
 
 def private_host():
+    tailnet = tailscale_host()
+    if tailnet:
+        return tailnet
     try:
-        infos = socket.getaddrinfo(socket.gethostname(), None,
-                                   socket.AF_INET, socket.SOCK_STREAM)
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
     except OSError:
         return "127.0.0.1"
     for info in infos:
@@ -57,19 +77,18 @@ def _flags(args):
         if arg in ("-h", "--help"):
             print(USAGE.rstrip())
             return None
-        if arg in ("--host", "--port", "--root"):
-            if index + 1 >= len(args):
-                raise ValueError(f"{arg} needs a value")
-            value = args[index + 1]
-            if arg == "--host":
-                host = value
-            elif arg == "--port":
-                port = int(value)
-            else:
-                roots.append(value)
-            index += 2
-            continue
-        raise ValueError(f"unknown argument {arg!r}")
+        if arg not in ("--host", "--port", "--root"):
+            raise ValueError(f"unknown argument {arg!r}")
+        if index + 1 >= len(args):
+            raise ValueError(f"{arg} needs a value")
+        value = args[index + 1]
+        if arg == "--host":
+            host = value
+        elif arg == "--port":
+            port = int(value)
+        else:
+            roots.append(value)
+        index += 2
     if port < 0 or port > 65535:
         raise ValueError("port must be 0..65535")
     if not roots:
@@ -114,10 +133,13 @@ def start(args):
         return 5
     print(f"mobile running tree={reply['tree']} addr={reply['address']} "
           f"host={reply['host']} port={reply['port']} roots={','.join(reply['roots'])} "
-          f"token={token} token_file={config.display(token_path())} "
+          f"token={token} token_file={config.display(mobtoken.path())} "
           f"daemon_created={'true' if created else 'false'}")
     if host == "127.0.0.1":
-        print("note loopback-only; pass --host <lan-ip> for Wi-Fi", file=sys.stderr)
+        print("note loopback-only; pass --host <lan-ip> or a Tailscale IP",
+              file=sys.stderr)
+    elif mobserve.is_tailnet(ipaddress.ip_address(host)):
+        print("note tailnet-only; reachable through Tailscale", file=sys.stderr)
     return 0
 
 
@@ -146,8 +168,7 @@ def status(args):
     entry = regstore.current()
     if not entry or regprobe.probe(entry)[0] != "running":
         if as_json:
-            print(json.dumps({"k": "mobile", "state": "down",
-                              "tree": registry.tree()}))
+            print(json.dumps({"k": "mobile", "state": "down", "tree": registry.tree()}))
         else:
             print(f"mobile down tree={registry.tree()} daemon=down")
         return 1
@@ -160,7 +181,7 @@ def status(args):
         print(json.dumps(reply, sort_keys=True))
     elif reply.get("state") == "running":
         print(f"mobile running tree={reply['tree']} addr={reply['address']} "
-              f"roots={','.join(reply['roots'])} token_file={config.display(token_path())}")
+              f"roots={','.join(reply['roots'])} token_file={config.display(mobtoken.path())}")
     else:
         print(f"mobile stopped tree={reply.get('tree')} daemon=running")
     return 0
@@ -171,11 +192,8 @@ def main(argv):
         print(USAGE.rstrip())
         return 0 if argv else 2
     command, rest = argv[0], argv[1:]
-    if command == "start":
-        return start(rest)
-    if command == "stop":
-        return stop(rest)
-    if command == "status":
-        return status(rest)
+    commands = {"start": start, "stop": stop, "status": status}
+    if command in commands:
+        return commands[command](rest)
     print(f"err unknown mobile command {command!r}\n{USAGE}", file=sys.stderr)
     return 2

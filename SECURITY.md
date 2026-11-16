@@ -44,9 +44,9 @@ Out of scope by design:
 - A local user who can already read `.logs/` reading record contents or the
   mobile token. The token file is created with mode `0600`, but it is not a
   defense against the same user account.
-- Exposing the mobile bridge to a public network. It is local-network only and
-  refuses public addresses. Do not port-forward it, tunnel it or place it behind
-  a public reverse proxy.
+- Exposing the mobile bridge to a public network. It is private-network only:
+  loopback, LAN or Tailscale. It refuses public addresses. Do not port-forward
+  it, expose it with Tailscale Funnel or place it behind a public reverse proxy.
 - Denial of service from a deliberately huge task, tool output or model
   response beyond the documented bounds.
 
@@ -57,7 +57,7 @@ Out of scope by design:
 - `.logs/` contains full run records, observations and the mobile bearer token.
   Treat it as sensitive; it is git-ignored.
 - The mobile bridge requires a bearer token on every `/v1` request and binds
-  one literal private or loopback address. Start it only on a network you trust.
+  one literal private, loopback or Tailscale address. Start it only on a network you trust.
 - `api` has the same filesystem permissions as your shell. Use a dedicated
   workspace, a container or an unprivileged account when running untrusted
   tasks.

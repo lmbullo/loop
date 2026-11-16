@@ -29,7 +29,7 @@ commands:
     - {cmd: list, usage: "[--json] [--prune]", effect: "probe every server in the machine registry; --prune removes dead rows", exit: "0"}
     - {cmd: runs, usage: "[--json]", effect: "every record with derived state; daemon if available, else disk", exit: "0 ok, 1 corrupt record"}
     - {cmd: logs, usage: "[-n N] [-f]", effect: "tail .logs/server.log; -f follows", exit: "0, 1 follow error"}
-    - {cmd: mobile, usage: "<start|status|stop> [--host IP] [--port N] [--root DIR ...]; status also takes --json", effect: "manage the opt-in local-network HTTP bridge; start defaults to LOOP_MOBILE_ROOTS or LOOP_ROOT and prints addr plus the token", exit: "0 ok/stopped, 1 status down, 2 usage, 5 daemon or bind failure"}
+    - {cmd: mobile, usage: "<start|status|stop> [--host IP] [--port N] [--root DIR ...]; status also takes --json", effect: "manage the opt-in private-network HTTP bridge (LAN or Tailscale); start defaults to LOOP_MOBILE_ROOTS or LOOP_ROOT and prints addr plus the token", exit: "0 ok/stopped, 1 status down, 2 usage, 5 daemon or bind failure"}
     - {cmd: _stale, usage: "", effect: "remove dead socket/pid/registry entries", exit: "0"}
   internal:
     - "_daemon: used by srvctl"
@@ -131,7 +131,7 @@ socket_protocol:
 mobile_bridge:
   purpose: "Android-first app can choose an allowlisted directory, enqueue through the queue, read snapshots and poll one run's projected log"
   process: "a thread inside the daemon; it is not a second control plane and it never executes a run"
-  bind: "one literal private or loopback IP; 0.0.0.0, unspecified, multicast and public addresses are refused; non-private peers get 403"
+  bind: "one literal private, loopback or Tailscale (100.64.0.0/10) IP; 0.0.0.0, unspecified, multicast and public addresses are refused; peers outside RFC1918/ULA/link-local/loopback/Tailscale get 403; when Tailscale is up the default host is this node's 100.x.y.z address"
   auth: "every /v1 request needs Authorization: Bearer <token>; token = LOOP_MOBILE_TOKEN or .logs/mobile.token mode 0600; compare is constant-time"
   roots: "LOOP_MOBILE_ROOTS (os.pathsep) or repeated --root; normalize to realpath and reject any path outside the allowlist; omit hidden dirs and symlinks that escape"
   routes:
@@ -164,5 +164,5 @@ guards:
   - server restart is not a run restart; use resume for an interrupted run
   - a stopped daemon does not stop workers; check server status or workers.live_entries()
   - server status exits 1 when the daemon is down even if records are healthy; view and server runs still work
-  - the mobile bridge is opt-in and local-only: never bind 0.0.0.0 or a public address, never accept a non-private peer, never omit the bearer check
+  - the mobile bridge is opt-in and private-network-only: never bind 0.0.0.0 or a public address, never accept a peer outside RFC1918/ULA/link-local/loopback/Tailscale 100.64.0.0/10, never omit the bearer check
   - the mobile app must not own a queue, run id or log row; it renders only responses from the daemon
