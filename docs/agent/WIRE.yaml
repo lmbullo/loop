@@ -10,7 +10,7 @@ messages:
     system   wire.system                api.header() snapshotted at run start; no run-specific values
     user     run_start.task
     for each turn event:
-      assistant  turn.message         content is null; tool_calls carry the calls
+      assistant  turn.message         content is null; a silent stop stores empty content and no tool_calls; tool_calls carry the calls
       tool       one per call         keyed by call.id, content is call.observation
     for each nudge event:
       user       nudge.text           only after a silent stop or a length-truncated reply on turn > 1 with no earlier nudge; at most one per run
@@ -143,7 +143,7 @@ cost:
 
 header:
   function: api.header()
-  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, done and one-nudge stop semantics, parallel-call and repeated-probe-script guidance, large-observation guidance, and the four tool signatures
+  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, low-effort output rules (one or two sentences, smallest change, chunked writes, short result), done and one-nudge stop semantics, parallel-call and repeated-probe-script guidance, large-observation guidance, and the four tool signatures
   stability: constant bytes for every run; no max_inline, task, root or model value enters it, so the first system message is a reusable cache prefix; each run also stores the text in its wire event
   migration: records with no wire event replay with the current api.header(); a resumed old run appends a wire event before its next turn, paying one prefix change
   refresh: a soft reload may re-import api, but the worker passes the run's recorded wire snapshot to context and call, so the static prefix does not change mid-run; new runs pick up edited text
