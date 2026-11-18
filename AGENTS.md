@@ -113,11 +113,13 @@ make test                           # stdlib unittest suite
 make lint                           # ruff E4/E9/F when installed, otherwise skipped
 make verify                         # manifest-driven offline checks
 make audit                          # offline cache audit for RUN (newest by default)
+make output                         # offline completion split for RUN (newest by default)
 make sim                            # sim1 task + sim2 task2
 python3 scripts/check_manifest.py   # contract integrity
 python3 scripts/doctor.py           # local environment health
 python3 scripts/repo_map.py         # file/entrypoint map for agents
 python3 scripts/cache_audit.py RUN_ID  # prefix growth, hit/miss/out/cost, suspected breaks
+python3 scripts/output_audit.py RUN_ID  # reasoning/tool/result split, top-output turns, truncations
 ```
 
 Never run a real `api` call or `resume RUN_ID` in an offline verification. They
@@ -189,6 +191,8 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 - `python3 scripts/verify.py --skip-server` exits 0.
 - Prefix or observation changes: `make audit RUN_ID` reports `prefix_ok=True`
   and no suspected cache breaks.
+- Default, prompt or tool changes: `make output RUN_ID` shows the completion
+  split and any length truncations; use it before claiming an output reduction.
 - `git status --short` is empty except for intended files.
 - The commit subject/body pass `scripts/commit_check.py`.
 - Any changed public behavior is reflected in `manifest.json` and `docs/agent/`

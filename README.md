@@ -59,6 +59,7 @@ python3 run.py tui           # interactive TUI over local records
 make test                    # stdlib unittest suite
 make verify                  # every offline check declared in manifest.json
 make audit                   # offline cache audit for the newest record
+make output                  # offline completion split for the newest record
 ```
 
 Install the `loop` launcher on `PATH` if you want to run it from anywhere:
