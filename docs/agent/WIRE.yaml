@@ -18,8 +18,8 @@ messages:
     - reasoning_content is replayed in the assistant message because thinking mode rejects a missing field; it becomes part of the cached prefix after its turn; turn.usage.reasoning_c counts characters, not tokens
     - assistant prose text is not stored in the message and is never re-sent; a terminal reply is kept only as end.result
     - "non-empty terminal reply -> finish=done with result=content.strip()"
-    - "length finish with no usable tool call -> one length nudge; empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
-    - a silent stop stores message.content="" and fold.context omits empty tool_calls (the API rejects []); the nudge itself is a separate event
+    - "a length finish is never executed, even when it carries a truncated tool call -> one length nudge; empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
+    - a silent stop stores message.content="" and fold.context omits empty tool_calls (the API rejects []); a length turn is folded as an empty assistant turn with no tool_calls or reasoning so the nudge retries it cleanly; the nudge itself is a separate event
     - the prompt tells the model to call done(result); a second silent stop still loses the result
     - done ends the run; it is recorded in turn.done and end, not as a tool observation
     - the whole list is re-sent each turn; only the appended suffix is a cache miss

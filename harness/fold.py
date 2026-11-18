@@ -63,11 +63,19 @@ def context(events, task, wire_spec=None):
         if ev["type"] != "turn":
             continue
         message = dict(ev["data"]["message"])
-        message.setdefault("reasoning_content", "")
-        if not message.get("tool_calls"):
-            # The API rejects tool_calls:[]; omit the empty field on a silent
-            # stop so the following nudge can produce a real assistant turn.
+        if ev["data"].get("finish_reason") == "length":
+            # A length stop is not a usable assistant turn: its arguments may
+            # be cut mid-JSON and its reasoning is runaway. Keep the nudge
+            # retry clean instead of replaying the truncated turn.
+            message["content"] = ""
+            message["reasoning_content"] = ""
             message.pop("tool_calls", None)
+        else:
+            message.setdefault("reasoning_content", "")
+            if not message.get("tool_calls"):
+                # The API rejects tool_calls:[]; omit the empty field on a
+                # silent stop so the nudge can produce a real assistant turn.
+                message.pop("tool_calls", None)
         msgs.append(message)
         for call in ev["data"].get("calls") or []:
             msgs.append({"role": "tool", "tool_call_id": call["id"],

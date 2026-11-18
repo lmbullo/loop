@@ -106,7 +106,10 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
             emit(ev)
             return finish(writer, emit, events + [ev], turn, "http_error", None, 4)
         hit, miss, out, reason, finish_reason, message, text = read_turn(r, turn)
-        calls, done, obs_n = run_calls(message, obs_dir, root, obs_n, max_inline, seen)
+        if finish_reason == "length":
+            calls, done = [], None
+        else:
+            calls, done, obs_n = run_calls(message, obs_dir, root, obs_n, max_inline, seen)
         ev = writer.append("turn", {
             "turn": turn, "finish_reason": finish_reason,
             "usage": {"hit": hit, "miss": miss, "out": out, "reasoning_c": reason,

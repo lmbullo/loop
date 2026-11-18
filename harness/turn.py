@@ -103,10 +103,10 @@ def stop(message, text, turn, nudged, finish_reason=None):
     ('no_tool_call', None)  empty stop with no prior work or after one nudge
     None                    the turn has tool calls; execute and continue
     """
+    if finish_reason == "length":
+        return ("nudge", LENGTH_NUDGE) if not nudged else ("no_tool_call", None)
     if message["tool_calls"]:
         return None
-    if finish_reason == "length" and not nudged:
-        return "nudge", LENGTH_NUDGE
     if isinstance(text, str) and text.strip():
         return "done", text.strip()
     if turn > 1 and not nudged:
