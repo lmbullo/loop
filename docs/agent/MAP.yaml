@@ -88,9 +88,14 @@ modules:
     - {path: harness/srvdaemon.py, owns: "socket serve loop, registry entry, startup reconcile, supervisor thread"}
     - {path: harness/srvwork.py, owns: "supervisor: reap, promote queue, launch one worker"}
     - {path: harness/srvconn.py, owns: "socket command handlers; cancel and force-stop interruption; mobile_start/stop/status dispatch"}
-    - {path: harness/mobile.py, owns: "server mobile CLI: private host default, roots, token load, daemon request and status output"}
+    - {path: harness/mobile.py, owns: "server mobile CLI: private host default, HOME allowlist, token load, daemon request and status output"}
+    - {path: harness/mobpaths.py, owns: "mobile path safety: HOME containment, realpath allowlist, hidden/symlink filtering and bounded discovery"}
+    - {path: harness/mobworkspaces.py, owns: "mobile workspace routing: registry probe, daemon lookup and safe detached start for another workspace"}
+    - {path: harness/mobrecords.py, owns: "one workspace's durable records, workers, summaries, logs and costs read without process-global state"}
+    - {path: harness/mobview.py, owns: "workspace-scoped snapshot/runs/log views, explicit aggregate overview and start response"}
     - {path: harness/mobserve.py, owns: "opt-in mobile HTTP listener: private bind and peer filter, bearer auth, request limits, lifecycle"}
-    - {path: harness/mobapi.py, owns: "mobile routes over existing functions: directory allowlist, enqueue, snapshot, runs, run log"}
+    - {path: harness/mobapi.py, owns: "mobile routes over existing functions: directory allowlist, task routing, workspace routes and health"}
+    - {path: harness/moberr.py, owns: "one status/text error type for the transport-neutral mobile API"}
     - {path: harness/mobtoken.py, owns: "mobile bearer token: LOOP_MOBILE_TOKEN or .logs/mobile.token mode 0600"}
     - {path: harness/srvclient.py, owns: "client attach/stream/reconnect; api entry"}
     - {path: harness/srvrun.py, owns: "run targeting (always enqueue) and record tailing"}
@@ -106,15 +111,16 @@ modules:
     - {path: harness/regprobe.py, owns: "pid liveness, /proc start fingerprint, socket ping/probe"}
   mobile_app:
     - {path: mobile/lib/main.dart, owns: "Flutter entry point and app shell"}
-    - {path: mobile/lib/api.dart, owns: "private-address guard, bearer HTTP client, JSON error mapping"}
-    - {path: mobile/lib/models.dart, owns: "pure snapshot, task, log and directory models"}
-    - {path: mobile/lib/store.dart, owns: "client state derived from server polling; saved connection, submit, browse, watch run"}
+    - {path: mobile/lib/api.dart, owns: "private-address guard, bearer HTTP client, scoped snapshot and workspace discovery calls"}
+    - {path: mobile/lib/models.dart, owns: "pure snapshot, workspace, task, log and directory models"}
+    - {path: mobile/lib/store.dart, owns: "client state derived from server polling; workspace selection, scoped refresh, discovery, start, submit, browse, watch run"}
     - {path: mobile/lib/session.dart, owns: "last successful connection persisted with shared_preferences for auto-login"}
     - {path: mobile/lib/home.dart, owns: "app shell: Gruvbox header, tasks/activity/workspace tabs, floating composer and nav rail; keyboard-aware"}
     - {path: mobile/lib/navigation.dart, owns: "floating Gruvbox nav rail: animated destinations, haptics and safe-area inset"}
-    - {path: mobile/lib/task_list.dart, owns: "task board: workspace strip, summary metrics and active/queued/done cards in one scrollable list"}
+    - {path: mobile/lib/task_list.dart, owns: "selected-workspace task board: workspace strip, summary metrics and active/queued/done cards in one scrollable list"}
     - {path: mobile/lib/activity_view.dart, owns: "activity tab: run metrics and current/queued/recent timeline"}
-    - {path: mobile/lib/workspace_view.dart, owns: "workspace tab: active root, allowlisted roots, bridge details, config and disconnect"}
+    - {path: mobile/lib/workspace_view.dart, owns: "workspace tab: selected root, discovered workspaces, allowlisted roots, bridge details, config and disconnect"}
+    - {path: mobile/lib/workspace_rows.dart, owns: "discovered workspace rows: state, run/queue/done/cost metadata and daemon start action"}
     - {path: mobile/lib/task_rows.dart, owns: "rounded task and queue cards; task text and state lead, metadata defers to run detail"}
     - {path: mobile/lib/prompt_box.dart, owns: "floating task composer: rounded Gruvbox surface, borderless multiline field, queue action, keyboard spacing"}
     - {path: mobile/lib/dir_picker.dart, owns: "server-backed allowlisted directory navigation with a floating path bar, rounded rows and footer action"}
@@ -200,6 +206,6 @@ change_map:
   - {change: prompt over any view, start: [tui/input.py, tui/render.py, tui/prompt.py], test: [tests/test_tui_input.py, tests/test_tui_loginput.py, tests/test_tui_prompt.py]}
   - {change: offline scenario, start: [scenarios/, "manifest.scenarios[]"], test: ["python3 run.py sim1 <id>"]}
   - {change: sim wire or cache projection, start: [harness/sim1.py, harness/sim2.py, harness/observe.py, harness/pricing.py], test: [tests/test_pricing.py, tests/test_observe.py]}
-  - {change: mobile task list, activity, workspace, prompt, run detail or shared chrome, start: [mobile/lib/home.dart, mobile/lib/navigation.dart, mobile/lib/task_list.dart, mobile/lib/activity_view.dart, mobile/lib/workspace_view.dart, mobile/lib/task_rows.dart, mobile/lib/prompt_box.dart, mobile/lib/run_screen.dart, mobile/lib/connect_pane.dart, mobile/lib/dir_picker.dart, mobile/lib/theme.dart, mobile/lib/widgets.dart], test: [mobile/test/layout_test.dart, mobile/test/widget_test.dart]}
-  - {change: mobile bridge route, token or lifecycle, start: [harness/mobile.py, harness/mobapi.py, harness/mobserve.py, harness/mobtoken.py], test: [tests/test_mobile_api.py, tests/test_mobile_http.py]}
+  - {change: mobile task list, activity, workspace, prompt, run detail or shared chrome, start: [mobile/lib/home.dart, mobile/lib/navigation.dart, mobile/lib/task_list.dart, mobile/lib/activity_view.dart, mobile/lib/workspace_view.dart, mobile/lib/workspace_rows.dart, mobile/lib/task_rows.dart, mobile/lib/prompt_box.dart, mobile/lib/run_screen.dart, mobile/lib/connect_pane.dart, mobile/lib/dir_picker.dart, mobile/lib/theme.dart, mobile/lib/widgets.dart], test: [mobile/test/layout_test.dart, mobile/test/widget_test.dart]}
+  - {change: mobile bridge route, token or lifecycle, start: [harness/mobile.py, harness/mobpaths.py, harness/mobworkspaces.py, harness/mobrecords.py, harness/mobview.py, harness/mobapi.py, harness/mobserve.py, harness/mobtoken.py], test: [tests/test_mobile_api.py, tests/test_mobile_http.py, tests/test_mobile_workspaces.py]}
   - {change: new doc, start: [docs/agent/], test: ["manifest.files[]", docs/agent/index.yaml]}

@@ -162,6 +162,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('opening the keyboard keeps the composer focused', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await pumpHome(tester);
+    final field = find.byKey(const Key('task-field'));
+    await tester.tap(field);
+    await tester.pump();
+    expect(tester.widget<TextField>(field).focusNode?.hasFocus, isTrue);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bottom-nav')), findsNothing);
+    expect(tester.widget<TextField>(field).focusNode?.hasFocus, isTrue);
+  });
+
   testWidgets('task rows lead with task text and status, not metadata', (
     tester,
   ) async {

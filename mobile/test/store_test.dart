@@ -92,6 +92,32 @@ void main() {
     expect(store.snapshot, Snapshot.empty);
   });
 
+  test('workspace switches request a scoped snapshot and clear stale data', () async {
+    final api = FakeApi();
+    final store = LoopStore(apiFactory: (_) => api, pollInterval: const Duration(hours: 1));
+    addTearDown(store.dispose);
+    await store.connect('127.0.0.1', 8787, 'token');
+    expect(store.workspaces.single.path, '/tmp/ws');
+    store.selectRoot('/tmp/ws/src');
+    await store.refresh();
+    expect(api.snapshotRoots.last, '/tmp/ws/src');
+    api.failedRoot = '/tmp/ws/src';
+    await store.refresh();
+    expect(store.snapshot, Snapshot.empty);
+    expect(store.online, isFalse);
+    expect(store.error, 'snapshot failed');
+  });
+
+  test('start workspace asks the server and refreshes the workspace list', () async {
+    final api = FakeApi();
+    final store = LoopStore(apiFactory: (_) => api, pollInterval: const Duration(hours: 1));
+    addTearDown(store.dispose);
+    await store.connect('127.0.0.1', 8787, 'token');
+    expect(await store.startWorkspace('/tmp/ws'), isTrue);
+    expect(api.started, ['/tmp/ws']);
+    expect(store.online, isTrue);
+  });
+
   test('a bad host is rejected before an API is created', () async {
     var created = 0;
     final store = LoopStore(

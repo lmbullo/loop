@@ -62,15 +62,32 @@ void main() {
     setUp(() async {
       requests.clear();
       server = await serve((request) async {
-        requests.add('${request.method} ${request.uri.path}');
+        requests.add(request.uri.hasQuery
+            ? '${request.method} ${request.uri.path}?${request.uri.query}'
+            : '${request.method} ${request.uri.path}');
         if (request.headers.value(HttpHeaders.authorizationHeader) !=
             'Bearer t0ken') {
           await reply(request, 401, {'ok': false, 'text': 'unauthorized'});
           return;
         }
         switch (request.uri.path) {
+          case '/v1/workspaces':
+            await reply(request, 200, {
+              'workspaces': [
+                {'name': 'ws', 'path': '/tmp/ws', 'state': 'running'},
+              ],
+              'totals': {'cost': 0.5},
+            });
+          case '/v1/workspaces/start':
+            final body = jsonDecode(await utf8.decoder.bind(request).join());
+            await reply(request, 200, {
+              'k': 'workspace_started',
+              'workspace': {'path': body['root'], 'state': 'running'},
+            });
           case '/v1/snapshot':
             await reply(request, 200, {
+              'tree': '/tmp/ws',
+              'mobile': {'scope': 'workspace', 'source': 'daemon'},
               'daemon': {'state': 'running'},
               'current': {
                 'id': 'run-1',
@@ -169,6 +186,19 @@ void main() {
       expect(log.terminal, isTrue);
       expect(log.summary!.result, 'all good');
       expect(requests, contains('GET /v1/snapshot'));
+    });
+
+    test('requests workspace discovery, scoped snapshots and daemon start', () async {
+      final snapshot = Snapshot.fromJson(await api.snapshot('/tmp/ws'));
+      expect(snapshot.tree, '/tmp/ws');
+      expect(snapshot.scope, 'workspace');
+      final listing = await api.workspaces();
+      expect(listing['workspaces'], isNotEmpty);
+      final started = await api.startWorkspace('/tmp/ws');
+      expect(started['workspace']['state'], 'running');
+      expect(requests, contains('GET /v1/snapshot?root=%2Ftmp%2Fws'));
+      expect(requests, contains('GET /v1/workspaces'));
+      expect(requests, contains('POST /v1/workspaces/start'));
     });
 
     test('maps auth and http errors', () async {

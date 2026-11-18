@@ -90,6 +90,23 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["entries"][-1]["result"], "ok")
 
+    def test_lists_workspaces_and_rejects_start_outside_home(self):
+        status, data = self.call("GET", "/v1/workspaces")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["workspaces"][0]["path"], os.path.realpath(self.root))
+        status, data = self.call("POST", "/v1/workspaces/start",
+                                 {"root": os.path.join(self.tmp, "outside")})
+        self.assertEqual(status, 403)
+        self.assertFalse(data["ok"])
+
+    def test_snapshot_is_scoped_to_the_requested_workspace(self):
+        status, data = self.call(
+            "GET", "/v1/snapshot?root=" + self.root)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["tree"], os.path.realpath(self.root))
+        self.assertEqual(data["mobile"]["scope"], "workspace")
+        self.assertEqual(data["queue"], [])
+
     def test_rejects_non_local_hosts_and_short_tokens(self):
         for bad in ("0.0.0.0", "8.8.8.8", "example.com", "100.128.0.1"):
             with self.assertRaises(ValueError):

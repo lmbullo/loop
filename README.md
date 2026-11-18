@@ -180,12 +180,14 @@ renders one frame without a terminal.
 
 ## Android client
 
-`mobile/` is a Gruvbox-styled, Android-first Flutter client for the same tree.
-It uses a floating composer, a floating tasks/activity/workspace nav rail and
-rounded state cards. The bridge is opt-in, binds one literal private, loopback
-or Tailscale address, and requires a bearer token on every `/v1` request. With
-Tailscale up it defaults to this node's `100.x.y.z` tailnet address, so the
-phone can reach it from any network.
+`mobile/` is a Gruvbox-styled, Android-first Flutter client for multiple local
+workspaces. It uses a floating composer, a floating tasks/activity/workspace nav
+rail and rounded state cards. The bridge is opt-in, binds one literal private,
+loopback or Tailscale address, and requires a bearer token on every `/v1`
+request. It defaults its allowlist to `$HOME`, discovers permitted workspaces and
+already-running daemons, and routes each selected workspace to its own queue,
+records and costs. With Tailscale up it defaults to this node's `100.x.y.z`
+tailnet address, so the phone can reach it from any network.
 
 ```sh
 python3 run.py server mobile start --host 192.168.1.10 --root ~/project

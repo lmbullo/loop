@@ -7,6 +7,7 @@ import 'models.dart';
 import 'store.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'workspace_rows.dart';
 
 class WorkspaceView extends StatelessWidget {
   const WorkspaceView({
@@ -44,6 +45,16 @@ class WorkspaceView extends StatelessWidget {
           style: LoopType.meta,
         ),
         const SizedBox(height: LoopSpace.md),
+        if (store.workspaces.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: LoopSpace.sm),
+            child: Text(
+              '${store.workspaces.length} workspaces · '
+              '\$${store.workspaces.fold<double>(0, (sum, item) => sum + (item.cost ?? 0)).toStringAsFixed(6)} total',
+              key: const Key('workspace-aggregate'),
+              style: LoopType.meta.copyWith(color: LoopColors.faint),
+            ),
+          ),
         LoopCard(
           color: LoopColors.surface,
           borderColor: selected == null
@@ -93,15 +104,6 @@ class WorkspaceView extends StatelessWidget {
             label: const Text('browse allowlisted directories'),
           ),
         ),
-        if (store.listing.roots.isNotEmpty) ...[
-          const SectionHeader(label: 'allowed roots'),
-          for (final entry in store.listing.roots)
-            _RootTile(
-              entry: entry,
-              selected: entry.path == selected,
-              onTap: () => store.selectRoot(entry.path),
-            ),
-        ],
         const SectionHeader(label: 'bridge'),
         LoopCard(
           color: LoopColors.surface,
@@ -145,6 +147,25 @@ class WorkspaceView extends StatelessWidget {
             ],
           ),
         ),
+        if (store.workspaces.isNotEmpty) ...[
+          const SectionHeader(label: 'workspaces'),
+          for (final item in store.workspaces)
+            WorkspaceRow(
+              item: item,
+              selected: item.path == selected || item.path == store.snapshot.tree,
+              onSelect: () => store.selectRoot(item.path),
+              onStart: () => store.startWorkspace(item.path),
+            ),
+        ],
+        if (store.listing.roots.isNotEmpty) ...[
+          const SectionHeader(label: 'allowed roots'),
+          for (final entry in store.listing.roots)
+            _RootTile(
+              entry: entry,
+              selected: entry.path == selected,
+              onTap: () => store.selectRoot(entry.path),
+            ),
+        ],
         const SizedBox(height: LoopSpace.lg),
         TextButton(
           key: const Key('disconnect-button'),

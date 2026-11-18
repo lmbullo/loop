@@ -48,6 +48,7 @@ routes:
   - {task: add or change a post-run verify command, read: [docs/agent/WIRE.yaml, docs/agent/RECORD.yaml], run: [python3, -m, unittest, tests.test_verify]}
   - {task: operate or debug the control plane, read: [docs/agent/SERVER.yaml, docs/agent/DEBUG.yaml], run: [python3, run.py, server, status]}
   - {task: run the mobile bridge or build the Android app, read: [docs/agent/SERVER.yaml, mobile/README.md], run: [python3, run.py, server, mobile, status]}
+  - {task: change mobile workspace discovery, routing, aggregation or daemon start, read: [docs/agent/SERVER.yaml, docs/agent/MAP.yaml, mobile/README.md], run: [python3, -m, unittest, tests.test_mobile_workspaces]}
   - {task: change the mobile task list, activity timeline or floating composer, read: [docs/agent/MAP.yaml, docs/agent/WORKFLOWS.yaml, mobile/README.md], run: [sh, -c, "cd mobile && flutter analyze --no-pub && flutter test --no-pub"]}
   - {task: change the mobile connection form, directory picker, workspace view or run detail, read: [docs/agent/MAP.yaml, docs/agent/WORKFLOWS.yaml, mobile/README.md], run: [sh, -c, "cd mobile && flutter analyze --no-pub && flutter test --no-pub"]}
   - {task: change the mobile Gruvbox theme, floating nav or shared chrome, read: [docs/agent/MAP.yaml, mobile/README.md], run: [sh, -c, "cd mobile && flutter analyze --no-pub && flutter test --no-pub"]}

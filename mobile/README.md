@@ -1,13 +1,15 @@
 # loop mobile
 
-Android-first Flutter client for one local `loop` tree. It chooses an
-allowlisted directory, queues a task through the existing daemon, reads
-snapshots and polls one run's projected log. It is a renderer plus a requester:
-it has no queue, run engine or authoritative state.
+Android-first Flutter client for multiple local `loop` workspaces. The bridge
+discovers permitted workspaces under your home directory, routes each request to
+that workspace's own daemon, and shows only the selected workspace's tasks,
+queues, runs, logs, summaries and costs. A home overview is explicit and
+aggregate. The app is a renderer plus a requester: it has no queue, run engine or
+authoritative state.
 
 ## Local bridge
 
-The bridge is opt-in and lives inside the tree's daemon. It binds one literal
+The bridge is opt-in and lives inside one tree's daemon. It binds one literal
 private, loopback or Tailscale address and requires a bearer token on every
 `/v1` request. `0.0.0.0`, public addresses and peers outside RFC1918, IPv6
 ULA/link-local, loopback or the Tailscale `100.64.0.0/10` range are refused.
@@ -16,18 +18,35 @@ When Tailscale is up, `server mobile start` defaults to this node's `100.x.y.z`
 tailnet address, so the phone can connect from any network with Tailscale
 running. Pass `--host` to bind a LAN address instead.
 
+The allowlist defaults to your home directory (`$HOME`). Every configured root
+and every selected workspace must resolve under `$HOME`; hidden directories,
+traversal and symlinks that escape a root are rejected. Starting the bridge from
+any workspace therefore discovers the other permitted workspace directories and
+any daemons already registered on this machine.
+
 ```sh
 # this node's tailnet address (falls back to the LAN IPv4 when Tailscale is off)
 tailscale ip -4
 
-# one or more allowlisted workspace roots
+# one or more allowlisted workspace roots under $HOME
 python3 run.py server mobile start --port 8787 \
   --root /home/me/project-a --root /home/me/project-b
 
 # equivalent allowlist via environment
 LOOP_MOBILE_ROOTS=/home/me/project-a:/home/me/project-b \
   python3 run.py server mobile start
+
+# the default allows discovery anywhere under $HOME
+python3 run.py server mobile start --port 8787
 ```
+
+Workspace-scoped routes take `?root=<path>` for snapshots, runs and logs;
+`POST /v1/tasks {task,root}` enqueues through that workspace's existing queue.
+`GET /v1/workspaces` and `GET /v1/overview` are the explicit aggregate views.
+`POST /v1/workspaces/start {root}` starts that workspace's daemon when it is
+permitted and stopped. If a daemon is stopped or unreachable, the app reports
+that state; completed records, logs and costs remain readable from durable
+bytes, while its queue and active run are not shown as current.
 
 The `start` line prints `addr=`, `roots=` and `token=`. The token is also stored
 in `.logs/mobile.token` with mode 0600. Use the addr host and port plus that
@@ -114,13 +133,16 @@ cards on the scrollable canvas. The rail switches between `tasks`, `activity`
 and `workspace` with an animated accent pill.
 
 The tasks tab combines a workspace strip, running/queued/cost metrics and
-active/queued/done cards. The activity tab is a timeline of current, queued and
-recent runs with a spend summary and tappable rows. The workspace tab exposes
-the active root, the allowlisted roots, bridge details, connection settings and
-disconnect. The composer is hidden outside tasks; the rail hides while the
-keyboard is open so the composer stays above the inset without crowding a
-small phone. Long task text truncates in a card, while ids, turns, cost and
-finish stay in the run log.
+active/queued/done cards for the selected workspace. The activity tab is a
+timeline of current, queued and recent runs with a spend summary and tappable
+rows. The workspace tab exposes the active root, discovered workspaces with
+their state and costs, a start action for stopped daemons, the allowlisted
+roots, bridge details, connection settings and disconnect. Switching workspace
+clears the previous snapshot before the scoped request, and a failed refresh
+shows an error instead of stale task data. The composer is hidden outside
+tasks; the rail hides while the keyboard is open so the composer stays above
+the inset without crowding a small phone. Long task text truncates in a card,
+while ids, turns, cost and finish stay in the run log.
 
 The connection screen is a rounded login card over the same backdrop. The
 directory picker keeps a floating path bar and footer action over rounded
@@ -147,8 +169,10 @@ omitted.
 
 ## Verification scope
 
-`python3 -m unittest tests.test_mobile_api tests.test_mobile_http` covers the
-server bridge. `flutter test --no-pub` covers the client protocol, store, widget
-flows, the Gruvbox palette, the floating composer and nav rail, the activity
-timeline, task-card hierarchy and keyboard/inset layout with in-memory
-fixtures. No test submits a real agent task or calls a model.
+`python3 -m unittest tests.test_mobile_api tests.test_mobile_http
+tests.test_mobile_workspaces` covers the server bridge, discovery, workspace
+isolation, aggregation, routing, offline fallback and safe daemon start.
+`flutter test --no-pub` covers the client protocol, store, widget flows, the
+Gruvbox palette, the floating composer and nav rail, the activity timeline,
+task-card hierarchy and keyboard/inset layout with in-memory fixtures. No test
+submits a real agent task or calls a model.

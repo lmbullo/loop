@@ -27,7 +27,9 @@ class LoopApiException implements Exception {
 abstract class LoopApi {
   Future<Map<String, dynamic>> health();
   Future<Map<String, dynamic>> dirs([String? path]);
-  Future<Map<String, dynamic>> snapshot();
+  Future<Map<String, dynamic>> workspaces();
+  Future<Map<String, dynamic>> startWorkspace(String root);
+  Future<Map<String, dynamic>> snapshot([String? root]);
   Future<Map<String, dynamic>> enqueue(String task, String root);
   Future<Map<String, dynamic>> runLog(String runId);
   void close();
@@ -178,7 +180,18 @@ class HttpLoopApi implements LoopApi {
   );
 
   @override
-  Future<Map<String, dynamic>> snapshot() => _request('GET', '/v1/snapshot');
+  Future<Map<String, dynamic>> workspaces() => _request('GET', '/v1/workspaces');
+
+  @override
+  Future<Map<String, dynamic>> startWorkspace(String root) =>
+      _request('POST', '/v1/workspaces/start', body: {'root': root});
+
+  @override
+  Future<Map<String, dynamic>> snapshot([String? root]) => _request(
+        'GET',
+        '/v1/snapshot',
+        query: root == null || root.isEmpty ? null : {'root': root},
+      );
 
   @override
   Future<Map<String, dynamic>> enqueue(String task, String root) =>

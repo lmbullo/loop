@@ -36,6 +36,11 @@ class TaskList extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: LoopSpace.lg),
         children: [
           _WorkspaceCard(store: store, onBrowse: onBrowse),
+          if (snapshot.tree.isNotEmpty && !snapshot.online)
+            EmptyLine(
+              text: 'workspace daemon ${snapshot.daemonState} · '
+                  'durable ${snapshot.source} history only',
+            ),
           _Overview(snapshot: snapshot),
           const SectionHeader(label: 'active'),
           if (snapshot.current == null)

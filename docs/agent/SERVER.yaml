@@ -129,21 +129,28 @@ socket_protocol:
   fallback: when the daemon is down or old and omits done, the TUI calls srvsnap.local_done() to derive the same list from record bytes, skipping live runs
 
 mobile_bridge:
-  purpose: "Android-first app can choose an allowlisted directory, enqueue through the queue, read snapshots and poll one run's projected log"
-  process: "a thread inside the daemon; it is not a second control plane and it never executes a run"
+  purpose: "Android-first app can browse permitted workspaces, select one, enqueue through that workspace's queue, and read only that workspace's running, queued, completed, log, summary and cost data; a home overview may aggregate explicitly"
+  process: "a thread inside the daemon; it is a router, not a second control plane, and it never executes a run"
   bind: "one literal private, loopback or Tailscale (100.64.0.0/10) IP; 0.0.0.0, unspecified, multicast and public addresses are refused; peers outside RFC1918/ULA/link-local/loopback/Tailscale get 403; when Tailscale is up the default host is this node's 100.x.y.z address"
   auth: "every /v1 request needs Authorization: Bearer <token>; token = LOOP_MOBILE_TOKEN or .logs/mobile.token mode 0600; compare is constant-time"
-  roots: "LOOP_MOBILE_ROOTS (os.pathsep) or repeated --root; normalize to realpath and reject any path outside the allowlist; omit hidden dirs and symlinks that escape"
+  roots: "LOOP_MOBILE_ROOTS (os.pathsep) or repeated --root, default HOME; normalize to realpath and require every root and selected workspace to stay under HOME; omit hidden dirs and symlinks that escape"
+  routing: "workspace = an independent tree with its own daemon, queue, workers, records and costs; a selected root is probed in the global daemon registry and requests go over its unix socket; a selected subdirectory resolves to the nearest registered or marked workspace ancestor; the router never reads another workspace's queue as current"
+  discovery: "registry entries under HOME plus bounded non-hidden directory candidates under each allowed root; a dead entry is reported offline/stale, never as running"
+  start: "POST /v1/workspaces/start resolves a permitted root under HOME and spawns the same detached daemon lifecycle with LOOP_ROOT=<workspace> and LOOP_RUNS=<workspace>/.logs"
+  offline: "durable run records, summaries and costs remain readable; current and queue are omitted and queue_known=false so stale daemon state is not presented as current"
   routes:
-    - {method: GET, path: "/v1/health", result: "tree, pid, roots"}
+    - {method: GET, path: "/v1/health", result: "tree, pid, roots, home"}
     - {method: GET, path: "/v1/dirs?path=", result: "roots plus allowlisted child directories; absent path lists roots only"}
-    - {method: GET, path: "/v1/snapshot", result: "srvsnap.snapshot plus schema and mobile roots"}
-    - {method: GET, path: "/v1/runs", result: "recread.scan rows"}
-    - {method: GET, path: "/v1/runs/<run_id>", result: "runlog.load: tool calls plus full final summary, interruption, error or pending tail"}
-    - {method: POST, path: "/v1/tasks", body: "{task,root}", result: "queue.add at the back; returns the queue item"}
+    - {method: GET, path: "/v1/workspaces", result: "discovered workspace rows with state, run/queue/done counts, cost and can_start; explicit aggregate totals"}
+    - {method: GET, path: "/v1/overview", result: "same explicit aggregate as /v1/workspaces"}
+    - {method: POST, path: "/v1/workspaces/start", body: "{root}", result: "start a permitted workspace daemon if stopped; created=false when already running"}
+    - {method: GET, path: "/v1/snapshot?root=", result: "that workspace's daemon snapshot; offline fallback reports durable history only"}
+    - {method: GET, path: "/v1/runs?root=", result: "that workspace's record rows from its daemon or durable bytes"}
+    - {method: GET, path: "/v1/runs/<run_id>?root=", result: "runlog projection scoped to that workspace; a run id from another tree is 404"}
+    - {method: POST, path: "/v1/tasks", body: "{task,root}", result: "enqueue through the selected workspace's existing queue; offline daemon is 409"}
   limits: "task <= 20000 chars; body <= 64 KiB; one directory listing <= 500 children"
   lifecycle: "server mobile start|status|stop; daemon stop/restart closes the listener; workers are unaffected; the app holds no authoritative state"
-  client: "the Flutter app stores the last successful host, port and token with shared_preferences and auto-connects on launch; failed auto-connect keeps the form populated; no queue or run state is stored"
+  client: "the Flutter app stores the last successful host, port and token with shared_preferences and auto-connects on launch; it clears a workspace snapshot on switch or refresh failure, shows discovered workspace state and can request a daemon start; no queue or run state is stored"
 
 env_to_worker:
   keys: [LOOP_API_KEY, LOOP_AUTH_FILE, LOOP_MODEL, LOOP_URL, LOOP_MAX_TOKENS, LOOP_THINK_BUDGET, LOOP_MAX_INLINE, LOOP_HTTP_TIMEOUT_S, LOOP_ROOT]

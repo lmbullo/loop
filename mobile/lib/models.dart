@@ -99,6 +99,53 @@ class TaskItem {
   String get costLabel => cost == null ? '-' : '\$${cost!.toStringAsFixed(6)}';
 }
 
+class WorkspaceItem {
+  const WorkspaceItem({
+    required this.name,
+    required this.path,
+    required this.state,
+    required this.detail,
+    required this.running,
+    required this.queued,
+    required this.done,
+    this.cost,
+    this.canStart = false,
+    this.source = '',
+  });
+
+  factory WorkspaceItem.fromJson(Object? raw) {
+    final json = asMap(raw);
+    final path = asString(json['path']);
+    return WorkspaceItem(
+      name: asString(json['name'], path),
+      path: path,
+      state: asString(json['state'], 'unknown').toLowerCase(),
+      detail: asString(json['detail']),
+      running: asInt(json['running']),
+      queued: asInt(json['queued']),
+      done: asInt(json['done']),
+      cost: asDouble(json['cost']),
+      canStart: asBool(json['can_start']),
+      source: asString(json['source']),
+    );
+  }
+
+  final String name;
+  final String path;
+  final String state;
+  final String detail;
+  final int running;
+  final int queued;
+  final int done;
+  final double? cost;
+  final bool canStart;
+  final String source;
+
+  bool get online => state == 'running' || state == 'starting';
+
+  String get costLabel => cost == null ? '-' : '\$${cost!.toStringAsFixed(6)}';
+}
+
 class Snapshot {
   const Snapshot({
     required this.daemonState,
@@ -109,11 +156,18 @@ class Snapshot {
     required this.done,
     required this.totalCost,
     required this.version,
+    this.tree = '',
+    this.scope = 'workspace',
+    this.source = 'daemon',
+    this.queueKnown = true,
+    this.stale = false,
   });
 
   factory Snapshot.fromJson(Object? raw) {
     final json = asMap(raw);
     final daemon = asMap(json['daemon']);
+    final mobile = asMap(json['mobile']);
+    final workspace = asMap(json['workspace']);
     return Snapshot(
       daemonState: asString(daemon['state'], 'down').toLowerCase(),
       daemonDetail: asString(daemon['detail']),
@@ -129,6 +183,11 @@ class Snapshot {
       ],
       totalCost: asDouble(asMap(json['costs'])['total']),
       version: asInt(json['version']),
+      tree: asString(json['tree'], asString(workspace['path'])),
+      scope: asString(mobile['scope'], 'workspace'),
+      source: asString(mobile['source'], asString(json['source'], 'daemon')),
+      queueKnown: json['queue_known'] != false,
+      stale: asBool(daemon['stale']),
     );
   }
 
@@ -151,8 +210,15 @@ class Snapshot {
   final List<TaskItem> done;
   final double? totalCost;
   final int version;
+  final String tree;
+  final String scope;
+  final String source;
+  final bool queueKnown;
+  final bool stale;
 
   bool get online => daemonState == 'running' || daemonState == 'starting';
+
+  bool get aggregate => scope == 'aggregate';
 
   String get totalCostLabel =>
       totalCost == null ? '-' : '\$${totalCost!.toStringAsFixed(6)}';

@@ -17,18 +17,17 @@ import socket
 import subprocess
 import sys
 
-from . import config, mobapi, mobserve, mobtoken, regprobe, regstore, registry, srvctl
+from . import config, mobapi, mobpaths, mobserve, mobtoken, regprobe, regstore, registry, srvctl
 
 USAGE = """\
 usage: python3 run.py server mobile <start|status|stop> [options]
 
   start [--host IP] [--port N] [--root DIR ...]
                      start the bridge; roots default to LOOP_MOBILE_ROOTS
-                     (os.pathsep separated) or LOOP_ROOT
+                     (os.pathsep) or HOME; every root must stay under HOME
   status [--json]    bridge address, private/tailnet host, roots, token file
   stop               close the bridge; the daemon and workers stay up
 """
-
 
 def tailscale_host():
     """Return this node's Tailscale IPv4 address, or None when unavailable."""
@@ -49,7 +48,6 @@ def tailscale_host():
             return value
     return None
 
-
 def private_host():
     tailnet = tailscale_host()
     if tailnet:
@@ -67,7 +65,6 @@ def private_host():
         if ip.is_private and not ip.is_loopback:
             return value
     return "127.0.0.1"
-
 
 def _flags(args):
     host, port, roots = None, mobserve.DEFAULT_PORT, []
@@ -93,16 +90,14 @@ def _flags(args):
         raise ValueError("port must be 0..65535")
     if not roots:
         configured = config.env("LOOP_MOBILE_ROOTS")
-        roots = configured.split(os.pathsep) if configured else [config.root()]
+        roots = configured.split(os.pathsep) if configured else [mobpaths.home()]
     return host or private_host(), port, roots
-
 
 def _call(entry, request):
     try:
         return regprobe.call(entry["address"], request, timeout=10.0)
     except (OSError, ValueError) as exc:
         return {"k": "error", "text": f"{type(exc).__name__}: {exc}"}
-
 
 def start(args):
     try:
@@ -115,6 +110,12 @@ def start(args):
     host, port, roots = parsed
     try:
         roots = mobapi.normalize_roots(roots)
+        bad = next((root for root in roots
+                    if not mobpaths.inside(root, mobpaths.home())), None)
+        if not roots:
+            raise ValueError("no mobile roots are configured")
+        if bad:
+            raise ValueError(f"root is outside the home directory: {bad}")
         mobserve.validate_host(host)
     except (ValueError, OSError) as exc:
         print(f"err mobile start {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -142,7 +143,6 @@ def start(args):
         print("note tailnet-only; reachable through Tailscale", file=sys.stderr)
     return 0
 
-
 def stop(args):
     if args:
         print(f"err mobile stop takes no arguments\n{USAGE}", file=sys.stderr)
@@ -158,7 +158,6 @@ def stop(args):
         return 5
     print(f"mobile stopped tree={registry.tree()} daemon=running")
     return 0
-
 
 def status(args):
     as_json = "--json" in args
@@ -185,7 +184,6 @@ def status(args):
     else:
         print(f"mobile stopped tree={reply.get('tree')} daemon=running")
     return 0
-
 
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):

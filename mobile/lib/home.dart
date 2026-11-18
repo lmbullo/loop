@@ -119,6 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  static Widget _shown(bool visible, Widget child) =>
+      Visibility(visible: visible, child: child);
+
   Widget _connected(LoopStore store) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final onTasks = _tab == LoopTab.tasks;
@@ -128,14 +131,19 @@ class _HomeScreenState extends State<HomeScreen> {
           bottom: false,
           child: Column(
             children: [
-              if (!keyboard)
+              // Stable child slots: a conditional `if` here would change the
+              // Column list when the keyboard appears, rebuild the composer by
+              // index and drop its focus before a key can land.
+              _shown(
+                !keyboard,
                 LoopHeader(
                   state: store.statusState,
                   detail: store.statusDetail,
                   host: store.settings?.label,
                   onConfig: () => setState(() => _editingConnection = true),
                 ),
-              if (store.error != null) ErrorBanner(text: store.error!),
+              ),
+              _shown(store.error != null, ErrorBanner(text: store.error ?? '')),
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 240),
@@ -174,7 +182,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              if (onTasks)
+              _shown(
+                onTasks,
                 PromptBox(
                   controller: _task,
                   canSubmit: store.canSubmit,
@@ -182,12 +191,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   onSubmit: _submit,
                   workspace: store.selectedRoot,
                 ),
-              if (!keyboard)
+              ),
+              _shown(
+                !keyboard,
                 FloatingNav(
                   active: _tab,
                   onSelect: _selectTab,
                   bottomInset: MediaQuery.paddingOf(context).bottom,
                 ),
+              ),
             ],
           ),
         ),

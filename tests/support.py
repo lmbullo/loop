@@ -33,6 +33,7 @@ def sandbox():
     with tempfile.TemporaryDirectory(prefix="loop-test-") as tmp:
         env = {k: v for k, v in os.environ.items() if k not in ENV_KEYS}
         env.update({
+            "HOME": tmp,
             "LOOP_ROOT": ROOT,
             "LOOP_RUNS": os.path.join(tmp, "logs"),
             "LOOP_REGISTRY": os.path.join(tmp, "registry.json"),

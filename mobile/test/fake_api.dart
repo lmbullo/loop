@@ -15,6 +15,23 @@ class FakeApi implements LoopApi {
     ],
     'dirs': [],
   };
+  Map<String, dynamic> workspacesData = {
+    'workspaces': [
+      {
+        'name': 'ws',
+        'path': '/tmp/ws',
+        'state': 'running',
+        'running': 0,
+        'queued': 0,
+        'done': 0,
+        'cost': 0,
+      }
+    ],
+    'totals': {'cost': 0},
+  };
+  final List<String?> snapshotRoots = [];
+  final List<String> started = [];
+  String? failedRoot;
   final Map<String, Map<String, dynamic>> listings = {};
   Map<String, dynamic> logData = {
     'id': 'run-1',
@@ -55,9 +72,29 @@ class FakeApi implements LoopApi {
   }
 
   @override
-  Future<Map<String, dynamic>> snapshot() async {
+  Future<Map<String, dynamic>> workspaces() async {
     _maybeFail();
+    return workspacesData;
+  }
+
+  @override
+  Future<Map<String, dynamic>> startWorkspace(String root) async {
+    _maybeFail();
+    started.add(root);
+    return {
+      'k': 'workspace_started',
+      'workspace': {'path': root, 'state': 'running'},
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> snapshot([String? root]) async {
+    _maybeFail();
+    if (failedRoot != null && failedRoot == root) {
+      throw const LoopApiException(ApiFailure.network, 'snapshot failed');
+    }
     snapshots++;
+    snapshotRoots.add(root);
     return snapshotData;
   }
 

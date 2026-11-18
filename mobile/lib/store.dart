@@ -30,6 +30,7 @@ class LoopStore extends ChangeNotifier {
   LoopApi? _api;
   Snapshot snapshot = Snapshot.empty;
   DirListing listing = DirListing.empty;
+  List<WorkspaceItem> workspaces = [];
   RunLog? runLog;
   String? activeRunId;
   String? selectedRoot;
@@ -38,6 +39,7 @@ class LoopStore extends ChangeNotifier {
   bool connecting = false;
   bool submitting = false;
   bool loadingDirs = false;
+  bool loadingWorkspaces = false;
   bool loadingLog = false;
 
   Timer? _timer;
@@ -71,10 +73,16 @@ class LoopStore extends ChangeNotifier {
       _api = _apiFactory(settings!);
       snapshot = Snapshot.empty;
       listing = DirListing.empty;
+      workspaces = [];
       selectedRoot = null;
       runLog = null;
       activeRunId = null;
       await browse(null, notify: false);
+      await _loadWorkspaces(notify: false);
+      if (workspaces.isNotEmpty &&
+          !workspaces.any((item) => item.path == selectedRoot)) {
+        selectedRoot = workspaces.first.path;
+      }
       await refresh(notify: false);
       _startTimer();
       return online;
@@ -94,6 +102,7 @@ class LoopStore extends ChangeNotifier {
     settings = null;
     snapshot = Snapshot.empty;
     listing = DirListing.empty;
+    workspaces = [];
     runLog = null;
     activeRunId = null;
     selectedRoot = null;
@@ -130,17 +139,63 @@ class LoopStore extends ChangeNotifier {
   Future<void> refresh({bool notify = true}) async {
     final api = _api;
     if (api == null) return;
+    final root = selectedRoot;
     try {
-      snapshot = Snapshot.fromJson(await api.snapshot());
-      online = true;
-      error = null;
+      final next = Snapshot.fromJson(await api.snapshot(root));
+      if (root == selectedRoot) {
+        snapshot = next;
+        online = true;
+        error = null;
+      }
       if (selectedRoot == null && listing.roots.isNotEmpty) {
         selectedRoot = listing.roots.first.path;
       }
     } catch (failure) {
-      _setFailure(failure);
+      if (root == selectedRoot) {
+        snapshot = Snapshot.empty;
+        online = false;
+        _setFailure(failure);
+      }
     }
     if (notify) _notify();
+  }
+
+  Future<void> _loadWorkspaces({bool notify = true}) async {
+    final api = _api;
+    if (api == null) return;
+    loadingWorkspaces = true;
+    if (notify) _notify();
+    try {
+      final data = await api.workspaces();
+      workspaces = [
+        for (final row in asList(data['workspaces'])) WorkspaceItem.fromJson(row),
+      ];
+    } catch (failure) {
+      _setFailure(failure);
+    } finally {
+      loadingWorkspaces = false;
+      if (notify) _notify();
+    }
+  }
+
+  Future<void> refreshWorkspaces({bool notify = true}) =>
+      _loadWorkspaces(notify: notify);
+
+  Future<bool> startWorkspace(String path) async {
+    final api = _api;
+    if (api == null || path.isEmpty) return false;
+    try {
+      await api.startWorkspace(path);
+      await _loadWorkspaces(notify: false);
+      if (selectedRoot == path) await refresh(notify: false);
+      error = null;
+      _notify();
+      return true;
+    } catch (failure) {
+      _setFailure(failure);
+      _notify();
+      return false;
+    }
   }
 
   Future<void> browse(String? path, {bool notify = true}) async {
@@ -162,8 +217,14 @@ class LoopStore extends ChangeNotifier {
   }
 
   void selectRoot(String path) {
+    if (selectedRoot == path) return;
     selectedRoot = path;
+    snapshot = Snapshot.empty;
+    runLog = null;
+    activeRunId = null;
+    error = null;
     _notify();
+    refresh();
   }
 
   Future<bool> submitTask(String text) async {
@@ -186,6 +247,7 @@ class LoopStore extends ChangeNotifier {
     try {
       await api.enqueue(task, root);
       await refresh(notify: false);
+      await _loadWorkspaces(notify: false);
       return true;
     } catch (failure) {
       _setFailure(failure);
