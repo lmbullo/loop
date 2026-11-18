@@ -53,22 +53,37 @@ def _render(event, as_json):
     sys.stdout.flush()
 
 
-def stream(address, request, as_json=False, budget=600.0):
-    deadline = time.time() + budget
+def _reconnect_until(deadline, budget=30.0):
+    """Give a live run time to come back without capping the run itself."""
+    until = time.time() + budget
+    return until if deadline is None else min(until, deadline)
+
+
+def stream(address, request, as_json=False, budget=None):
+    # budget is only a hard cap for callers that ask for one. A normal attach
+    # waits for the run's `end` event however many turns it takes.
+    deadline = None if budget is None else time.time() + budget
     run_id = request.get("run_id")
     last_seq = int(request.get("from_seq") or 0)
     attempt = request
     ended = False
     code = 5
-    while time.time() < deadline:
+    last_progress = time.time()
+    while deadline is None or time.time() < deadline:
         try:
             sock = _connect(address, attempt)
+            last_progress = time.time()
         except OSError:
-            entry = _reconnect(deadline)
+            # No total run cap, but do not spin forever on a registry entry that
+            # claims to be running while its socket refuses connections.
+            if time.time() - last_progress > 30.0:
+                break
+            entry = _reconnect(_reconnect_until(deadline))
             if entry is None:
                 break
             address = entry["address"]
             attempt = {"cmd": "attach", "run_id": run_id, "from_seq": last_seq} if run_id else request
+            time.sleep(0.15)
             continue
         try:
             reader = sock.makefile("rb")
@@ -108,7 +123,8 @@ def stream(address, request, as_json=False, budget=600.0):
                 pass
         if ended:
             return code
-        entry = _reconnect(deadline)
+        last_progress = time.time()
+        entry = _reconnect(_reconnect_until(deadline))
         if entry is None:
             break
         address = entry["address"]

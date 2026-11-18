@@ -60,6 +60,13 @@ class ConfigTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"LOOP_THINK_BUDGET": "17"}, clear=False):
             self.assertEqual(config.think_budget(), 17)
 
+    def test_defaults_do_not_starve_the_loop(self):
+        self.assertGreaterEqual(config.MAX_TOKENS, 65536)
+        self.assertGreaterEqual(config.THINK_BUDGET, 32768)
+        self.assertGreaterEqual(config.exec_timeout_ms(), 600000)
+        with mock.patch.dict(os.environ, {"LOOP_EXEC_TIMEOUT_MS": "0"}, clear=False):
+            self.assertEqual(config.exec_timeout_ms(), 0)
+
     def test_display_relative_and_outside(self):
         inside = os.path.join(config.ROOT, "harness", "config.py")
         self.assertEqual(config.display(inside), os.path.join("harness", "config.py"))

@@ -12,9 +12,15 @@ from . import tools
 NUDGE = ("No tool call was received. If the task is complete, call "
          "done(result) with the final result. Otherwise continue with the "
          "next tool call; do not reply with prose.")
-LENGTH_NUDGE = ("The last reply hit max_tokens before a usable tool call. "
-                "Reply with one tool call and no private reasoning. Split a "
-                "large write into append=true calls under 4000 bytes.")
+LENGTH_HEAD = "The last reply hit max_tokens"
+LENGTH_NUDGE = (LENGTH_HEAD + " before a usable tool call; that "
+                "turn was not executed. Re-send the needed call now. If a write "
+                "is too large, split it into append=true chunks and verify the "
+                "tail with a read.")
+
+
+def is_length_nudge(text):
+    return isinstance(text, str) and text.startswith(LENGTH_HEAD)
 
 
 def canonical_args(raw):
@@ -99,12 +105,13 @@ def stop(message, text, turn, nudged, finish_reason=None):
 
     ('done', result)        non-empty assistant text is the answer
     ('nudge', NUDGE)        empty stop after real work gets one retry
-    ('nudge', LENGTH_NUDGE) a truncated reply gets one retry with a tighter ask
+    ('nudge', LENGTH_NUDGE) a truncated reply always gets a retry; a turn that
+                            ran out of output is unfinished work, not a stop
     ('no_tool_call', None)  empty stop with no prior work or after one nudge
     None                    the turn has tool calls; execute and continue
     """
     if finish_reason == "length":
-        return ("nudge", LENGTH_NUDGE) if not nudged else ("no_tool_call", None)
+        return "nudge", LENGTH_NUDGE
     if message["tool_calls"]:
         return None
     if isinstance(text, str) and text.strip():

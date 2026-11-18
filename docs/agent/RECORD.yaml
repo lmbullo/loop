@@ -56,7 +56,7 @@ event_notes:
   done_call: appears on the assistant message but is not appended as a call; turn.done records it and the run ends
   non_str_done: "done.result must be str; a non-str result is an err bad_args observation and the run continues"
   no_tool_call: "non-empty content -> finish=done with result=stripped content; empty content on turn 1 -> finish=no_tool_call; empty content after turn 1 with no earlier nudge -> one nudge event and another turn; a second empty content -> finish=no_tool_call"
-  nudge: "one user message recorded after an empty terminal turn with turn > 1 and no earlier nudge; fold.context inserts it at its seq; it is not a turn"
+  nudge: "one user message recorded by the stop policy; a silent-stop nudge needs turn > 1 and no earlier silent nudge, while a length nudge repeats on every truncated turn and does not spend the silent retry; fold.context inserts it at its seq; it is not a turn"
   resume_event: records from_seq, turn and rebuilt message count; it does not replay old tool calls
   verify_declaration: {ran: false, exit: null, note: null, when: "before the first turn, only when the task carries a command"}
   verify_result: {ran: true, when: "after the terminal turn, before end", exit: "0 means ok; the event stores exit and view renders ok=1/0", note: "first non-blank stdout+stderr line plus ms=<duration>"}
@@ -82,7 +82,7 @@ fold:
   functions:
     - {name: totals_of, effect: "sum turn.usage into hit/miss/out/reasoning_c"}
     - {name: wire, effect: "the first wire event, or null for records written before wire snapshots"}
-    - {name: derive, effect: "task, root, turn, obs_n, nudged, the last done call, max_inline and the wire snapshot"}
+    - {name: derive, effect: "task, root, turn, obs_n, nudged (silent-stop nudges only), the last done call, max_inline and the wire snapshot"}
     - {name: pending_verify, effect: "last verify.command with ran=false, else null; a ran=true event clears it"}
     - {name: context, effect: "rebuild the request message list from the recorded wire, turns, calls and nudges"}
   aliases: harness.agent re-exports totals_of, derive, context and the turn helpers read_turn/run_calls/stop for callers and tests

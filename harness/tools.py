@@ -29,7 +29,9 @@ def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inlin
     if bad is not None:
         return bad
     cwd = config.resolve(a.get("cwd") or ".", sandbox or config.root())
-    code, out, err, dur = spawn.spawn(argv, cwd, a.get("stdin", ""), a.get("timeout_ms", 120000), kill_group=True)
+    code, out, err, dur = spawn.spawn(
+        argv, cwd, a.get("stdin", ""), a.get("timeout_ms", config.exec_timeout_ms()),
+        kill_group=True)
     return observe.render_exec(code, dur, out, err, obs_dir, name, sandbox=sandbox,
                                rel_base=rel_base, saved=saved, max_inline=max_inline,
                                ledger=ledger, obs_id=obs_id)

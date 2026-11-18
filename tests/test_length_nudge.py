@@ -45,6 +45,47 @@ class LengthNudgeTest(unittest.TestCase):
         nudges = [e["data"]["text"] for e in events if e["type"] == "nudge"]
         self.assertEqual(nudges, [turn.LENGTH_NUDGE])
 
+    def test_repeated_length_turns_keep_retrying(self):
+        with sandbox() as tmp:
+            run_id = record.new_id()
+            writer = recwrite.Writer(run_id)
+            try:
+                with mock.patch.object(agent.auth, "api_key", return_value="k"), \
+                        mock.patch.object(agent.api, "call",
+                                          side_effect=[response([broken_write()], "length"),
+                                                       response([broken_write()], "length"),
+                                                       response([done_call()], "tool_calls")]):
+                    summary = agent.run_task(writer, lambda ev: ev, task="t", root=tmp)
+            finally:
+                writer.close()
+            with open(record.record_path(run_id), encoding="utf-8") as f:
+                events = [json.loads(line) for line in f if line.strip()]
+        self.assertEqual(summary["finish"], "done")
+        nudges = [e["data"]["text"] for e in events if e["type"] == "nudge"]
+        self.assertEqual(nudges, [turn.LENGTH_NUDGE, turn.LENGTH_NUDGE])
+
+    def test_length_nudge_does_not_consume_silent_retry(self):
+        exec_call = {"id": "e", "type": "function", "function": {
+            "name": "exec", "arguments": json.dumps({"argv": ["true"]})}}
+        with sandbox() as tmp:
+            run_id = record.new_id()
+            writer = recwrite.Writer(run_id)
+            try:
+                with mock.patch.object(agent.auth, "api_key", return_value="k"), \
+                        mock.patch.object(agent.api, "call",
+                                          side_effect=[response([broken_write()], "length"),
+                                                       response([exec_call], "tool_calls"),
+                                                       response([], "stop"),
+                                                       response([done_call()], "tool_calls")]):
+                    summary = agent.run_task(writer, lambda ev: ev, task="t", root=tmp)
+            finally:
+                writer.close()
+            with open(record.record_path(run_id), encoding="utf-8") as f:
+                events = [json.loads(line) for line in f if line.strip()]
+        self.assertEqual(summary["finish"], "done")
+        texts = [e["data"].get("text") for e in events if e["type"] == "nudge"]
+        self.assertEqual(texts, [turn.LENGTH_NUDGE, turn.NUDGE])
+
     def test_length_turn_is_cleaned_for_retry(self):
         data = json.loads(json.dumps(TURN))
         data["finish_reason"] = "length"

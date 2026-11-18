@@ -2,9 +2,10 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGS = ".logs"
-THINK_BUDGET = 1024
-MAX_TOKENS = 8192
+THINK_BUDGET = 32768
+MAX_TOKENS = 65536
 DEFAULT_MAX_INLINE = 2048
+DEFAULT_EXEC_TIMEOUT_MS = 600000
 RENDERER = "obs/2"
 DEFAULT_AUTH_FILE = "~/.pi/agent/auth.json"
 
@@ -57,3 +58,7 @@ def max_tokens():
 
 def think_budget():
     return env_int("LOOP_THINK_BUDGET", THINK_BUDGET)
+
+
+def exec_timeout_ms():
+    return env_int("LOOP_EXEC_TIMEOUT_MS", DEFAULT_EXEC_TIMEOUT_MS)

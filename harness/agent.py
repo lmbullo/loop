@@ -2,7 +2,7 @@ import sys
 import urllib.error
 
 from . import api, auth, config, fold, ledger, pricing, record, recread, reload, verifier
-from .turn import read_turn, run_calls, stop
+from .turn import is_length_nudge, read_turn, run_calls, stop
 
 totals_of = fold.totals_of
 derive = fold.derive
@@ -127,7 +127,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
             ev = writer.append("nudge", {"text": result})
             emit(ev)
             events = events + [ev]
-            nudged = True
+            nudged = nudged or not is_length_nudge(result)
             continue
         return settle(writer, emit, events, turn, cmd, root, kind, result, 0)
 

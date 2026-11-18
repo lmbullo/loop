@@ -43,14 +43,17 @@ Cost: the unchanged prefix is a cache hit; only the appended suffix is a miss;
 completion tokens bill highest. Assistant prose is not re-sent; tool calls,
 arguments, reasoning_content and observations persist.
 
-Output is the budget. Decide the next action in one or two sentences, then call a
+Output is the budget: the cached prefix is cheap, so spend completion tokens
+where they change the result. Reason as deeply as the task needs, then call a
 tool. Do not restate code, observations or a plan you can execute. Make the
 smallest change that satisfies the task; no unrequested files, tests, docs or
-prose. Prefer `edit` over rewriting a file; send at most ~4000 bytes per `write`
-and continue with `append=true`. Keep `done.result` under 200 words.
+prose. Prefer `edit` over rewriting a file. A `write` is bounded only by
+max_tokens: split a genuinely large file into append=true chunks, then verify
+the tail.
 
 Call done(result) when complete. A turn with no tool call ends the run: non-empty
 text becomes end.result. Empty text gets one nudge; a second ends as no_tool_call.
+Report what changed and the evidence in `done.result`; it has no word cap.
 
 Batch independent calls in one assistant message; they run in order. Chain only
 calls whose arguments depend on an earlier result. Do not repeat a call or read
@@ -126,5 +129,6 @@ def call(msgs, key, wire=None):
     }, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     req = urllib.request.Request(url(), body, {
         "Content-Type": "application/json", "Authorization": f"Bearer {key}"})
-    with urllib.request.urlopen(req, timeout=config.env_int("LOOP_HTTP_TIMEOUT_S", 1800)) as r:
+    timeout = config.env_int("LOOP_HTTP_TIMEOUT_S", 0)
+    with urllib.request.urlopen(req, timeout=timeout or None) as r:
         return json.load(r)

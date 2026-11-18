@@ -13,12 +13,12 @@ messages:
       assistant  turn.message         content is null; a silent stop stores empty content and no tool_calls; tool_calls carry the calls
       tool       one per call         keyed by call.id, content is call.observation
     for each nudge event:
-      user       nudge.text           only after a silent stop or a length-truncated reply on turn > 1 with no earlier nudge; at most one per run
+      user       nudge.text           after a silent stop (at most one per run) or after any length-truncated reply (repeats until a usable turn)
   rules:
     - reasoning_content is replayed in the assistant message because thinking mode rejects a missing field; it becomes part of the cached prefix after its turn; turn.usage.reasoning_c counts characters, not tokens
     - assistant prose text is not stored in the message and is never re-sent; a terminal reply is kept only as end.result
     - "non-empty terminal reply -> finish=done with result=content.strip()"
-    - "a length finish is never executed, even when it carries a truncated tool call -> one length nudge; empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
+    - "a length finish is never executed, even when it carries a truncated tool call -> a length nudge on every truncated turn; the loop has no turn cap (tests/test_turn_budget.py exercises 400 turns); empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
     - a silent stop stores message.content="" and fold.context omits empty tool_calls (the API rejects []); a length turn is folded as an empty assistant turn with no tool_calls or reasoning so the nudge retries it cleanly; the nudge itself is a separate event
     - the prompt tells the model to call done(result); a second silent stop still loses the result
     - done ends the run; it is recorded in turn.done and end, not as a tool observation
@@ -30,10 +30,10 @@ messages:
 
 request:
   endpoint: "LOOP_URL, default https://api.deepseek.com/chat/completions"
-  body: {model: "wire.model, default LOOP_MODEL deepseek-flash", messages: "the folded list", tools: "wire.tools", max_tokens: "wire.max_tokens, default 8192", thinking: "wire.thinking, default {type: enabled, budget_tokens: LOOP_THINK_BUDGET 1024}"}
+  body: {model: "wire.model, default LOOP_MODEL deepseek-flash", messages: "the folded list", tools: "wire.tools", max_tokens: "wire.max_tokens, default 65536", thinking: "wire.thinking, default {type: enabled, budget_tokens: LOOP_THINK_BUDGET 32768}"}
   wire: "loop-wire/1; at run start api.snapshot() records the request-static fields into a wire event, and later turns pass that snapshot to api.call, so a soft reload cannot change the cached prefix"
   auth: "Bearer LOOP_API_KEY, else LOOP_AUTH_FILE.deepseek.key"
-  timeout: "LOOP_HTTP_TIMEOUT_S, default 1800 s"
+  timeout: "LOOP_HTTP_TIMEOUT_S; 0 or unset (the default) means no urlopen timeout; a positive value is a per-call cap in seconds"
 
 tools:
   source: harness/api.py TOOLS; run_start.tools records the four names in order
@@ -43,7 +43,7 @@ tools:
     details:
       - no shell, globs, pipes, redirects or expansion; use ["sh","-c","..."] only when a shell is required
       - cwd resolves against the run root (LOOP_ROOT for api, the recorded root on resume) when relative; default cwd is .
-      - default timeout is 120000 ms in production; sims default to 10000 ms
+      - default timeout is LOOP_EXEC_TIMEOUT_MS (600000 ms in production); 0 disables the per-command timeout; the model may pass timeout_ms per call; sims default to 10000 ms
       - a timeout kills the process group and reports code=TIMEOUT
       - "a spawn failure reports code=127 and TypeName: message on stderr"
       - stdin is encoded UTF-8; the runner starts a new session so the timeout can kill the group
@@ -78,7 +78,7 @@ verify:
   entry: "run.py api --verify CMD [--] [TASK|-]"
   transport: task request field verify -> queue item -> job -> worker spec -> agent.run_task
   root: run root (run_start.root); not the client cwd
-  shell: sh -c CMD with a 120000 ms timeout and process-group kill
+  shell: sh -c CMD with the exec timeout (default 600000 ms; 0 disables) and process-group kill
   evidence: first non-blank stdout+stderr line cut to 180 chars plus " ms=<duration>"; no output is "no output ms=<duration>"
   order: "declare before the first turn: {command, ran:false, exit:null, note:null}; after done or a terminal reply, append {ran:true, exit, note} before end"
   pass_fail: the event stores exit; view renders ok=1 when exit is 0 and ok=0 otherwise; status never gates the run
@@ -143,7 +143,7 @@ cost:
 
 header:
   function: api.header()
-  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, low-effort output rules (one or two sentences, smallest change, chunked writes, short result), done and one-nudge stop semantics, parallel-call and repeated-probe-script guidance, large-observation guidance, and the four tool signatures
+  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, output rules (reason as deeply as needed, smallest change, chunked writes only when a file is too large, uncapped result), done and one-nudge stop semantics with unlimited length retries, parallel-call and repeated-probe-script guidance, large-observation guidance, and the four tool signatures
   stability: constant bytes for every run; no max_inline, task, root or model value enters it, so the first system message is a reusable cache prefix; each run also stores the text in its wire event
   migration: records with no wire event replay with the current api.header(); a resumed old run appends a wire event before its next turn, paying one prefix change
   refresh: a soft reload may re-import api, but the worker passes the run's recorded wire snapshot to context and call, so the static prefix does not change mid-run; new runs pick up edited text

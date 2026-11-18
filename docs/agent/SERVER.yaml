@@ -124,7 +124,7 @@ socket_protocol:
   shutdown: stops the daemon and leaves workers running
   cancel: "drops a waiting id, else interrupts the live worker named by run_id (or id as a fallback); reply k=cancelled with kind=queued|running|null, changed=true|false, and the resolved id/run_id/pid when known"
   tui_surface: enqueue, drop, move, cancel
-  stream: "run/attach first send hello, then record events from disk; streaming stops at end or interrupted; the client reconnects after a daemon restart and resumes from the last seen seq"
+  stream: "run/attach first send hello, then record events from disk; streaming stops at end or interrupted; there is no total client time budget, so a 400-turn run streams to its end; after a daemon restart the client gets a 30 s reconnect window and resumes from the last seen seq"
   snapshot: "daemon, current, last, done, queue, costs, tree, waiting, workers_live, version, reconciled; done is a bounded newest-first list of terminal runs (current excluded)"
   fallback: when the daemon is down or old and omits done, the TUI calls srvsnap.local_done() to derive the same list from record bytes, skipping live runs
 
@@ -153,7 +153,7 @@ mobile_bridge:
   client: "the Flutter app stores the last successful host, port and token with shared_preferences and auto-connects on launch; it clears a workspace snapshot on switch or refresh failure, shows discovered workspace state and can request a daemon start; no queue or run state is stored"
 
 env_to_worker:
-  keys: [LOOP_API_KEY, LOOP_AUTH_FILE, LOOP_MODEL, LOOP_URL, LOOP_MAX_TOKENS, LOOP_THINK_BUDGET, LOOP_MAX_INLINE, LOOP_HTTP_TIMEOUT_S, LOOP_ROOT]
+  keys: [LOOP_API_KEY, LOOP_AUTH_FILE, LOOP_MODEL, LOOP_URL, LOOP_MAX_TOKENS, LOOP_THINK_BUDGET, LOOP_MAX_INLINE, LOOP_HTTP_TIMEOUT_S, LOOP_EXEC_TIMEOUT_MS, LOOP_ROOT]
   rule: the worker removes any of these keys not present in the job payload; LOOP_RUNS and LOOP_REGISTRY are daemon process settings, not per-run settings
 
 status:

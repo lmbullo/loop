@@ -1,4 +1,5 @@
 from . import api
+from .turn import is_length_nudge
 
 ZERO = {"hit": 0, "miss": 0, "out": 0, "reasoning_c": 0}
 
@@ -35,7 +36,10 @@ def derive(events):
             obs_n += len(d.get("calls") or [])
             done = d.get("done")
         elif ev["type"] == "nudge":
-            nudged = True
+            # A length nudge retries unfinished output; only a silent-stop nudge
+            # spends the one retry that a later empty reply is allowed.
+            if not is_length_nudge(d.get("text")):
+                nudged = True
         elif ev["type"] == "resume" and root is None:
             root = d.get("root")
     return {"task": task, "root": root, "turn": turn, "obs_n": obs_n,

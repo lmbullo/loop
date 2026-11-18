@@ -86,9 +86,11 @@ Credentials resolve in this order:
    `{"deepseek": {"key": "..."}}`
 
 Useful overrides: `LOOP_URL` (chat-completions endpoint), `LOOP_MODEL`
-(default `deepseek-flash`), `LOOP_MAX_TOKENS`, `LOOP_MAX_INLINE`,
-`LOOP_HTTP_TIMEOUT_S`. The full environment contract is in
-[`docs/agent/index.yaml`](docs/agent/index.yaml).
+(default `deepseek-flash`), `LOOP_MAX_TOKENS` (default 65536),
+`LOOP_THINK_BUDGET` (default 32768), `LOOP_MAX_INLINE`,
+`LOOP_EXEC_TIMEOUT_MS` (default 600000; 0 disables), and
+`LOOP_HTTP_TIMEOUT_S` (unset/0 waits indefinitely). The full environment
+contract is in [`docs/agent/index.yaml`](docs/agent/index.yaml).
 
 The daemon starts on demand. To operate it explicitly:
 
