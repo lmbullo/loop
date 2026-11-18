@@ -189,11 +189,12 @@ class AgentLoopTest(unittest.TestCase):
         quiet = {"role": "assistant", "content": None, "tool_calls": []}
         self.assertEqual(turn.stop(quiet, None, 1, False), ("no_tool_call", None))
         self.assertEqual(turn.stop(quiet, None, 2, False), ("nudge", turn.NUDGE))
+        self.assertEqual(turn.stop(quiet, None, 2, False, "length")[1], turn.LENGTH_NUDGE)
+        self.assertEqual(turn.stop(quiet, "cut", 2, False, "length")[1], turn.LENGTH_NUDGE)
+        self.assertEqual(turn.stop(quiet, None, 2, True, "length"), ("no_tool_call", None))
         self.assertEqual(turn.stop(quiet, " answer ", 2, True), ("done", "answer"))
-        busy = {"role": "assistant", "content": None,
-                "tool_calls": [{"id": "c", "function": {"name": "exec"}}]}
+        busy = {"role": "assistant", "content": None, "tool_calls": [{"id": "c"}]}
         self.assertIsNone(turn.stop(busy, "side text", 2, False))
-
 
 if __name__ == "__main__":
     unittest.main()

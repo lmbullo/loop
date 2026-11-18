@@ -59,10 +59,10 @@ class AgentContextTest(unittest.TestCase):
         self.assertTrue(agent.derive(events)["nudged"])
         msgs = agent.context(events, RUN_START["task"])
         self.assertEqual(msgs[2]["content"], None)
+        self.assertNotIn("tool_calls", msgs[2])
         self.assertEqual(msgs[3], {"role": "user", "content": NUDGE["text"]})
         self.assertEqual(msgs[4]["role"], "assistant")
         self.assertEqual(msgs[5], {"role": "tool", "tool_call_id": "c1", "content": "ok"})
-
     def test_context_header_is_stable_across_inline_limits(self):
         one = dict(RUN_START, max_inline=1234)
         two = dict(RUN_START, max_inline=999)
@@ -78,12 +78,14 @@ class AgentContextTest(unittest.TestCase):
     def test_header_requires_done_and_parallel_calls(self):
         text = agent.api.header()
         self.assertIn("Call done(result)", text)
-        self.assertIn("Issue independent tool calls together", text)
-        self.assertIn("write it once as a script and run the", text)
+        self.assertIn("Batch independent calls in one assistant message", text)
+        self.assertIn("write it once as", text)
         self.assertIn("Large observations", text)
         self.assertIn("shown a-b of N", text)
         self.assertIn("next: sed -n a,bp", text)
-        self.assertIn("one nudge", text)
+        self.assertIn("Empty text gets one nudge", text)
+        self.assertIn("Output is the budget", text)
+        self.assertIn("smallest change", text)
         self.assertNotIn("{max_inline}", text)
 
     def test_read_turn(self):

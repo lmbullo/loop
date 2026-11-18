@@ -116,7 +116,7 @@ def run_task(writer, emit, task=None, root=None, should_stop=None, verify=None):
         events = events + [ev]
         if done is not None:
             return settle(writer, emit, events, turn, cmd, root, "done", done["result"], 0)
-        action = stop(message, text, turn, nudged)
+        action = stop(message, text, turn, nudged, finish_reason)
         if action is None:
             continue
         kind, result = action

@@ -6,20 +6,20 @@ from . import config
 TOOLS = [
     {"type": "function", "function": {
         "name": "exec",
-        "description": "Spawn argv directly. Returns exit code, stdout, stderr.",
+        "description": "Spawn argv directly; no shell. Returns exit code, stdout, stderr.",
         "parameters": {"type": "object", "properties": {
             "argv": {"type": "array", "items": {"type": "string"}},
             "cwd": {"type": "string"}, "stdin": {"type": "string"},
             "timeout_ms": {"type": "integer"}}, "required": ["argv"]}}},
     {"type": "function", "function": {
         "name": "write",
-        "description": "Write data to path as UTF-8.",
+        "description": "Write UTF-8 data; append=true continues a large file.",
         "parameters": {"type": "object", "properties": {
             "path": {"type": "string"}, "data": {"type": "string"},
             "append": {"type": "boolean"}}, "required": ["path", "data"]}}},
     {"type": "function", "function": {
         "name": "edit",
-        "description": "Replace exactly one occurrence of old with new.",
+        "description": "Replace one occurrence; old+new is the smallest unique span.",
         "parameters": {"type": "object", "properties": {
             "path": {"type": "string"}, "old": {"type": "string"},
             "new": {"type": "string"}}, "required": ["path", "old", "new"]}}},
@@ -32,54 +32,44 @@ TOOLS = [
 WIRE_SCHEMA = "loop-wire/1"
 
 BASE = """\
-This repo and its artifacts are agent-facing. The code in it is machine text
-that agents read and edit: human readability is not a goal.
+This repo is agent-facing: machine text, not human prose.
 
-The message list is append-only: every turn appends one assistant message and
-one tool message per call; earlier entries are never edited, reordered or
-re-sent in a new form. The run record is append-only as well: one JSONL line
-per event, fsynced before the next turn, and `end` is the only completion
-marker.
+Messages are append-only: each turn appends one assistant message and one tool
+message per call; no earlier entry is edited or re-sent. The record is append-only
+JSONL, one event per turn, fsynced; `end` is the only completion marker. One run
+per tree: the tree lock makes a second run busy.
 
-One run per tree. The run you are in holds the tree lock, so starting another
-run in this tree fails with busy naming the holder pid. argv is passed
-literally: no shell, so no globs, pipes or redirects unless you use sh -c.
+Cost: the unchanged prefix is a cache hit; only the appended suffix is a miss;
+completion tokens bill highest. Assistant prose is not re-sent; tool calls,
+arguments, reasoning_content and observations persist.
 
-Cost: the whole message list is re-sent each turn, so the unchanged prefix is a
-cache hit and only the appended suffix is a cache miss; output tokens bill
-highest. reasoning_content is replayed because thinking mode requires it; after
-the turn it is part of the cached prefix.
+Output is the budget. Decide the next action in one or two sentences, then call a
+tool. Do not restate code, observations or a plan you can execute. Make the
+smallest change that satisfies the task; no unrequested files, tests, docs or
+prose. Prefer `edit` over rewriting a file; send at most ~4000 bytes per `write`
+and continue with `append=true`. Keep `done.result` under 200 words.
 
-Assistant prose text is not re-sent; tool calls, their arguments,
-reasoning_content and observations persist.
-Call done(result) when the task is complete. A turn with no tool call also ends
-the run: non-empty text becomes end.result. An empty reply gets one nudge to
-call done or continue; a second empty reply finishes it as no_tool_call.
+Call done(result) when complete. A turn with no tool call ends the run: non-empty
+text becomes end.result. Empty text gets one nudge; a second ends as no_tool_call.
 
-Issue independent tool calls together in one assistant message; they run in the
-order given. Chain only calls whose arguments depend on an earlier result, and do
-not re-run a call whose result is already in the message list. When the same
-probe or probe pair is about to repeat, write it once as a script and run the
-script; repeated single-step probing costs a turn each time.
+Batch independent calls in one assistant message; they run in order. Chain only
+calls whose arguments depend on an earlier result. Do not repeat a call or read
+whose result is in the message list; when a probe would repeat, write it once as
+a script and run the script.
 
-Large observations are replaced by a shape summary; the raw bytes are saved
-under the run's obs directory. A summary reports `shown a-b of N` and, when it
-elides lines, a ready `next: sed -n a,bp <path>` command; pass those argv tokens
-as-is (exec argv is literal, so no quoting) to get the next slice verbatim. Do
-not re-read a file you already have; an observation marked same=obs-N is byte
-identical to that earlier observation. Prefer one read of the range you need
-over many small probes.
+Large observations become a shape summary: `shown a-b of N`, `elided c-d`, and a
+`next: sed -n a,bp <saved>` slice; pass those argv tokens literally. `same=obs-N`
+means byte-identical to an earlier observation.
 
 Paths are relative to the working directory.
 
-exec(argv: [str], cwd?: str, stdin?: str, timeout_ms?: int) -> observation
-  Spawns argv directly. No shell: no pipes, globs, redirects, expansion. Use
-  ["sh","-c","..."] when needed. No state persists between calls.
-
-write(path: str, data: str, append?: bool) -> observation
-edit(path: str, old: str, new: str) -> observation
-  Replaces exactly one occurrence. Fails if match count != 1. Returns hunk.
-done(result: str) -> finishes the task; call this instead of stopping silently.
+exec(argv, cwd?, stdin?, timeout_ms?) -> observation
+  Spawns argv directly; no shell, globs, pipes or redirects unless you use
+  ["sh","-c","..."]; no state persists.
+write(path, data, append?) -> observation
+edit(path, old, new) -> observation
+  Replaces exactly one occurrence; fails unless the match count is 1.
+done(result) -> finishes the run.
 """
 
 
@@ -100,7 +90,7 @@ def thinking():
 
 
 def max_tokens():
-    return config.env_int("LOOP_MAX_TOKENS", 65536)
+    return config.max_tokens()
 
 
 def snapshot():

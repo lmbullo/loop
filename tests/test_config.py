@@ -48,6 +48,13 @@ class ConfigTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"LOOP_MAX_INLINE": "bad"}, clear=True):
             self.assertEqual(config.max_inline(), config.DEFAULT_MAX_INLINE)
 
+    def test_max_tokens(self):
+        self.assertEqual(config.max_tokens(), config.MAX_TOKENS)
+        with mock.patch.dict(os.environ, {"LOOP_MAX_TOKENS": "17"}, clear=False):
+            self.assertEqual(config.max_tokens(), 17)
+        with mock.patch.dict(os.environ, {"LOOP_MAX_TOKENS": "bad"}, clear=True):
+            self.assertEqual(config.max_tokens(), config.MAX_TOKENS)
+
     def test_think_budget(self):
         self.assertEqual(config.think_budget(), config.THINK_BUDGET)
         with mock.patch.dict(os.environ, {"LOOP_THINK_BUDGET": "17"}, clear=False):

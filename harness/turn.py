@@ -12,6 +12,9 @@ from . import tools
 NUDGE = ("No tool call was received. If the task is complete, call "
          "done(result) with the final result. Otherwise continue with the "
          "next tool call; do not reply with prose.")
+LENGTH_NUDGE = ("The last reply hit max_tokens before a usable tool call. "
+                "Reply with one tool call and no private reasoning. Split a "
+                "large write into append=true calls under 4000 bytes.")
 
 
 def canonical_args(raw):
@@ -91,16 +94,19 @@ def run_calls(message, obs_dir, root, obs_n, max_inline=None, ledger=None):
     return calls, done, obs_n
 
 
-def stop(message, text, turn, nudged):
+def stop(message, text, turn, nudged, finish_reason=None):
     """Return the terminal action for a turn with no done call, or None.
 
     ('done', result)        non-empty assistant text is the answer
     ('nudge', NUDGE)        empty stop after real work gets one retry
+    ('nudge', LENGTH_NUDGE) a truncated reply gets one retry with a tighter ask
     ('no_tool_call', None)  empty stop with no prior work or after one nudge
     None                    the turn has tool calls; execute and continue
     """
     if message["tool_calls"]:
         return None
+    if finish_reason == "length" and not nudged:
+        return "nudge", LENGTH_NUDGE
     if isinstance(text, str) and text.strip():
         return "done", text.strip()
     if turn > 1 and not nudged:

@@ -18,7 +18,7 @@ facts:
   tree_lock: ".logs/run.lock; one run per tree; a second api queues a front item and waits"
   network: api and resume RUN_ID only; both cost real tokens
   tools: [exec, write, edit, done]
-  request: "model LOOP_MODEL; max_tokens LOOP_MAX_TOKENS (65536); thinking enabled with LOOP_THINK_BUDGET (32768); the run start snapshots model, tools, system, max_tokens, thinking and renderer into a wire event; authorization from LOOP_API_KEY or LOOP_AUTH_FILE"
+  request: "model LOOP_MODEL; max_tokens LOOP_MAX_TOKENS (8192); thinking enabled with LOOP_THINK_BUDGET (1024); the run start snapshots model, tools, system, max_tokens, thinking and renderer into a wire event; authorization from LOOP_API_KEY or LOOP_AUTH_FILE"
   verify: "run.py api --verify CMD; declared before the first turn, run after the terminal turn, recorded as verify events before end; view derives ok=1 from exit 0 and ok=0 otherwise"
   inline_limit: "LOOP_MAX_INLINE, default 2048 bytes; run_start.max_inline pins the observation bound for a run; renderer obs/2 emits a compact head/tail/stderr index and same=obs-N for an exact repeat"
   prompt_prefix: "wire.system, wire.tools, wire.model, wire.max_tokens and wire.thinking are snapshotted at run start; task and observation facts are appended later, so the static prefix cannot change mid-run"

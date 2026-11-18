@@ -28,6 +28,7 @@ shortcuts:
   - {cmd: make verify, effect: "scripts/verify.py --skip-server"}
   - {cmd: "make audit RUN=<id>", effect: "offline cache audit for one record; RUN defaults to the newest"}
   - {cmd: "python3 scripts/cache_audit.py [RUN_ID] [--json]", effect: "prefix growth, hit/miss/out/cost, reuse references and suspected cache breaks; no model call"}
+  - {cmd: "python3 scripts/output_audit.py [RUN_ID] [--json] [--top N]", effect: "completion split into reasoning, tool arguments and result; top-output turns and length truncations; no model call"}
   - {cmd: make sim, effect: "sim1 task + sim2 task2"}
   - {cmd: make clean, effect: "bytecode and tool caches; never .logs"}
   - {cmd: "python3 scripts/verify.py --list", effect: list selected checks}
@@ -49,6 +50,8 @@ test_map:
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
   - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, budget-filling head/tail/stderr shape, byte-sized next slice, saved bytes, exact-repeat same=obs-N ledger}
   - {test: test_audit.py, contract: "offline cache audit projection: prefix growth, reuse references, wire sha"}
+  - {test: test_output_audit.py, contract: "offline output audit: reasoning/argument/result split, top turns and truncations"}
+  - {test: test_length_nudge.py, contract: "loop integration: one length-specific nudge after a truncated reply"}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
   - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}

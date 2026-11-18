@@ -64,6 +64,10 @@ def context(events, task, wire_spec=None):
             continue
         message = dict(ev["data"]["message"])
         message.setdefault("reasoning_content", "")
+        if not message.get("tool_calls"):
+            # The API rejects tool_calls:[]; omit the empty field on a silent
+            # stop so the following nudge can produce a real assistant turn.
+            message.pop("tool_calls", None)
         msgs.append(message)
         for call in ev["data"].get("calls") or []:
             msgs.append({"role": "tool", "tool_call_id": call["id"],

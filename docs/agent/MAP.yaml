@@ -162,6 +162,7 @@ modules:
     - {path: scripts/verify.py, owns: "run manifest.checks[] offline; --skip-server, --only, --json, --list"}
     - {path: scripts/check_manifest.py, owns: "registered files, importable entries, record/check/scenario integrity"}
     - {path: scripts/repo_map.py, owns: "generated manifest map with line counts"}
+    - {path: scripts/output_audit.py, owns: "offline output audit: splits completion tokens into reasoning, tool arguments and result; names the top turns and truncations"}
     - {path: scripts/cache_audit.py, owns: "offline cache audit: rebuilds request prefixes from record bytes, reports hit/miss/out/cost, reuse references and suspected cache breaks"}
     - {path: scripts/doctor.py, owns: "local health; never starts the daemon"}
     - {path: scripts/commit_check.py, owns: "conventional subject plus why and check lines"}

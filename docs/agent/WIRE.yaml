@@ -13,13 +13,13 @@ messages:
       assistant  turn.message         content is null; tool_calls carry the calls
       tool       one per call         keyed by call.id, content is call.observation
     for each nudge event:
-      user       nudge.text           only after a silent stop on turn > 1 with no earlier nudge; at most one per run
+      user       nudge.text           only after a silent stop or a length-truncated reply on turn > 1 with no earlier nudge; at most one per run
   rules:
     - reasoning_content is replayed in the assistant message because thinking mode rejects a missing field; it becomes part of the cached prefix after its turn; turn.usage.reasoning_c counts characters, not tokens
     - assistant prose text is not stored in the message and is never re-sent; a terminal reply is kept only as end.result
     - "non-empty terminal reply -> finish=done with result=content.strip()"
-    - "empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
-    - a silent stop stores message.content="" so the following nudge has a valid assistant turn; the nudge itself is a separate event
+    - "length finish with no usable tool call -> one length nudge; empty terminal reply on turn 1 -> finish=no_tool_call; after turn 1 with no earlier nudge -> one nudge user message and another turn; a second empty reply -> finish=no_tool_call"
+    - a silent stop stores message.content="" and fold.context omits empty tool_calls (the API rejects []); the nudge itself is a separate event
     - the prompt tells the model to call done(result); a second silent stop still loses the result
     - done ends the run; it is recorded in turn.done and end, not as a tool observation
     - the whole list is re-sent each turn; only the appended suffix is a cache miss
@@ -30,7 +30,7 @@ messages:
 
 request:
   endpoint: "LOOP_URL, default https://api.deepseek.com/chat/completions"
-  body: {model: "wire.model, default LOOP_MODEL deepseek-flash", messages: "the folded list", tools: "wire.tools", max_tokens: "wire.max_tokens, default 65536", thinking: "wire.thinking, default {type: enabled, budget_tokens: LOOP_THINK_BUDGET 32768}"}
+  body: {model: "wire.model, default LOOP_MODEL deepseek-flash", messages: "the folded list", tools: "wire.tools", max_tokens: "wire.max_tokens, default 8192", thinking: "wire.thinking, default {type: enabled, budget_tokens: LOOP_THINK_BUDGET 1024}"}
   wire: "loop-wire/1; at run start api.snapshot() records the request-static fields into a wire event, and later turns pass that snapshot to api.call, so a soft reload cannot change the cached prefix"
   auth: "Bearer LOOP_API_KEY, else LOOP_AUTH_FILE.deepseek.key"
   timeout: "LOOP_HTTP_TIMEOUT_S, default 1800 s"
@@ -93,7 +93,7 @@ observation:
     - {when: binary sample, output: "kind=binary bytes=<n> sha256=<16 hex> head_hex=<24 bytes>"}
     - {when: "len(raw) <= run max_inline", output: raw UTF-8 text, verbatim}
     - {when: larger text, output: "obs bytes=<n> lines=<n> sha=<12 hex> saved=<root-relative path>; then shown 1-<a> of <n>[; elided <a+1>-<b>], head:/tail: whole lines filling the byte bound, stderr_tail: up to 2 lines when stderr was not already shown, and next: sed -n <a+1>,<c>p <path> when lines are elided; that slice renders verbatim"}
-    - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>] [next: sed -n <a>,<b>p <path>]"}; next is present when the earlier copy was summarized so a repeat can advance instead of dead-ending on the old summary
+    - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>] [next: sed -n <a>,<b>p <path>]"}
     - {when: no output, output: empty string}
   bounding:
     - valid UTF-8 text is never binary: only control bytes (<9, 14..31, 127) count, so non-ASCII characters stay readable; an invalid sample falls back to the byte rule (>20% of the first 4096 bytes outside printable ASCII)
@@ -135,9 +135,11 @@ cost:
   accounting:
     - each turn.usage.cost is rounded to 6 decimals
     - end sums hit, miss, out, reasoning_c and computes the run cost once
+    - output is completion tokens: reasoning + tool arguments + result; scripts/output_audit.py splits the recorded total
     - the unchanged prefix is a cache hit; only the appended suffix is a miss; output bills highest; because reasoning_content is replayed, it joins the cached prefix after its turn
     - the sim projection uses bytes/4 as tokens and pricing.cost, so rates come from the manifest
   audit: "python3 scripts/cache_audit.py [RUN_ID] [--json] replays the recorded prefixes offline; prefix_ok=True and no suspected cache breaks mean the static prefix only grew; make audit RUN=<id> is the wrapper"
+  output_audit: "python3 scripts/output_audit.py [RUN_ID] [--json] splits completion tokens into reasoning, tool arguments and result, names the turns with the largest output and counts length truncations; no model call"
 
 header:
   function: api.header()
