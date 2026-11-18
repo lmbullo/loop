@@ -139,7 +139,7 @@ cost:
     - the unchanged prefix is a cache hit; only the appended suffix is a miss; output bills highest; because reasoning_content is replayed, it joins the cached prefix after its turn
     - the sim projection uses bytes/4 as tokens and pricing.cost, so rates come from the manifest
   audit: "python3 scripts/cache_audit.py [RUN_ID] [--json] replays the recorded prefixes offline; prefix_ok=True and no suspected cache breaks mean the static prefix only grew; make audit RUN=<id> is the wrapper"
-  output_audit: "python3 scripts/output_audit.py [RUN_ID] [--json] splits completion tokens into reasoning, tool arguments and result, names the turns with the largest output and counts length truncations; no model call"
+  output_audit: "make output RUN=<id> wraps python3 scripts/output_audit.py [RUN_ID] [--json]; it splits completion tokens into reasoning, tool arguments and result, names the turns with the largest output and counts length truncations; no model call"
 
 header:
   function: api.header()

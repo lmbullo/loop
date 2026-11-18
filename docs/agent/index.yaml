@@ -100,6 +100,7 @@ commands:
     - [make, sim]
     - [make, verify]
     - [make, audit]
+    - [make, output]
     - [make, clean]
     - [python3, scripts/check_manifest.py]
     - [python3, scripts/doctor.py]

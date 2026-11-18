@@ -27,6 +27,7 @@ shortcuts:
   - {cmd: make lint, effect: "ruff E4/E9/F when installed; skips otherwise"}
   - {cmd: make verify, effect: "scripts/verify.py --skip-server"}
   - {cmd: "make audit RUN=<id>", effect: "offline cache audit for one record; RUN defaults to the newest"}
+  - {cmd: "make output RUN=<id>", effect: "offline completion split for one record; RUN defaults to the newest"}
   - {cmd: "python3 scripts/cache_audit.py [RUN_ID] [--json]", effect: "prefix growth, hit/miss/out/cost, reuse references and suspected cache breaks; no model call"}
   - {cmd: "python3 scripts/output_audit.py [RUN_ID] [--json] [--top N]", effect: "completion split into reasoning, tool arguments and result; top-output turns and length truncations; no model call"}
   - {cmd: make sim, effect: "sim1 task + sim2 task2"}
