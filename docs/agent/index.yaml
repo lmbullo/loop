@@ -108,6 +108,8 @@ commands:
     - [python3, scripts/repo_map.py]
     - [python3, scripts/cache_audit.py, RUN_ID]
     - [python3, scripts/cache_audit.py, RUN_ID, --json]
+    - [python3, scripts/output_audit.py, RUN_ID]
+    - [python3, scripts/output_audit.py, RUN_ID, --json]
     - [python3, scripts/verify.py, --list]
   network_and_cost:
     - [python3, run.py, api, TASK]

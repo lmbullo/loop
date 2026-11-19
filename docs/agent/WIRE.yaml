@@ -2,8 +2,8 @@ schema: loop-agent-doc/1
 id: wire
 title: "Agent wire: tools, observations, cost"
 read_when: [change a tool, change observation bounding, change the stop condition, change verify behavior, reason about cost]
-source: [harness/api.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
-verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_verify tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
+source: [harness/api.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/bound.py, harness/ledger.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
+verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_length_nudge tests.test_turn_budget tests.test_verify tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
 
 messages:
   order: |
@@ -78,7 +78,7 @@ verify:
   entry: "run.py api --verify CMD [--] [TASK|-]"
   transport: task request field verify -> queue item -> job -> worker spec -> agent.run_task
   root: run root (run_start.root); not the client cwd
-  shell: sh -c CMD with the exec timeout (default 600000 ms; 0 disables) and process-group kill
+  shell: sh -c CMD with a fixed 120000 ms timeout and process-group kill; LOOP_EXEC_TIMEOUT_MS applies only to the exec tool
   evidence: first non-blank stdout+stderr line cut to 180 chars plus " ms=<duration>"; no output is "no output ms=<duration>"
   order: "declare before the first turn: {command, ran:false, exit:null, note:null}; after done or a terminal reply, append {ran:true, exit, note} before end"
   pass_fail: the event stores exit; view renders ok=1 when exit is 0 and ok=0 otherwise; status never gates the run

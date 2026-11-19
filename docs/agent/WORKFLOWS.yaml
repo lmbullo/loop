@@ -53,6 +53,7 @@ test_map:
   - {test: test_audit.py, contract: "offline cache audit projection: prefix growth, reuse references, wire sha"}
   - {test: test_output_audit.py, contract: "offline output audit: reasoning/argument/result split, top turns and truncations"}
   - {test: test_length_nudge.py, contract: "loop integration: one length-specific nudge after a truncated reply"}
+  - {test: test_turn_budget.py, contract: "no turn or attach cap: a 400-turn task runs to done and srvclient.stream defaults to no total budget"}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
   - {test: test_tools.py, contract: write/append/content alias/edit uniqueness, exec sandbox cwd}
   - {test: test_assets.py, contract: scenario load/defaults, sim ownership, fixture mounting}
@@ -67,6 +68,7 @@ test_map:
   - {test: test_checks.py, contract: audited kinds, line-limit failure, TUI contract}
   - {test: test_mobile_api.py, contract: mobile root allowlist, symlink containment, enqueue through queue, run log ids and routing}
   - {test: test_mobile_http.py, contract: bearer auth, private bind and peer filter, dirs/snapshot/queue/run-log routes, token file mode}
+  - {test: test_mobile_workspaces.py, contract: "mobile workspace tests: discovery, stale registry, isolation, aggregation, routing, offline fallback and safe start"}
   - {test: mobile/test/api_test.dart, contract: private-host guard, JSON mapping, bearer header and HTTP error mapping}
   - {test: mobile/test/store_test.dart, contract: saved settings, connect, root selection, submit, run watch, failure, disconnect}
   - {test: mobile/test/session_test.dart, contract: load, save, clear and incomplete saved connection settings}
@@ -124,6 +126,7 @@ recipes:
     - "name the behavior: test_newest_run_wins, not test_resolve_2"
     - prefer pure functions; use run_py() for CLI coverage
     - keep it under 200 lines and register it with kind test
+    - add the file and its contract to test_map below
     - run the single test during development, then the full suite
   mobile:
     - keep app code under mobile/ and the server bridge in harness/mob*.py
@@ -131,7 +134,7 @@ recipes:
     - "keep the Gruvbox system: palette and type in theme.dart, shared backdrop/header/cards in widgets.dart, animated nav in navigation.dart, rounded fields in connect_pane.dart, and call cards plus one result callout in run_screen.dart"
     - server route changes go in mobapi.py; HTTP/auth/lifecycle changes go in mobserve.py
     - add a Python test for the server and a Flutter test for the protocol, widget state or layout
-    - run "python3 -m unittest tests.test_mobile_api tests.test_mobile_http"
+    - run "python3 -m unittest tests.test_mobile_api tests.test_mobile_http tests.test_mobile_workspaces"
     - run "cd mobile && flutter analyze --no-pub && flutter test --no-pub"
     - build with "flutter build apk --release --target-platform android-arm64 --split-per-abi"
   scenario:

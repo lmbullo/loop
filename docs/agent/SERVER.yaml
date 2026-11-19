@@ -2,8 +2,8 @@ schema: loop-agent-doc/1
 id: server
 title: Server, queue and workers
 read_when: [operate the control plane, queue a task, diagnose a worker, change lifecycle]
-source: [manifest.server, harness/server.py, harness/srvcmd.py, harness/srvdaemon.py, harness/srvwork.py, harness/srvconn.py, harness/srvclient.py, harness/srvrun.py, harness/srvsnap.py, harness/srvlist.py, harness/srvwire.py, harness/srvctl.py, harness/mobile.py, harness/mobserve.py, harness/mobapi.py, harness/mobtoken.py, harness/worker.py, harness/workers.py, harness/queue.py, harness/job.py, harness/registry.py, harness/regstore.py, harness/regprobe.py]
-verify: [python3 run.py server status, python3 run.py server runs --json, "python3 -m unittest tests.test_queue tests.test_workers tests.test_regstore tests.test_mobile_api tests.test_mobile_http"]
+source: [manifest.server, harness/server.py, harness/srvcmd.py, harness/srvdaemon.py, harness/srvwork.py, harness/srvconn.py, harness/srvclient.py, harness/srvrun.py, harness/srvsnap.py, harness/srvlist.py, harness/srvwire.py, harness/srvctl.py, harness/mobile.py, harness/mobpaths.py, harness/mobworkspaces.py, harness/mobrecords.py, harness/mobview.py, harness/mobserve.py, harness/mobapi.py, harness/moberr.py, harness/mobtoken.py, harness/worker.py, harness/workers.py, harness/queue.py, harness/job.py, harness/registry.py, harness/regstore.py, harness/regprobe.py]
+verify: [python3 run.py server status, python3 run.py server runs --json, "python3 -m unittest tests.test_queue tests.test_workers tests.test_regstore tests.test_srv_cancel tests.test_mobile_api tests.test_mobile_http tests.test_mobile_workspaces"]
 
 process_model: |
   one tree  = realpath of LOOP_ROOT (default: the checkout)
