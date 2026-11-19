@@ -72,8 +72,14 @@ def _path(call, name):
 def _size(call, name):
     arg = args_of(call)
     if name == "write":
+        if isinstance(arg.get("bytes"), int):
+            return arg["bytes"]
         data = arg.get("data")
         return len(data.encode("utf-8")) if isinstance(data, str) else 0
+    old = arg.get("old_bytes")
+    new = arg.get("new_bytes")
+    if isinstance(old, int) and isinstance(new, int):
+        return (old, new)
     old, new = arg.get("old"), arg.get("new")
     return (len(old.encode()) if isinstance(old, str) else 0,
             len(new.encode()) if isinstance(new, str) else 0)
@@ -138,10 +144,11 @@ def render(state, limit=MAX_DIGEST):
         files = sorted((st.get("files") or {}).items(),
                        key=lambda kv: kv[1][1], reverse=True)
         lines = [f"[loop checkpoint] compacted={st.get('count', 0)} "
-                 f"through=T{st.get('after', 0)}"]
+                 f"through=T{st.get('after', 0)}",
+                 "note: summary only; read mutable state before continuing a sequence"]
         if files:
             lines.append("files: " + " ".join(
-                f"{path}({item[0]}@{item[1]})" for path, item in files[:MAX_FILES]))
+                f"{path}({item[0]}@{item[1]}" + _measure(item[2]) + ")" for path, item in files[:MAX_FILES]))
         if st.get("fails"):
             lines.append("fails:")
             lines.extend(" " + _one(item) for item in st["fails"][-MAX_FAILS:])
@@ -165,6 +172,14 @@ def render(state, limit=MAX_DIGEST):
             st["files"].pop(oldest[0][0], None)
         text = build(st)
     return text[:limit]
+
+
+def _measure(size):
+    if isinstance(size, int) and size:
+        return f",{size}B"
+    if isinstance(size, (list, tuple)) and len(size) == 2:
+        return f",-{size[0]}+{size[1]}"
+    return ""
 
 
 def _one(item):

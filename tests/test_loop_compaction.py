@@ -4,7 +4,7 @@ import unittest
 from unittest import mock
 
 from harness import agent, budget, fold, memo, record, recwrite, retry
-from tests.support import RUN_START, event, sandbox
+from tests.support import RUN_START, sandbox
 from tests.test_context_compact import compact_event, turn_event
 
 

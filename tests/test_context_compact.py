@@ -56,7 +56,7 @@ class ContextCompactTest(unittest.TestCase):
         one = memo.build(events, 0, 1, None)
         two = memo.build(events, 0, 1, None)
         self.assertEqual(one, two)
-        self.assertIn("a.txt(write@1)", one[1])
+        self.assertIn("a.txt(write@1,3B)", one[1])
         state = memo.collect(events, 0, 1, None)
         self.assertIn("a.txt", state["files"])
 
