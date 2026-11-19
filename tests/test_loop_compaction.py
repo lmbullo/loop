@@ -52,6 +52,10 @@ class LoopCompactionTest(unittest.TestCase):
                             for ev in compacts))
         self.assertEqual(fold.derive(events)["base_turn"],
                          compacts[-1]["data"]["after"])
+        spec = fold.wire(events)
+        sizes = [budget.est_request(fold.context(events[:i], "t", spec), spec)
+                 for i, ev in enumerate(events) if ev["type"] == "turn"]
+        self.assertLess(max(sizes), 12000)
 
     def test_length_stop_escalates_the_output_ceiling(self):
         caps = []
