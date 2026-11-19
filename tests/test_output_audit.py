@@ -8,7 +8,7 @@ from tests.support import END, RUN_ID, RUN_START, TURN, event, sandbox, write_re
 def wire():
     return {"schema": "loop-wire/1", "system": "S", "tools": "[]",
             "thinking": "{}", "model": "m", "max_tokens": 1,
-            "renderer": "obs/2", "sha": "abc"}
+            "renderer": "obs/3", "replay_reasoning": False, "sha": "abc"}
 
 
 class OutputAuditTest(unittest.TestCase):

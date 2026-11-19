@@ -10,7 +10,7 @@ facts:
   runtime: python >=3.8, stdlib only, tested on 3.12
   human_entry: "README.md; public support and policy docs: CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md, LICENSE"
   machine_rule: "human-facing prose only in the human layer; AGENTS.md, docs/agent/*.yaml and manifest.json stay machine-first"
-  bootstrap: "python3 run.py --json -> one compact loop-index/1 line derived from manifest.json; no tree walk, no absolute paths"
+  bootstrap: "python3 run.py --json [FIELD] -> one compact loop-index/1 line (or the FIELD subtree) derived from manifest.json; no tree walk, no absolute paths"
   entry: "python3 run.py <command>; modules are import-only"
   root: dirname(run.py), overridable with LOOP_ROOT
   state: "<LOOP_ROOT>/.logs, overridable with LOOP_RUNS"
@@ -33,6 +33,7 @@ facts:
 docs:
   - {path: docs/agent/MAP.yaml, title: Tree map, read_when: [find the owning module, find an entry point, find who writes state], topics: [entrypoints, execution model, subsystems, write ownership, imports]}
   - {path: docs/agent/RECORD.yaml, title: Record and view, read_when: [inspect a run, change event fields, resume a run, debug corruption], topics: [loop-record/1, events, nudge, state, fold, writer, reconcile, view, resume]}
+  - {task: run 400 turns or diagnose a long run, read: [docs/agent/WIRE.yaml, docs/agent/RECORD.yaml, docs/agent/DEBUG.yaml, harness/loop.py, harness/budget.py, harness/memo.py, harness/retry.py]}
   - {path: docs/agent/WIRE.yaml, title: Agent wire, read_when: [change a tool, change observation bounding, change the stop policy, reason about cost], topics: [tools, observations, failures, stop/nudge, verify, request, cost, sim wires, header]}
   - {path: docs/agent/SERVER.yaml, title: Server, queue and workers, read_when: [operate the daemon, queue a task, diagnose a worker, change lifecycle, expose the mobile bridge], topics: [daemon, worker, queue, locks, reconcile, reload, restart, socket, mobile bridge, bearer token, directory allowlist]}
   - {path: docs/agent/WORKFLOWS.yaml, title: Change, test and verification workflows, read_when: [change code, add a test, add a scenario, add a check, commit], topics: [verification ladder, test map, recipes, manifest registration, commit protocol]}

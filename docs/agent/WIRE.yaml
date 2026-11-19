@@ -3,7 +3,7 @@ id: wire
 title: "Agent wire: tools, observations, cost"
 read_when: [change a tool, change observation bounding, change the stop condition, change verify behavior, reason about cost]
 source: [harness/api.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/bound.py, harness/ledger.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
-verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_length_nudge tests.test_turn_budget tests.test_verify tests.test_observe tests.test_tools tests.test_spawn tests.test_pricing", python3 run.py sim1 edge, python3 run.py sim2 edge2]
+verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_length_nudge tests.test_turn_budget tests.test_verify tests.test_observe tests.test_bound tests.test_tools tests.test_spawn tests.test_pricing tests.test_context_compact tests.test_loop_compaction tests.test_retry tests.test_obs_read", python3 run.py sim1 edge, python3 run.py sim2 edge2]
 
 messages:
   order: |
@@ -47,7 +47,7 @@ tools:
       - a timeout kills the process group and reports code=TIMEOUT
       - "a spawn failure reports code=127 and TypeName: message on stderr"
       - stdin is encoded UTF-8; the runner starts a new session so the timeout can kill the group
-      - bad or empty argv returns err bad_args exec requires argv:list[str], got <type>
+      - bad or empty argv returns err bad_args exec requires argv:list[str], got <type>; a str argv also names the ["sh","-c","..."] fix
       - a standalone shell operator token or a shell keyword in argv[0] returns err shell_syntax <detail>; exec has no shell, so use ["sh","-c","..."]
       - output is always exit=<code> ms=<dur> followed by the bounded payload
   write:
@@ -65,7 +65,8 @@ tools:
     details:
       - missing or empty path returns err bad_args edit requires path:str
       - old and new must be str; otherwise "err bad_args edit requires old:str and new:str; <key> incorrect"
-      - exactly one match is required; zero or multiple returns err match=<n> expected=1 <path> and does not change the file
+      - exactly one match is required; zero or multiple returns err match=<n> expected=1 <path> plus diagnostics and does not change the file
+      - multiple matches add lines=<1-based line numbers> hint=extend old with adjacent unique text; zero matches add near=<line> hint=check whitespace/indent, hint=file uses CRLF, or lines=<first significant-line hits>
       - success is "ok -<old bytes> +<new bytes> <path>" and a window from 40 bytes before to 40 bytes after the replacement
   done:
     signature: "done(result: str)"
@@ -92,8 +93,8 @@ observation:
   cases:
     - {when: binary sample, output: "kind=binary bytes=<n> sha256=<16 hex> head_hex=<24 bytes>"}
     - {when: "len(raw) <= run max_inline", output: raw UTF-8 text, verbatim}
-    - {when: larger text, output: "obs bytes=<n> lines=<n> sha=<12 hex> saved=<root-relative path>; then shown 1-<a> of <n>[; elided <a+1>-<b>], head:/tail: whole lines filling the byte bound, stderr_tail: up to 2 lines when stderr was not already shown, and next: sed -n <a+1>,<c>p <path> when lines are elided; that slice renders verbatim"}
-    - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>] [next: sed -n <a>,<b>p <path>]"}
+    - {when: larger text, output: "obs bytes=<n> lines=<n> sha=<12 hex> saved=<root-relative path>; then shown 1-<a> of <n>[; elided <a+1>-<b>], head:/tail: whole lines filling the byte bound, stderr_tail: up to 2 lines when stderr was not already shown, and one next: continuation: sed -n <a+1>,<c>p <path> when lines are elided, or tail -c +<byte> <path> when a shown line was cut or the payload is one over-bound line; following it always advances without losing bytes"}
+    - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>] [next: sed -n <a>,<b>p <path> | tail -c +<byte> <path>]"}
     - {when: no output, output: empty string}
   bounding:
     - valid UTF-8 text is never binary: only control bytes (<9, 14..31, 127) count, so non-ASCII characters stay readable; an invalid sample falls back to the byte rule (>20% of the first 4096 bytes outside printable ASCII)
@@ -101,9 +102,9 @@ observation:
     - binary output is not saved; the digest is the only recoverable description
     - large text is saved at .logs/runs/<run_id>/obs/obs-<k>.txt; k counts dispatched tool observations over the run; done and malformed-argument calls do not consume a name
     - saved paths are root-relative (.logs/runs/<run_id>/obs/obs-<k>.txt), so the agent reads one from the run cwd without knowing the run id; an obs dir outside the run root yields an absolute path
-    - head and tail lines are cut to 120 characters; a line appears once; when the text has at most 11 lines the two halves cover every line
+    - head and tail lines are cut to 120 characters; a cut line emits tail -c +<byte> so no byte is unreachable; a single over-bound line fills the byte allowance and resumes with tail -c; a line appears once; when the text has at most 11 lines the two halves cover every line
     - the ledger is derived from record events plus saved artifacts, so resume rebuilds the same sha->obs map; an exact repeat becomes a one-line reference because the earlier payload is already in the append-only message list
-    - read a saved file by grepping the line you need or by a small range; re-reading it whole is summarized again
+    - follow next: literally: sed -n for hidden lines, tail -c +n for a cut line; re-reading the whole saved file is summarized again
     - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set when a large text file was saved, including a reference to an earlier archive
     - "why 2048: recorded observations have p75 ~2.3KB and p90 ~6KB; the 2KB bound keeps ordinary calls verbatim, and the summary now spends that bound on whole head/tail lines (median ~40 visible lines, ~56% of a saved payload) plus a byte-sized next slice, so one read replaces several chunked probes"
 
@@ -115,7 +116,7 @@ failures:
     - {trigger: "write missing or empty path", observation: "err bad_args write requires path:str"}
     - {trigger: "edit missing or empty path", observation: "err bad_args edit requires path:str"}
     - {trigger: "edit missing or non-str old or new", observation: "err bad_args edit requires old:str and new:str; <key> incorrect"}
-    - {trigger: edit match count is not 1, observation: "err match=<n> expected=1 <path>"}
+    - {trigger: edit match count is not 1, observation: "err match=<n> expected=1 <path> [lines=... | near=... | hint=file uses CRLF]"}
     - {trigger: "done result is not a str", observation: "err bad_args done requires result:str, got <Type>"}
     - {trigger: "exec argv carries a standalone shell operator or a shell keyword at argv[0]", observation: "err shell_syntax <detail>; exec has no shell. Use [\"sh\",\"-c\",\"...\"]"}
     - {trigger: tool name is not exec, write, edit or done, observation: "err unknown_tool <name> expected one of exec, write, edit, done"}
@@ -160,3 +161,21 @@ sims:
     notes: exec plus structured edit; blank runs collapsed; output shape "$ code=<code> out=<n>B <body>"
     detail: saves the full payload when it exceeds 2000 bytes and inlines the first 2000 bytes only when the payload has at most 40 newlines; the binary digest has no bytes= or saved file
   scenarios: see docs/agent/WORKFLOWS.yaml for scenario commands and the fixture contract
+
+long_run:
+  context: "the request is rebuilt from record bytes; a compact event is the only intentional prefix break"
+  compaction:
+    watermark: "LOOP_CONTEXT_HIGH estimated prompt tokens; LOOP_CONTEXT_LOW target tail; LOOP_KEEP_TURNS verbatim floor"
+    digest: "deterministic memo over turns <= after: changed files, failures, recent commands; no model call and no clock"
+    event: "compact {after, from, count, digest, state, bytes, tokens, prompt}; the next request is system + task + digest + turns > after"
+    hysteresis: "when the post-compact floor is already above high, the next compact waits for floor + max(1024, high/4) so the prefix does not change every turn"
+  retry:
+    transient: "HTTP 408/409/425/429/5xx and URLError/timeout/empty choices retry with capped exponential backoff"
+    retry_after: "Retry-After wins, capped at 120 s"
+    context: "a 400 whose body names a context limit appends a forced compact and retries the same turn; four attempts max"
+    record: "retry {attempt, code, delay_ms, text} is audited but is not part of the message list"
+  output:
+    per_turn: "LOOP_TURN_TOKENS=16384 default; a length stop records the truncated turn, never executes it, and retries at wire.max_tokens"
+    safety: "eight consecutive length stops end output_limit; that is a runaway guard, not a turn or time cap"
+  reasoning: "wire.replay_reasoning=0 sends reasoning_content='' for old assistant turns; the field is required by thinking mode and empty is accepted"
+  observations: "read-like commands (cat, sed, head, tail, grep, ls, git diff) keep a contiguous head up to LOOP_READ_INLINE=8192; failures keep stderr_tail"

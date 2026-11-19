@@ -8,10 +8,10 @@ table. Code wins over docs: fix the doc and, when the contract is affected,
 prose belongs only in `README.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`,
 `CODE_OF_CONDUCT.md` and the GitHub issue/PR templates.
 
-Bootstrap: `python3 run.py --json` prints one compact `loop-index/1` line
-(purpose, runtime, entrypoints, checks, scenarios, docs, invariants, env, layout,
-record, wire). It reads `manifest.json` only: no tree walk, no module import, no
-absolute paths.
+Bootstrap: `python3 run.py --json [FIELD]` prints one compact `loop-index/1` line
+for the whole index or one dotted FIELD (purpose, runtime, entrypoints, checks,
+scenarios, docs, invariants, env, layout, record, wire). It reads `manifest.json`
+only: no tree walk, no module import, no absolute paths.
 
 ## What this tree is
 
@@ -21,8 +21,9 @@ as the only source of truth.
 
 - One exec waist: `exec`, `write`, `edit`, `done`.
 - Bounded observations: inline while small; larger text becomes a budget-filling
-  head/tail/stderr shape with a byte-sized `next:` slice and saved raw bytes;
-  binary output is a digest.
+  head/tail/stderr shape with one executable `next:` slice (`sed -n` for hidden
+  lines, `tail -c +n` for a cut long line) and saved raw bytes; binary output is
+  a digest.
 - Cache-aware accounting: the unchanged prefix is a cache hit, only the appended
   suffix is a miss.
 - Durable runs: one JSONL record per run; `view` is a pure function over bytes;
@@ -214,3 +215,23 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 - A declared verify command with `ran: false` is pending; a `ran: true` result is
   final and is never rerun on resume.
 - See `docs/agent/DEBUG.yaml` for the full symptom matrix and recovery order.
+
+## Long runs
+
+- No total turn or wall-clock cap. Bound one request (HTTP timeout), one
+  completion (per-turn ceiling with escalation), and one retry streak; never
+  the run.
+- Context is append-only except at a `compact` event. Compaction is a pure
+  function of record bytes: it drops whole old turns into a deterministic
+  digest and keeps a verbatim tail. It is the only intentional cache-prefix
+  break.
+- A transport failure retries with capped backoff and is audited as a `retry`
+  event. A context-length error forces one compact and retries the same turn.
+- `reasoning_content` stays in the record for audit, but new runs send the
+  required field empty (`LOOP_REPLAY_REASONING=0`) so old private thought is
+  not re-billed. The field must be present in thinking mode.
+- Read-like exec output keeps a contiguous head up to `LOOP_READ_INLINE` (8192
+  bytes); a failing command keeps its stderr tail. `exec` accepts `argv` (list,
+  literal) or `cmd` (string, `sh -c`).
+- A silent stop gets one nudge per streak; real tool work resets the streak. A
+  length stop is never executed and escalates the completion ceiling.

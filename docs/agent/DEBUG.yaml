@@ -109,3 +109,12 @@ escalation:
   - {layer: daemon/workers, read: docs/agent/SERVER.yaml, change: srv*.py, worker.py, queue.py plus tests}
   - {layer: contract, read: manifest.json, change: scripts/check_manifest.py must pass}
   - {layer: docs, read: docs/agent/, change: manifest.files plus index.yaml}
+
+long_run_symptoms:
+  cache_miss_every_turn: "a compact on every turn means the post-compact floor is above the high watermark; check compact.prompt vs LOOP_CONTEXT_HIGH and the hysteresis in harness/loop.py ensure(); raise high or lower keep_turns"
+  repeated_context_400: "the provider still rejects the prompt after four forced compacts; reduce LOOP_CONTEXT_HIGH and LOOP_KEEP_TURNS, inspect compact.state for a huge digest or one oversized recent observation"
+  output_limit: "eight consecutive finish_reason=length turns ended the run; split the write into append=true chunks, or raise LOOP_TURN_TOKENS/LOOP_MAX_TOKENS"
+  retry_storm: "retry events with growing delay_ms are transport backoff; check code and text, then LOOP_RETRY_ATTEMPTS/base/max. A 4xx is never retried"
+  stale_history: "a fact vanished from context: it was older than the last compact. Read compact.digest; the full bytes remain in record.jsonl and obs/. Add the durable fact to a workspace file before compacting"
+  lost_reasoning: "reasoning_content is present in the record but empty in later requests by design (LOOP_REPLAY_REASONING=0); set it to 1 only when a provider or task needs old thought replayed"
+  read_slice_repeats: "a read-mode next: command should advance by the shown line count; if it repeats, inspect bound.summary hidden_from/hidden_to and test_obs_read"

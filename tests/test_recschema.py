@@ -62,6 +62,14 @@ class RecSchemaTest(unittest.TestCase):
         with self.assertRaises(record.Corrupt):
             recschema.event(RUN_ID, 1, "end", {"exit": 0})
 
+    def test_wire_field_is_backward_compatible(self):
+        old = {"schema": "loop-wire/1", "system": "s", "tools": "[]",
+               "thinking": "{}", "model": "m", "max_tokens": 1,
+               "renderer": "obs/2", "sha": "x"}
+        recschema.check(recschema.event(RUN_ID, 1, "wire", old), RUN_ID, 1)
+        new = dict(old, replay_reasoning=False)
+        recschema.check(recschema.event(RUN_ID, 1, "wire", new), RUN_ID, 1)
+
     def test_view_doc_has_text_limits(self):
         limits = recschema.view_doc()["text_limits"]
         for key in ("args", "err", "obs", "task", "text"):

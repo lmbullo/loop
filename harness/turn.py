@@ -23,18 +23,71 @@ def is_length_nudge(text):
     return isinstance(text, str) and text.startswith(LENGTH_HEAD)
 
 
+def parse_args(raw):
+    """Parse a tool-call argument string, tolerating a fenced or prefixed object."""
+    if isinstance(raw, dict):
+        return raw, None
+    if not isinstance(raw, str):
+        return None, f"arguments are {type(raw).__name__}, not object"
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if "\n" in text:
+            text = text.split("\n", 1)[1]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    candidates = [text]
+    start = text.find("{")
+    if start > 0:
+        candidates.append(text[start:])
+    for candidate in candidates:
+        try:
+            args = json.loads(candidate, strict=False)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(args, dict):
+            return args, None
+        return None, f"arguments are {type(args).__name__}, not object"
+    return None, "malformed_arguments expected one JSON object"
+
+
 def canonical_args(raw):
-    try:
-        args = json.loads(raw, strict=False)
-    except (ValueError, TypeError):
-        return raw or "{}"
-    if not isinstance(args, dict):
-        return raw or "{}"
+    args, err = parse_args(raw)
+    if err is not None:
+        return raw if isinstance(raw, str) and raw else "{}"
     try:
         return json.dumps(args, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=False, allow_nan=False)
     except (ValueError, TypeError):
-        return raw or "{}"
+        return raw if isinstance(raw, str) and raw else "{}"
+
+
+def record_args(fn, args):
+    """A small, deterministic audit record; file bodies stay in the workspace."""
+    try:
+        if fn == "exec":
+            data = {"argv": args.get("argv") or args.get("cmd") or [],
+                    "cwd": args.get("cwd")}
+            if "stdin" in args:
+                data["stdin_bytes"] = len(str(args.get("stdin")).encode())
+            if "timeout_ms" in args:
+                data["timeout_ms"] = args.get("timeout_ms")
+        elif fn == "write":
+            text = args.get("data") if isinstance(args.get("data"), str) else ""
+            data = {"path": args.get("path"), "bytes": len(text.encode()),
+                    "append": args.get("append") is True}
+        elif fn == "edit":
+            old = args.get("old") if isinstance(args.get("old"), str) else ""
+            new = args.get("new") if isinstance(args.get("new"), str) else ""
+            data = {"path": args.get("path"), "old_bytes": len(old.encode()),
+                    "new_bytes": len(new.encode())}
+        else:
+            data = {}
+        return json.dumps(data, sort_keys=True, separators=(",", ":"),
+                          ensure_ascii=False)[:1000]
+    except (TypeError, ValueError):
+        return ""
 
 
 def read_turn(r, turn=0):
@@ -62,20 +115,19 @@ def read_turn(r, turn=0):
             choice.get("finish_reason"), message, text)
 
 
-def run_calls(message, obs_dir, root, obs_n, max_inline=None, ledger=None):
+def run_calls(message, obs_dir, root, obs_n, max_inline=None, ledger=None,
+              read_inline=None):
     calls = []
     done = None
     for call in message["tool_calls"]:
         fn = call["function"]["name"]
-        try:
-            args = json.loads(call["function"]["arguments"], strict=False)
-            if not isinstance(args, dict):
-                raise ValueError(f"arguments are {type(args).__name__}, not object")
-        except (ValueError, TypeError) as e:
-            obs = f"err malformed_arguments {e}"
+        args, err = parse_args(call["function"]["arguments"])
+        if err is not None:
+            obs = f"err {err}" if err.startswith("bad_args") else f"err malformed_arguments {err}"
             calls.append({"id": call["id"], "name": fn, "observation": obs,
                           "bytes": len(obs.encode()), "saved": None})
             continue
+        audit = record_args(fn, args)
         if fn == "done":
             result = args.get("result", "")
             if not isinstance(result, str):
@@ -91,12 +143,16 @@ def run_calls(message, obs_dir, root, obs_n, max_inline=None, ledger=None):
         try:
             obs = tools.dispatch(fn, args, obs_dir, f"obs-{obs_n}", root,
                                  rel_base=root, saved=saved, max_inline=max_inline,
-                                 ledger=ledger, obs_id=f"obs-{obs_n}")
+                                 ledger=ledger, obs_id=f"obs-{obs_n}",
+                                 read_inline=read_inline)
         except Exception as e:
             obs = (f"err harness {type(e).__name__}: {e}; "
-                   f"exec argv, write path+data, edit path+old+new")
-        calls.append({"id": call["id"], "name": fn, "observation": obs,
-                      "bytes": len(obs.encode()), "saved": saved[0] if saved else None})
+                   f"exec argv or cmd, write path+data, edit path+old+new")
+        entry = {"id": call["id"], "name": fn, "observation": obs,
+                 "bytes": len(obs.encode()), "saved": saved[0] if saved else None}
+        if audit:
+            entry["args"] = audit
+        calls.append(entry)
     return calls, done, obs_n
 
 

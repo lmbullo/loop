@@ -77,15 +77,13 @@ class AgentContextTest(unittest.TestCase):
 
     def test_header_requires_done_and_parallel_calls(self):
         text = agent.api.header()
-        self.assertIn("Call done(result)", text)
-        self.assertIn("Batch independent calls in one assistant message", text)
-        self.assertIn("write it once as", text)
-        self.assertIn("Large observations", text)
+        self.assertIn("done(result)", text)
+        self.assertIn("batch independent calls", text)
+        self.assertIn("one script", text)
         self.assertIn("shown a-b of N", text)
-        self.assertIn("next: sed -n a,bp", text)
-        self.assertIn("Empty text gets one nudge", text)
-        self.assertIn("Output is the budget", text)
-        self.assertIn("smallest change", text)
+        self.assertIn("sed", text)
+        self.assertIn("read-like", text.lower())
+        self.assertIn("no turn or time cap", text)
         self.assertNotIn("{max_inline}", text)
 
     def test_read_turn(self):
@@ -117,7 +115,7 @@ class AgentContextTest(unittest.TestCase):
     def test_context_uses_recorded_wire(self):
         spec = {"schema": "loop-wire/1", "system": "PINNED HEADER",
                 "tools": "[]", "thinking": "{}", "model": "m",
-                "max_tokens": 1, "renderer": "obs/2", "sha": "x"}
+                "max_tokens": 1, "renderer": "obs/3", "replay_reasoning": False, "sha": "x"}
         events = [event(RUN_ID, 1, "run_start", dict(RUN_START)),
                   event(RUN_ID, 2, "wire", spec)]
         msgs = agent.context(events, "t")

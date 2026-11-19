@@ -59,6 +59,12 @@ def lines(ev):
             out.append(f"[verify] ok={ok} exit={data['exit']} " + one(data["note"] or "", _limit("obs")))
         else:
             out.append("[verify] pending cmd=" + one(data["command"], _limit("obs")))
+    elif kind == "compact":
+        out.append(f"[compact] turns={data['count']} after={data['after']} "
+                   f"from={data['from']} bytes={data['bytes']}")
+    elif kind == "retry":
+        out.append(f"[retry] attempt={data['attempt']} code={data['code']} "
+                   f"delay_ms={data['delay_ms']} " + one(data["text"], _limit("err")))
     elif kind == "error":
         out.append(f"[err] code={data['code']} finish={data['finish']} "
                    + one(data["text"], _limit("err")))

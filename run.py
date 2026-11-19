@@ -64,6 +64,19 @@ def _record(record):
     }
 
 
+def select(doc, name):
+    """Resolve one dotted field of the compact index; KeyError when absent."""
+    cur = doc
+    for part in name.split("."):
+        if isinstance(cur, dict) and part in cur:
+            cur = cur[part]
+        elif isinstance(cur, list) and part.isdigit() and int(part) < len(cur):
+            cur = cur[int(part)]
+        else:
+            raise KeyError(part)
+    return cur
+
+
 def usage(manifest):
     lines = ["usage: python3 run.py <command> [args]", "", manifest["purpose"]["summary"], ""]
     for e in manifest["entrypoints"]:
@@ -72,7 +85,7 @@ def usage(manifest):
         for s in e.get("subcommands", []):
             lines.append(f"         {e['id']} {s['id']:<9}{s['usage']:<14} {s['role']}")
     lines += ["", "scenarios: " + ", ".join(manifest_scenarios(manifest))]
-    lines += ["", "index: python3 run.py --json  (" + INDEX_SCHEMA + ", one compact line)"]
+    lines += ["", "index: python3 run.py --json [FIELD]  (" + INDEX_SCHEMA + ", one compact line)"]
     lines += ["", "version: python3 run.py --version  (-v, --v)"]
     lines += ["", "contract: manifest.json"]
     return "\n".join(lines)
@@ -95,10 +108,18 @@ def main(argv):
         print(f"loop {manifest.get('version') or 'unknown'}")
         return 0
     if argv[0] == "--json":
-        if len(argv) > 1:
-            print("err --json takes no arguments", file=sys.stderr)
+        if len(argv) > 2:
+            print("err --json takes at most one FIELD", file=sys.stderr)
             return 2
-        print(json.dumps(agent_index(manifest), sort_keys=True, separators=(",", ":")))
+        doc = agent_index(manifest)
+        if len(argv) == 2:
+            try:
+                doc = select(doc, argv[1])
+            except KeyError:
+                keys = ", ".join(sorted(doc)) if isinstance(doc, dict) else "value"
+                print(f"err unknown field {argv[1]!r}; fields: {keys}", file=sys.stderr)
+                return 2
+        print(json.dumps(doc, sort_keys=True, separators=(",", ":")))
         return 0
     if argv[0] in ("-h", "--help", "help"):
         print(usage(manifest))

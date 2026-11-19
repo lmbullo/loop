@@ -29,13 +29,17 @@ def audit(run_id):
     spec = fold.wire(events)
     rows = []
     prev = None
+    prev_epoch = 0
     ratio_samples = []
     reuse = 0
+    compacts = [ev["seq"] for ev in events if ev["type"] == "compact"]
     for ev in events:
         if ev["type"] != "turn":
             continue
         now = fold.context(events[:ev["seq"] - 1], task, spec)
+        epoch = sum(1 for seq in compacts if seq < ev["seq"])
         prefix_ok = prev is None or now[:len(prev)] == prev
+        intentional = epoch != prev_epoch
         usage = ev["data"].get("usage") or {}
         hit = int(usage.get("hit") or 0)
         miss = int(usage.get("miss") or 0)
@@ -44,7 +48,8 @@ def audit(run_id):
         appended_bytes = sum(_bytes([m]) for m in appended)
         rows.append({"turn": int(ev["data"].get("turn") or 0),
                      "hit": hit, "miss": miss, "out": out,
-                     "prefix_ok": prefix_ok, "prompt_bytes": _bytes(now),
+                     "prefix_ok": prefix_ok or intentional, "intentional": intentional,
+                     "prompt_bytes": _bytes(now),
                      "appended_bytes": appended_bytes})
         if prev is not None and appended_bytes > 200 and miss > 0:
             ratio_samples.append(miss / appended_bytes)
@@ -52,9 +57,12 @@ def audit(run_id):
             if (call.get("observation") or "").startswith("same="):
                 reuse += 1
         prev = now
+        prev_epoch = epoch
     ratio = sorted(ratio_samples)[len(ratio_samples) // 2] if ratio_samples else 0.25
     breaks = []
     for row in rows:
+        if row.get("intentional"):
+            continue
         expected = row["appended_bytes"] * ratio + 172
         if row["turn"] > 1 and row["miss"] > expected * 2 + 256:
             breaks.append({"turn": row["turn"], "miss": row["miss"],
@@ -70,6 +78,7 @@ def audit(run_id):
             "context_bytes_max": max((r["prompt_bytes"] for r in rows), default=0),
             "prefix_ok": all(r["prefix_ok"] for r in rows),
             "reuse_refs": reuse, "cache_breaks": breaks,
+            "compactions": len(compacts),
             "cost": round(pricing.cost(hit, miss, out), 6)}
 
 
@@ -87,7 +96,8 @@ def main(argv):
            f"hit_frac={row['hit_frac']:.4f} hit={row['hit']} miss={row['miss']} "
            f"out={row['out']} cost=${row['cost']:.6f} "
            f"ctx_max={row['context_bytes_max']}B reuse={row['reuse_refs']} "
-           f"prefix_ok={row['prefix_ok']} breaks={len(row['cache_breaks'])}"))
+           f"prefix_ok={row['prefix_ok']} breaks={len(row['cache_breaks'])} "
+           f"compactions={row['compactions']}"))
     return 0
 
 

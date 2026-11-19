@@ -43,6 +43,25 @@ class ToolsTest(unittest.TestCase):
         out = tools.do_edit({"path": "a.txt", "old": "x"}, self.root)
         self.assertIn("err bad_args", out)
 
+    def test_edit_failure_reports_lines(self):
+        tools.do_write({"path": "a.txt", "data": "x\nx\n"}, self.root)
+        out = tools.do_edit({"path": "a.txt", "old": "x", "new": "y"}, self.root)
+        self.assertIn("match=2 expected=1 a.txt lines=1,2", out)
+
+    def test_edit_zero_match_hints_whitespace_and_crlf(self):
+        tools.do_write({"path": "a.txt", "data": "    foo\n    bar\n"}, self.root)
+        out = tools.do_edit({"path": "a.txt", "old": "  foo\n  bar\n", "new": "z"}, self.root)
+        self.assertIn("near=1", out)
+        tools.do_write({"path": "b.txt", "data": "foo\r\nbar\r\n"}, self.root)
+        out = tools.do_edit({"path": "b.txt", "old": "foo\nbar\n", "new": "z"}, self.root)
+        self.assertIn("CRLF", out)
+
+    def test_exec_string_argv_runs_through_sh(self):
+        out = tools.do_exec({"argv": "printf hi"}, self.obs, "o1", sandbox=self.root)
+        self.assertIn("hi", out)
+        out = tools.do_exec({"cmd": "printf bye"}, self.obs, "o2", sandbox=self.root)
+        self.assertIn("bye", out)
+
     def test_exec_rejects_shell_syntax(self):
         for argv in (["echo", "hi", "|", "cat"],
                      ["sh", "-c", "echo", "&&", "cat"],

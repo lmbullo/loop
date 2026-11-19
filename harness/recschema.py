@@ -85,10 +85,18 @@ def check(ev, run_id, seq):
         raise record.Corrupt(f"run={run_id} seq={seq}: unknown event type {ev['type']!r}")
     fields = spec["data"]
     data = ev["data"]
-    if not isinstance(data, dict) or set(data) != set(fields):
-        raise record.Corrupt(f"run={run_id} seq={seq}: {ev['type']} payload fields {sorted(data) if isinstance(data, dict) else type(data).__name__} != {sorted(fields)}")
+    required = {k for k in fields if not k.endswith("?")}
+    optional = {k[:-1] for k in fields if k.endswith("?")}
+    if not isinstance(data, dict) or not required <= set(data) <= required | optional:
+        raise record.Corrupt(
+            f"run={run_id} seq={seq}: {ev['type']} payload fields "
+            f"{sorted(data) if isinstance(data, dict) else type(data).__name__} "
+            f"!= {sorted(fields)}")
     for key, sub in fields.items():
-        _valid(data[key], sub, d["types"], f"{ev['type']}.{key}")
+        name = key[:-1] if key.endswith("?") else key
+        if name not in data:
+            continue
+        _valid(data[name], sub, d["types"], f"{ev['type']}.{name}")
 
 
 def event(run_id, seq, kind, data, ts=None):

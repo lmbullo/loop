@@ -101,8 +101,13 @@ class ManifestTest(unittest.TestCase):
         self.assertNotIn(ROOT, proc.stdout)
         again = run_py("--json")
         self.assertEqual(proc.stdout, again.stdout)
-        bad = run_py("--json", "extra")
+        field = run_py("--json", "purpose.summary")
+        self.assertEqual(field.returncode, 0, field.stderr)
+        self.assertEqual(field.stdout.strip(), json.dumps(doc["purpose"]["summary"]))
+        self.assertEqual(run_py("--json", "checks.0.id").stdout.strip(), json.dumps(doc["checks"][0]["id"]))
+        bad = run_py("--json", "missing")
         self.assertEqual(bad.returncode, 2)
+        self.assertEqual(run_py("--json", "checks", "extra").returncode, 2)
 
     def test_view_list_and_line_audit(self):
         with sandbox():

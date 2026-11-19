@@ -113,7 +113,7 @@ class AgentLoopTest(unittest.TestCase):
             run_id = record.new_id()
             spec = {"schema": "loop-wire/1", "system": "PINNED", "tools": "[]",
                     "thinking": "{}", "model": "m", "max_tokens": 1,
-                    "renderer": "obs/2", "sha": "x"}
+                    "renderer": "obs/3", "replay_reasoning": False, "sha": "x"}
             writer = recwrite.Writer(run_id)
             try:
                 writer.append("run_start", dict(RUN_START, root=tmp))
@@ -128,7 +128,7 @@ class AgentLoopTest(unittest.TestCase):
                 writer.close()
             seen = {}
 
-            def fake_call(msgs, key, wire=None):
+            def fake_call(msgs, key, wire=None, max_tokens=None):
                 seen["system"] = msgs[0]["content"]
                 seen["wire"] = wire["sha"]
                 return response(None, [call("done", {"result": "ok"})], "tool_calls")
@@ -175,7 +175,7 @@ class AgentLoopTest(unittest.TestCase):
         self.assertIn("same", obs[0])
         self.assertTrue(obs[1].startswith("exit=") and "same=obs-1" in obs[1])
 
-    def test_reasoning_content_is_recorded_and_replayed(self):
+    def test_reasoning_content_is_recorded_but_not_rebilled(self):
         reply = response(None, [call("exec", {"argv": ["true"]})], "tool_calls")
         reply["choices"][0]["message"]["reasoning_content"] = "because"
         summary, events = self.run_fake([
@@ -183,7 +183,7 @@ class AgentLoopTest(unittest.TestCase):
         self.assertEqual(summary["finish"], "done")
         first = events[2]["data"]["message"]
         self.assertEqual(first["reasoning_content"], "because")
-        self.assertEqual(fold.context(events, "t")[2]["reasoning_content"], "because")
+        self.assertEqual(fold.context(events, "t")[2]["reasoning_content"], "")
 
     def test_turn_module_owns_the_stop_policy(self):
         quiet = {"role": "assistant", "content": None, "tool_calls": []}

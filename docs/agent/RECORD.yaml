@@ -153,3 +153,19 @@ resume:
     - run the same loop and append turn*, any nudge*, then end
     - fall back to config.root() if the recorded root is missing; say so on stderr
   scope: resume is not part of the control plane
+
+long_run:
+  compact:
+    when: "appended before a turn when the estimated prompt exceeds the compact trigger, or after a context-length API error"
+    data: {after: int, from: int, count: int, digest: str, state: "json str", bytes: int, tokens: int, prompt: int}
+    effect: "fold.context replaces every turn <= after with one user message holding digest; the checkpoint is cumulative across compacts"
+  retry:
+    when: "one record event per transport retry before the next attempt"
+    data: {attempt: int, code: "0 for network, HTTP code otherwise", delay_ms: int, text: str}
+    effect: "audit only; retry events never enter the message list and never change the cached prefix"
+  call_args:
+    field: "call.args is an optional compact JSON audit: argv/cwd for exec, path/bytes for write, path/old_bytes/new_bytes for edit"
+    effect: "keeps command history available to the compaction digest and to offline audits without duplicating file bodies"
+  reasoning:
+    record: "turn.message.reasoning_content keeps the generated text"
+    replay: "wire.replay_reasoning=0 sends empty reasoning_content in later requests; the field is present, so thinking mode accepts it"

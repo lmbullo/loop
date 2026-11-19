@@ -1,6 +1,12 @@
 import os
+import shlex
 
 from . import config, observe, spawn
+
+READ_WORDS = frozenset((
+    "cat", "head", "tail", "sed", "grep", "egrep", "fgrep", "rg", "ag", "ack",
+    "ls", "find", "tree", "wc", "stat", "file", "nl", "diff", "git"))
+GIT_READ = frozenset(("diff", "show", "log", "status", "grep", "blame"))
 
 SHELL_OPS = frozenset(("|", "||", "&&", ";", "&", ">", ">>", "<", "<<", "2>", "2>>", "&>", "|&"))
 SHELL_WORDS = frozenset((
@@ -20,21 +26,51 @@ def shell_syntax(argv):
     return None
 
 
+def read_like(argv):
+    """True for commands whose output is content, not a build/test report."""
+    if not argv:
+        return False
+    if (os.path.basename(argv[0]) in ("sh", "bash", "dash", "zsh", "ksh")
+            and len(argv) >= 3 and argv[1] in ("-c", "-lc")):
+        try:
+            argv = shlex.split(argv[2])
+        except ValueError:
+            argv = argv[2].split()
+        if not argv:
+            return False
+    first = os.path.basename(argv[0])
+    if first == "git":
+        return len(argv) > 1 and argv[1] in GIT_READ
+    return first in READ_WORDS
+
+
 def do_exec(a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None,
-            ledger=None, obs_id=None):
+            ledger=None, obs_id=None, read_inline=None):
     argv = a.get("argv")
+    if isinstance(argv, str):
+        argv = ["sh", "-c", argv]
+    if argv is None and isinstance(a.get("cmd"), str):
+        argv = ["sh", "-c", a["cmd"]]
     if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
-        return f"err bad_args exec requires argv:list[str], got {type(argv).__name__}"
+        hint = "; send argv:list[str] or cmd:str for a shell command"
+        return f"err bad_args exec requires argv:list[str] or cmd:str, got {type(argv).__name__}{hint}"
     bad = shell_syntax(argv)
     if bad is not None:
         return bad
+    read = read_like(argv)
+    cap = max_inline
+    if read:
+        cap = read_inline if read_inline is not None else config.read_inline()
+        if max_inline is not None and read_inline is None:
+            cap = max_inline
     cwd = config.resolve(a.get("cwd") or ".", sandbox or config.root())
     code, out, err, dur = spawn.spawn(
         argv, cwd, a.get("stdin", ""), a.get("timeout_ms", config.exec_timeout_ms()),
         kill_group=True)
     return observe.render_exec(code, dur, out, err, obs_dir, name, sandbox=sandbox,
-                               rel_base=rel_base, saved=saved, max_inline=max_inline,
-                               ledger=ledger, obs_id=obs_id)
+                               rel_base=rel_base, saved=saved, max_inline=cap,
+                               ledger=ledger, obs_id=obs_id,
+                               mode="read" if read else "mixed")
 
 
 def do_write(a, sandbox=None):
@@ -59,6 +95,65 @@ def do_write(a, sandbox=None):
         return f"err {type(e).__name__}: {e}"
 
 
+def _line_numbers(data, needle, limit=8):
+    out, start = [], 0
+    while len(out) < limit:
+        i = data.find(needle, start)
+        if i < 0:
+            break
+        n = data.count(b"\n", 0, i) + 1
+        if n not in out:
+            out.append(n)
+        start = i + 1
+    return out
+
+
+def _whitespace_near(data, old):
+    """Line where the stripped old lines occur in order, if any."""
+    pos, first = 0, None
+    for part in old.splitlines():
+        part = part.strip()
+        if not part:
+            continue
+        i = data.find(part, pos)
+        if i < 0:
+            return None
+        if first is None:
+            first = data.count(b"\n", 0, i) + 1
+        pos = i + len(part)
+    return first
+
+
+def edit_error(data, old, path):
+    """Explain a non-unique match without spending a read turn."""
+    count = data.count(old)
+    if count == 1:
+        return None
+    out = [f"err match={count} expected=1 {path}"]
+    if count == 0 and b"\r\n" in data and b"\r" not in old:
+        crlf = old.replace(b"\n", b"\r\n")
+        if data.count(crlf) == 1:
+            out.append("hint=file uses CRLF; include \\r\\n in old")
+            return " ".join(out)
+    near = _whitespace_near(data, old) if count == 0 else None
+    if near is not None:
+        out.append(f"near={near} hint=check whitespace/indent")
+    else:
+        lines = _line_numbers(data, old) if count else []
+        if not lines and count == 0:
+            for part in old.splitlines():
+                part = part.strip()
+                if part:
+                    lines = _line_numbers(data, part, 2)
+                    if lines:
+                        break
+        if lines:
+            out.append("lines=" + ",".join(str(n) for n in lines))
+        if count > 1:
+            out.append("hint=extend old with adjacent unique text")
+    return " ".join(out)
+
+
 def do_edit(a, sandbox=None):
     if not isinstance(a.get("path"), str) or not a["path"]:
         return "err bad_args edit requires path:str"
@@ -73,7 +168,7 @@ def do_edit(a, sandbox=None):
         return f"err {type(e).__name__}: {e}"
     old, new = a["old"].encode(), a["new"].encode()
     if s.count(old) != 1:
-        return f"err match={s.count(old)} expected=1 {a['path']}"
+        return edit_error(s, old, a["path"])
     i = s.find(old)
     s2 = s[:i] + new + s[i + len(old):]
     with open(path, "wb") as f:
@@ -94,10 +189,10 @@ def _remember(text, ledger, obs_id):
 
 
 def dispatch(fn, a, obs_dir, name, sandbox=None, rel_base=None, saved=None, max_inline=None,
-             ledger=None, obs_id=None):
+             ledger=None, obs_id=None, read_inline=None):
     if fn == "exec":
         return do_exec(a, obs_dir, name, sandbox, rel_base, saved, max_inline,
-                       ledger, obs_id)
+                       ledger, obs_id, read_inline)
     if fn == "write":
         return _remember(do_write(a, sandbox), ledger, obs_id)
     if fn == "edit":

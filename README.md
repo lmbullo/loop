@@ -50,7 +50,7 @@ git clone https://github.com/lmbullo/loop.git
 cd loop
 
 python3 run.py --version    # release declared in manifest.json
-python3 run.py --json        # one compact loop-index/1 contract line
+python3 run.py --json        # one compact loop-index/1 contract line (FIELD selects a subtree)
 python3 run.py sim1 task     # deterministic exec-only simulation
 python3 run.py sim2 task2    # deterministic shape-aware simulation
 python3 run.py probe         # headless TUI frame
@@ -243,7 +243,7 @@ MIT. See [`LICENSE`](LICENSE).
 
 audience: agents. The agent contract starts here and in `AGENTS.md`.
 
-- bootstrap: `python3 run.py --json` -> one compact `loop-index/1` line
+- bootstrap: `python3 run.py --json [FIELD]` -> one compact `loop-index/1` line (or the FIELD subtree)
 - contract of record: `manifest.json`
 - rules: `AGENTS.md`
 - routes: `docs/agent/index.yaml`
@@ -258,3 +258,15 @@ If code and docs disagree, code wins: fix the doc and, when the contract is
 affected, `manifest.json` in the same commit. Keep machine text machine-first;
 human-facing prose belongs only in the human layer named at the top of this
 file.
+
+## Long runs
+
+The loop has no total turn or time cap. It bounds one request, one completion
+and one retry streak instead. When the estimated prompt crosses
+`LOOP_CONTEXT_HIGH`, it appends a `compact` event: old turns become a
+deterministic digest (changed files, failures, recent commands) and a recent
+tail stays verbatim. That is the only intentional cache-prefix break, so a
+400-turn run keeps a stable prefix between checkpoints. `compact` and `retry`
+events are auditable, and `python3 scripts/cache_audit.py RUN` reports them
+separately from accidental misses. Read-like output keeps an 8 KiB contiguous
+window, and a per-turn completion ceiling escalates only after a length stop.

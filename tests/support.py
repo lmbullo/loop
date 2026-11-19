@@ -11,7 +11,11 @@ RUN_ID = "20240101T000000000Z-abcdef01"
 ENV_KEYS = ("LOOP_ROOT", "LOOP_RUNS", "LOOP_REGISTRY", "LOOP_AUTH_FILE",
             "LOOP_API_KEY", "LOOP_MODEL", "LOOP_URL", "LOOP_MAX_TOKENS",
             "LOOP_THINK_BUDGET", "LOOP_MAX_INLINE", "LOOP_HTTP_TIMEOUT_S",
-            "LOOP_EXEC_TIMEOUT_MS", "LOOP_MOBILE_TOKEN", "LOOP_MOBILE_ROOTS")
+            "LOOP_EXEC_TIMEOUT_MS", "LOOP_MOBILE_TOKEN", "LOOP_MOBILE_ROOTS",
+            "LOOP_READ_INLINE", "LOOP_TURN_TOKENS", "LOOP_CONTEXT_HIGH",
+            "LOOP_CONTEXT_LOW", "LOOP_KEEP_TURNS", "LOOP_RETRY_ATTEMPTS",
+            "LOOP_RETRY_BASE_MS", "LOOP_RETRY_MAX_MS", "LOOP_LENGTH_RETRIES",
+            "LOOP_REPLAY_REASONING")
 
 RUN_START = {"task": "test task", "root": "/tmp/root", "entrypoint": "api",
              "model": "fake", "tools": ["exec", "write", "edit", "done"],

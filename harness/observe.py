@@ -59,13 +59,12 @@ def same(entry):
 
 
 def render_api(raw, obs_dir, name, max_inline=None, saved=None, rel_base=None,
-               ledger=None, obs_id=None):
+               ledger=None, obs_id=None, mode="mixed"):
     """Bound one observation.
 
     Small payloads stay verbatim. Larger ones are archived and replaced by a
-    fixed-size head/tail shape. A duplicate of an earlier payload becomes a
-    one-line reference, because that payload is already in the append-only
-    message list.
+    budget-filling shape; read-like output keeps a contiguous head. A
+    duplicate of an earlier payload becomes a one-line reference.
     """
     max_inline = config.max_inline() if max_inline is None else max_inline
     if not raw:
@@ -86,7 +85,7 @@ def render_api(raw, obs_dir, name, max_inline=None, saved=None, rel_base=None,
         path = save(raw, obs_dir, f"{name}.txt", rel_base)
         if saved is not None:
             saved.append(path)
-        text = bound.summary(raw, path, max_inline)
+        text = bound.summary(raw, path, max_inline, mode)
     if ledger is not None:
         nxt = next((l[6:] for l in text.split("\n") if l.startswith("next: ")), None)
         ledger.add(raw, obs_id or name, saved[-1] if saved else None,
@@ -95,10 +94,10 @@ def render_api(raw, obs_dir, name, max_inline=None, saved=None, rel_base=None,
 
 
 def render_exec(code, dur, out, err, obs_dir, name, sandbox=None, rel_base=None,
-                saved=None, max_inline=None, ledger=None, obs_id=None):
+                saved=None, max_inline=None, ledger=None, obs_id=None, mode="mixed"):
     raw = out + (STDERR_SEP + err if err else b"")
     body = render_api(raw, obs_dir, name, max_inline=max_inline, saved=saved,
-                      rel_base=rel_base, ledger=ledger, obs_id=obs_id)
+                      rel_base=rel_base, ledger=ledger, obs_id=obs_id, mode=mode)
     return f"exit={code} ms={dur}\n" + body
 
 

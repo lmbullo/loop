@@ -50,7 +50,8 @@ class ObserveTest(unittest.TestCase):
         self.assertIn("obs bytes=", out)
         self.assertIn("saved=", out)
         self.assertIn("sha=", out)
-        self.assertLess(len(out.encode()), len(raw) // 2)
+        self.assertLessEqual(len(out.encode()), bound)
+        self.assertIn("next: tail -c +", out)
         self.assertEqual(saved, ["obs/o1.txt"])
         with open(os.path.join(self.obs, "o1.txt"), "rb") as f:
             self.assertEqual(f.read(), raw)

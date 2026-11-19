@@ -49,7 +49,8 @@ test_map:
   - {test: test_recwrite.py, contract: append/fsync, per-run and tree locks, seal, reconcile, torn-tail repair}
   - {test: test_view.py, contract: text render, derived markers, loop-view/1 round-trip, list rows}
   - {test: test_pricing.py, contract: manifest rates and the cost formula}
-  - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, budget-filling head/tail/stderr shape, byte-sized next slice, saved bytes, exact-repeat same=obs-N ledger}
+  - {test: test_observe.py, contract: binary detection, three bounding rules, the 2048-byte default bound, budget-filling head/tail/stderr shape, executable next continuation, saved bytes, exact-repeat same=obs-N ledger}
+  - {test: test_bound.py, contract: line-range and tail -c observation continuations, utf8-safe clipping}
   - {test: test_audit.py, contract: "offline cache audit projection: prefix growth, reuse references, wire sha"}
   - {test: test_output_audit.py, contract: "offline output audit: reasoning/argument/result split, top turns and truncations"}
   - {test: test_length_nudge.py, contract: "loop integration: one length-specific nudge after a truncated reply"}
@@ -171,7 +172,7 @@ recipes:
     - "run: python3 -m unittest tests.test_verify and python3 run.py view --schema"
   tool_or_observation:
     - update harness/tools.py, harness/observe.py or harness/spawn.py
-    - update tests/test_tools.py, tests/test_observe.py or tests/test_spawn.py
+    - update tests/test_tools.py, tests/test_observe.py, tests/test_bound.py or tests/test_spawn.py
     - update manifest.wire shape/threshold text
     - update docs/agent/WIRE.yaml
     - exercise python3 run.py sim1 edge and python3 run.py sim2 edge2
@@ -243,3 +244,18 @@ ci:
   python: "3.12 on Ubuntu; 15-minute timeout"
   steps: [compile, line and tui audits, check_manifest, unittest, verify --skip-server, tracked-file secret scan, git status --porcelain]
   rule: keep the tree clean; CI fails on untracked or modified files left by a check
+
+long_run_workflow:
+  goal: "finish 400 turns without a total cap while keeping the cached prefix stable and output small"
+  steps:
+    - [1, "use the compact default: LOOP_CONTEXT_HIGH=64000, LOOP_CONTEXT_LOW=32000, LOOP_KEEP_TURNS=16"]
+    - [2, "batch independent reads in one assistant message; read-like exec output is contiguous up to 8192 bytes"]
+    - [3, "on a length stop the harness records the truncated turn, escalates to LOOP_MAX_TOKENS, and retries; split a write if it repeats"]
+    - [4, "on a 5xx/429/network error the harness emits retry events and resumes the turn; a context 400 forces one compact"]
+    - [5, "after the run, audit: make audit RUN=... and make output RUN=...; compact breaks should be separated from accidental breaks"]
+  evidence:
+    - [tests/test_turn_budget.py, "400 turns reach done with no cap"]
+    - [tests/test_loop_compaction.py, "400 turns compact, bounded context, output escalation, context-error recovery"]
+    - [tests/test_context_compact.py, "deterministic digest and checkpoint context"]
+    - [tests/test_retry.py, "transient retry, auth fatal, context classification"]
+    - [tests/test_obs_read.py, "contiguous read window and stderr tail"]

@@ -5,8 +5,9 @@ import sys
 from . import record, regstore, registry
 
 SCHEMA = "loop-reload/1"
-MODULES = ("harness.config", "harness.api", "harness.observe",
-           "harness.tools", "harness.pricing")
+MODULES = ("harness.config", "harness.api", "harness.bound", "harness.observe",
+           "harness.spawn", "harness.tools", "harness.ledger", "harness.pricing",
+           "harness.budget", "harness.memo", "harness.retry")
 _seen = None
 
 
