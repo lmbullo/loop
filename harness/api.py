@@ -1,39 +1,73 @@
+"""The wire: tool schemas, the static system header, one model call.
+
+The schema, the header, the model and the limits are one snapshot per run, so
+the prefix stays a cache hit; only a task or an observation is ever appended.
+Argument order mirrors `tools.SIGNATURES`, and every schema carries the failure
+contract in its own description: a tool that cannot say how it fails costs a
+turn to learn.
+"""
+
 import json
 import urllib.request
 
-from . import config
+from . import config, tools
 
 TOOLS = [
     {"type": "function", "function": {
         "name": "exec",
-        "description": "Run argv (list) with no shell, or cmd (str) through sh -c. "
-                       "Read-like output stays contiguous up to the read bound.",
+        "description": "Run cmd (str) through sh -c for pipes, globs and compound "
+                       "lines, or argv (list) for literal spawn. Read-like output "
+                       "stays contiguous up to 8 KiB; larger output is saved and "
+                       "shaped with one runnable next: call.",
         "parameters": {"type": "object", "properties": {
-            "argv": {"type": "array", "items": {"type": "string"}},
-            "cmd": {"type": "string"},
-            "cwd": {"type": "string"}, "stdin": {"type": "string"},
+            "cmd": {"type": "string",
+                    "description": "one shell line, e.g. 'cd sub && grep -n x f | head'"},
+            "argv": {"type": "array", "items": {"type": "string"},
+                     "description": "literal argv, no shell: ['git','status']"},
+            "cwd": {"type": "string", "description": "relative to the workspace root"},
+            "stdin": {"type": "string"},
             "timeout_ms": {"type": "integer"}}, "required": []}}},
+    {"type": "function", "function": {
+        "name": "read",
+        "description": "Numbered lines of one file, paged: start/end for a range, "
+                       "find (+ctx) for pattern hits, offset for a long single line. "
+                       "Prints shown a-b of N and a runnable next: call.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string"},
+            "start": {"type": "integer", "description": "first line, 1-based"},
+            "end": {"type": "integer", "description": "last line, inclusive"},
+            "find": {"type": "string", "description": "regex; returns matching ranges"},
+            "ctx": {"type": "integer", "description": "context lines around a find hit"},
+            "offset": {"type": "integer", "description": "byte offset into the file"}},
+            "required": ["path"]}}},
     {"type": "function", "function": {
         "name": "write",
         "description": "Write UTF-8 data; append=true continues a chunked file. "
-                       "Prefer edit when a small span changes.",
+                       "Whole-file write; use edit for a small span.",
         "parameters": {"type": "object", "properties": {
             "path": {"type": "string"}, "data": {"type": "string"},
             "append": {"type": "boolean"}}, "required": ["path", "data"]}}},
     {"type": "function", "function": {
         "name": "edit",
-        "description": "Replace one occurrence; old is the smallest unique span. "
-                       "Batch independent edits as calls in one message.",
+        "description": "Replace unique spans in one atomic call: old+new, or "
+                       "edits:[{old,new}], all-or-nothing. A miss reports match "
+                       "count, line numbers and the fix, never a traceback.",
         "parameters": {"type": "object", "properties": {
-            "path": {"type": "string"}, "old": {"type": "string"},
-            "new": {"type": "string"}}, "required": ["path", "old", "new"]}}},
+            "path": {"type": "string"},
+            "old": {"type": "string"}, "new": {"type": "string"},
+            "edits": {"type": "array", "description": "batch of {old,new} hunks",
+                      "items": {"type": "object", "properties": {
+                          "old": {"type": "string"}, "new": {"type": "string"}},
+                          "required": ["old", "new"]}},
+            "replace_all": {"type": "boolean"}},
+            "required": ["path"]}}},
     {"type": "function", "function": {
         "name": "done",
         "description": "End the run with compact evidence: changed paths, checks, risk.",
         "parameters": {"type": "object", "properties": {
             "result": {"type": "string"}}, "required": ["result"]}}},
 ]
-WIRE_SCHEMA = "loop-wire/1"
+WIRE_SCHEMA = "loop-wire/2"
 
 BASE = """\
 This repo is agent-facing: machine text, not human prose.
@@ -49,35 +83,46 @@ Act in the fewest turns:
 - prefer edit over write; write append=true for a file larger than one reply
 - never re-read a path whose bytes are already in the message list
 - when a probe would repeat, write one script that answers every branch
-- observations are shaped: `shown a-b of N`; run the printed `next:` command to
-  advance. Read-like commands (cat, sed, head, tail, grep, ls, git diff) keep up
-  to 8 KiB contiguous, so ask for a range in one call.
+- observations are shaped: `shown a b of N`; the printed `next:` line is the
+  exact call that continues it, so copy it instead of deriving a range.
+  Read-like commands keep up to 8 KiB contiguous; run one command per call.
 - `same=obs-N` is a byte-identical earlier observation; do not fetch it again
 - a failed call explains the fix; do not send it unchanged
 
 Output is billed. Never echo file contents, diffs or long lists into tool
 arguments or done.result. done.result = changed paths, checks run, residual
 risk. There is no turn or time cap; call done(result) when the task is done.
-
-exec(argv | cmd, cwd?, stdin?, timeout_ms?) -> observation
-  argv is literal; cmd runs through sh -c. One call can batch independent work.
-write(path, data, append?) -> observation
-edit(path, old, new) -> observation
-  old must match exactly once.
-done(result) -> finishes the run.
 """
+
+# One note per signature; the call lines themselves come from tools.SIGNATURES so
+# the header cannot describe a tool the dispatcher does not have.
+NOTES = {
+    "exec": "  cmd is one shell line through sh -c; argv is literal, no shell. Either key\n"
+            "  alone works. cwd defaults to the workspace root and persists nowhere, so put\n"
+            "  `cd sub &&` inside one cmd instead of a separate call.",
+    "read": "  Numbered lines plus one executable next: call; no shell quoting needed.",
+    "write": "  Whole-file write; append=true continues a chunked file.",
+    "edit": "  old+new or edits:[{old,new}], all-or-nothing; returns a numbered window.",
+    "done": "  Ends the run.",
+}
 
 
 def model():
-    return config.env("LOOP_MODEL", "deepseek-flash")
+    return config.env("LOOP_MODEL", config.DEFAULT_MODEL)
 
 
 def url():
-    return config.env("LOOP_URL", "https://api.deepseek.com/chat/completions")
+    return config.env("LOOP_URL", config.DEFAULT_URL)
+
+
+def signatures():
+    """Call lines in dispatch order, each with its one-line note."""
+    order = ("exec", "read", "write", "edit", "done")
+    return "\n" + "\n".join(tools.SIGNATURES[name] + "\n" + NOTES[name] for name in order)
 
 
 def header():
-    return BASE
+    return BASE + signatures() + "\n"
 
 
 def thinking():
@@ -89,19 +134,11 @@ def max_tokens():
 
 
 def snapshot():
-    """Snapshot the request-static prefix once per run.
-
-    A soft reload may re-import this module mid-run. The worker passes the
-    snapshot back into call(), so the system header, tool schemas, model,
-    thinking budget and reasoning-replay policy cannot change between turns
-    of one run.
-    """
     spec = {"schema": WIRE_SCHEMA, "system": header(),
             "tools": json.dumps(TOOLS, sort_keys=True, separators=(",", ":")),
             "thinking": json.dumps(thinking(), sort_keys=True, separators=(",", ":")),
             "model": model(), "max_tokens": max_tokens(),
-            "renderer": config.RENDERER,
-            "replay_reasoning": config.replay_reasoning()}
+            "renderer": config.RENDERER, "replay_reasoning": config.replay_reasoning()}
     return dict(spec, sha=_sha(spec))
 
 

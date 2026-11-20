@@ -7,6 +7,7 @@ succeed (auth, bad request, context length) is raised immediately so the loop
 can decide whether compaction or a terminal error is the right answer.
 """
 
+import http.client
 import json
 import random
 import time
@@ -84,8 +85,10 @@ def call(msgs, key, wire=None, max_tokens=None, on_retry=None):
             last_code, last_text = exc.code, exc.text
             if exc.code not in RETRY_HTTP:
                 raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError,
-                ValueError, json.JSONDecodeError) as exc:
+        except (urllib.error.URLError, http.client.HTTPException, TimeoutError,
+                ConnectionError, OSError, ValueError, json.JSONDecodeError) as exc:
+            # A body cut mid-read is IncompleteRead, an HTTPException and not an
+            # OSError, so it needs its own place in the transport class.
             last_code, last_text = 0, f"{type(exc).__name__}: {exc}"[:600]
         if attempt >= attempts or code not in RETRY_HTTP and code != 0:
             raise Error(last_code, last_text, attempt)

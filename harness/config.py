@@ -18,6 +18,8 @@ DEFAULT_LENGTH_RETRIES = 8
 DEFAULT_EXEC_TIMEOUT_MS = 600000
 RENDERER = "obs/3"
 DEFAULT_AUTH_FILE = "~/.pi/agent/auth.json"
+DEFAULT_MODEL = "deepseek-flash"
+DEFAULT_URL = "https://api.deepseek.com/chat/completions"
 
 
 def asset(*parts):

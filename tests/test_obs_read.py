@@ -2,7 +2,7 @@ import re
 import tempfile
 import unittest
 
-from harness import bound, observe, tools
+from harness import bound, cmds, observe
 
 
 class ReadShapeTest(unittest.TestCase):
@@ -40,11 +40,11 @@ class ReadShapeTest(unittest.TestCase):
         self.assertLessEqual(len(out.encode()), 1024)
 
     def test_read_like_classification(self):
-        self.assertTrue(tools.read_like(["sed", "-n", "1,5p", "x"]))
-        self.assertTrue(tools.read_like(["git", "diff"]))
-        self.assertTrue(tools.read_like(["sh", "-c", "grep -n x | head"]))
-        self.assertFalse(tools.read_like(["python3", "-m", "unittest"]))
-        self.assertFalse(tools.read_like(["sh", "-c", "pytest -q"]))
+        self.assertTrue(cmds.read_like(["sed", "-n", "1,5p", "x"]))
+        self.assertTrue(cmds.read_like(["git", "diff"]))
+        self.assertTrue(cmds.read_like(["sh", "-c", "grep -n x | head"]))
+        self.assertFalse(cmds.read_like(["python3", "-m", "unittest"]))
+        self.assertFalse(cmds.read_like(["sh", "-c", "pytest -q"]))
 
 
 if __name__ == "__main__":

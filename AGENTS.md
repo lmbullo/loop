@@ -19,11 +19,17 @@ A research harness for a tool-calling agent loop. It compares tool and
 observation designs by token cost and correctness, using an append-only record
 as the only source of truth.
 
-- One exec waist: `exec`, `write`, `edit`, `done`.
+- Five tools, one waist: `exec` (literal argv or `cmd` through `sh -c`), `read`
+  (numbered, paged lines of one file), `write`, `edit` (atomic multi-hunk) and
+  `done`. No other name dispatches; a malformed-argument call is answered with
+  `err bad_args` and is never executed with `{}`.
 - Bounded observations: inline while small; larger text becomes a budget-filling
   head/tail/stderr shape with one executable `next:` slice (`sed -n` for hidden
   lines, `tail -c +n` for a cut long line) and saved raw bytes; binary output is
-  a digest.
+  a digest; an exact repeat of an earlier observation is one `same=obs-<k>` line.
+- `read` is the second paging waist: `shown a-b of N` plus at most one `next:`
+  line (`read(path=P, start=N)` or `read(path=P, offset=N)`) that resumes the
+  same slice; run it literally instead of refetching the file.
 - Cache-aware accounting: the unchanged prefix is a cache hit, only the appended
   suffix is a miss.
 - Durable runs: one JSONL record per run; `view` is a pure function over bytes;
@@ -54,12 +60,18 @@ as the only source of truth.
 - The record is append-only; one event per fsynced line; `end` is the only
   completion marker. A missing `end` is the interrupted marker.
 - Observations are verbatim except for the bounding rule in `harness/observe.py` and `harness/bound.py`;
-  text over the run's bound is summarized and its raw bytes are saved.
+  text over the run's bound is summarized and its raw bytes are saved, and a
+  byte-identical earlier observation is rendered as `same=obs-<k>` with the same
+  `next:` slice. Tool errors are observations, never harness crashes.
 - The system header, tool schema, model, `max_tokens`, thinking budget and
   renderer are constant per run and snapshotted in the `wire` event at run
   start; task and observations enter after that static prefix, so a soft reload
   cannot break the cache. `reasoning_content` is replayed because thinking mode
   requires it.
+- The wire schema is `loop-wire/2` (`api.WIRE_SCHEMA`). The header renders its
+  tool lines from `tools.SIGNATURES` and `api.TOOLS` renders the schemas, so a
+  tool exists once and never as hand-written prose; a `loop-wire/1` record
+  replays with its recorded text and is never rewritten.
 - Output is metered and reported, never gated.
 - A terminal turn with no tool call and no text is not final on its own: after
   turn 1 the loop records one `nudge` user message and retries; a second silent
@@ -77,7 +89,7 @@ as the only source of truth.
   `records/` artifacts may carry historical `/home/...` strings as data; they are
   never inputs.
 - `exec` argv is literal: no shell, globs, pipes or redirects unless the caller
-  passes `sh -c` explicitly.
+  passes `sh -c` explicitly or uses `cmd`. `read` has no shell syntax at all.
 - Source modules stay under 200 lines. Split, do not grow.
 - A `verify` event is evidence, not a gate: it stores `exit`; view renders
   `ok=1` when exit is 0 and `ok=0` otherwise; no command -> no event.
@@ -121,6 +133,7 @@ python3 scripts/doctor.py           # local environment health
 python3 scripts/repo_map.py         # file/entrypoint map for agents
 python3 scripts/cache_audit.py RUN_ID  # prefix growth, hit/miss/out/cost, suspected breaks
 python3 scripts/output_audit.py RUN_ID  # reasoning/tool/result split, top-output turns, truncations
+python3 scripts/call_audit.py RUN_ID    # tool call shapes, failures, repeats, refetches; loop-call-audit/1
 ```
 
 Never run a real `api` call or `resume RUN_ID` in an offline verification. They
@@ -194,6 +207,9 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
   and no suspected cache breaks.
 - Default, prompt or tool changes: `make output RUN_ID` shows the completion
   split and any length truncations; use it before claiming an output reduction.
+- Tool-call changes: `python3 scripts/call_audit.py RUN_ID` reports call names
+  and shapes, fail kinds and refetched reads; an unexplained fail kind or repeat
+  means the tool contract is wrong, not the model.
 - `git status --short` is empty except for intended files.
 - The commit subject/body pass `scripts/commit_check.py`.
 - Any changed public behavior is reflected in `manifest.json` and `docs/agent/`
@@ -209,7 +225,13 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
 - A second `api` queues a front item and streams that run; it does not attach to
   the in-flight run. The tree lock makes it wait.
 - `write` replaces a file by default; pass `append: true` to append.
-- `edit` requires exactly one match; fix the caller, not the matcher.
+- `edit` requires exactly one match per hunk; `edits: [...]` applies all or
+  nothing. Fix the caller, not the matcher; pass `replace_all: true` explicitly.
+- Follow a printed `next:` line literally. Re-reading a whole file or a whole
+  saved `obs` file costs a summarized turn; the slice is the cheap path.
+- A call whose arguments are malformed JSON or not an object gets
+  `err bad_args <fn> not dispatched`; it is never run with `{}` and never
+  consumes an `obs` name.
 - Binary observations are a digest only; raw bytes are not saved. Large text
   bytes are saved under the run's `obs/`.
 - A declared verify command with `ran: false` is pending; a `ran: true` result is
@@ -226,12 +248,14 @@ lines; `agent:` is required by this file. Never commit `.logs/`,
   digest and keeps a verbatim tail. It is the only intentional cache-prefix
   break.
 - A transport failure retries with capped backoff and is audited as a `retry`
-  event. A context-length error forces one compact and retries the same turn.
+  event; `http.client.HTTPException` (a body cut mid-read) counts as transport.
+  A context-length error forces one compact and retries the same turn.
 - `reasoning_content` stays in the record for audit, but new runs send the
   required field empty (`LOOP_REPLAY_REASONING=0`) so old private thought is
   not re-billed. The field must be present in thinking mode.
 - Read-like exec output keeps a contiguous head up to `LOOP_READ_INLINE` (8192
   bytes); a failing command keeps its stderr tail. `exec` accepts `argv` (list,
-  literal) or `cmd` (string, `sh -c`).
+  literal) or `cmd` (string, `sh -c`); `read` pages a file the same way and
+  prints the one `next:` call that continues it.
 - A silent stop gets one nudge per streak; real tool work resets the streak. A
   length stop is never executed and escalates the completion ceiling.

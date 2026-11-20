@@ -17,7 +17,7 @@ facts:
   record: ".logs/runs/<run_id>/record.jsonl; end is the only completion marker"
   tree_lock: ".logs/run.lock; one run per tree; a second api queues a front item and waits"
   network: api and resume RUN_ID only; both cost real tokens
-  tools: [exec, write, edit, done]
+  tools: [exec, read, write, edit, done]
   request: "model LOOP_MODEL; max_tokens LOOP_MAX_TOKENS (65536, the model ceiling); thinking enabled with LOOP_THINK_BUDGET (32768); the run start snapshots model, tools, system, max_tokens, thinking and renderer into a wire event; authorization from LOOP_API_KEY or LOOP_AUTH_FILE"
   turns: "no turn cap in the run loop: it continues until done, an empty terminal stop after the one silent nudge, or should_stop; a truncated (finish=length) turn is never executed and is retried without a retry limit; tests/test_turn_budget.py runs a 400-turn task"
   verify: "run.py api --verify CMD; declared before the first turn, run after the terminal turn, recorded as verify events before end; view derives ok=1 from exit 0 and ok=0 otherwise"
@@ -26,8 +26,11 @@ facts:
   silent_stop: "a turn with no tool call and no text gets one recorded nudge after turn 1; a second silent stop is finish=no_tool_call"
   sim_pricing: "sim1 and sim2 projections call pricing.cost, so cache rates come from manifest.cost_model"
   cache_audit: "python3 scripts/cache_audit.py [RUN_ID] [--json] rebuilds every request prefix from record bytes, asserts it only grows and reports hit/miss/out/cost, reuse references, peak context and suspected cache breaks; offline, no model call"
+  call_audit: "python3 scripts/call_audit.py [RUN_ID] [--json] (loop-call-audit/1) reports per-run call names and argument shapes, failure kinds, repeated and refetched reads, and the hit/miss/out/reasoning_c split; offline, no model call"
+  read_contract: "read pages one file and prints shown a-b of N plus at most one 'next: read(path=P, start=N|offset=N)'; a printed continuation is run literally instead of re-reading the file"
+  bad_args: "arguments that are not one JSON object, or that lack a required field, are answered 'err bad_args <fn> not dispatched: <why>' and never executed with {}; the turn continues"
   binary_obs: binary is a digest; raw bytes are not saved
-  schemas: {record: loop-record/1, wire: loop-wire/1, view: loop-view/1}
+  schemas: {record: loop-record/1, wire: loop-wire/2, view: loop-view/1}
   install: "sh install.sh -> $HOME/.local/bin/loop; --system -> /usr/local/bin/loop; --uninstall removes the launcher"
 
 docs:
@@ -46,6 +49,10 @@ routes:
   - {task: inspect a run without executing, read: [docs/agent/RECORD.yaml], run: [python3, run.py, view, RUN_ID]}
   - {task: audit cache reuse or a suspected cache break, read: [docs/agent/WIRE.yaml, docs/agent/WORKFLOWS.yaml], run: [make, audit]}
   - {task: change a tool or observation rule, read: [docs/agent/WIRE.yaml, docs/agent/WORKFLOWS.yaml], run: [python3, run.py, sim1, edge]}
+  - {task: change the read tool, its numbered ranges or the next: continuation, read: [docs/agent/WIRE.yaml, docs/agent/MAP.yaml], run: [python3, -m, unittest, tests.test_read]}
+  - {task: change shell classification or exec argv/cmd handling, read: [docs/agent/WIRE.yaml, docs/agent/MAP.yaml], run: [python3, -m, unittest, tests.test_cmds]}
+  - {task: change multi-hunk edit semantics or match diagnostics, read: [docs/agent/WIRE.yaml, docs/agent/MAP.yaml], run: [python3, -m, unittest, tests.test_edits]}
+  - {task: audit tool call shapes, failures or refetched reads, read: [docs/agent/WIRE.yaml, docs/agent/DEBUG.yaml], run: [python3, scripts/call_audit.py, RUN_ID, --json]}
   - {task: change the terminal or nudge stop policy, read: [docs/agent/WIRE.yaml, docs/agent/RECORD.yaml], run: [python3, -m, unittest, tests.test_agent_loop]}
   - {task: add or change a post-run verify command, read: [docs/agent/WIRE.yaml, docs/agent/RECORD.yaml], run: [python3, -m, unittest, tests.test_verify]}
   - {task: operate or debug the control plane, read: [docs/agent/SERVER.yaml, docs/agent/DEBUG.yaml], run: [python3, run.py, server, status]}
@@ -111,6 +118,8 @@ commands:
     - [python3, scripts/cache_audit.py, RUN_ID, --json]
     - [python3, scripts/output_audit.py, RUN_ID]
     - [python3, scripts/output_audit.py, RUN_ID, --json]
+    - [python3, scripts/call_audit.py, RUN_ID]
+    - [python3, scripts/call_audit.py, RUN_ID, --json]
     - [python3, scripts/verify.py, --list]
   network_and_cost:
     - [python3, run.py, api, TASK]

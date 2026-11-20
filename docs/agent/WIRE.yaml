@@ -2,8 +2,8 @@ schema: loop-agent-doc/1
 id: wire
 title: "Agent wire: tools, observations, cost"
 read_when: [change a tool, change observation bounding, change the stop condition, change verify behavior, reason about cost]
-source: [harness/api.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/tools.py, harness/observe.py, harness/bound.py, harness/ledger.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
-verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_length_nudge tests.test_turn_budget tests.test_verify tests.test_observe tests.test_bound tests.test_tools tests.test_spawn tests.test_pricing tests.test_context_compact tests.test_loop_compaction tests.test_retry tests.test_obs_read", python3 run.py sim1 edge, python3 run.py sim2 edge2]
+source: [harness/api.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/tools.py, harness/cmds.py, harness/read.py, harness/edits.py, harness/observe.py, harness/bound.py, harness/ledger.py, harness/spawn.py, harness/verifier.py, harness/pricing.py, manifest.wire, manifest.cost_model, manifest.env]
+verify: ["python3 -m unittest tests.test_agent_context tests.test_agent_loop tests.test_length_nudge tests.test_turn_budget tests.test_verify tests.test_observe tests.test_bound tests.test_tools tests.test_cmds tests.test_read tests.test_edits tests.test_bad_args tests.test_spawn tests.test_pricing tests.test_context_compact tests.test_loop_compaction tests.test_retry tests.test_obs_read", python3 run.py sim1 edge, python3 run.py sim2 edge2]
 
 messages:
   order: |
@@ -30,50 +30,70 @@ messages:
 
 request:
   endpoint: "LOOP_URL, default https://api.deepseek.com/chat/completions"
-  body: {model: "wire.model, default LOOP_MODEL deepseek-flash", messages: "the folded list", tools: "wire.tools", max_tokens: "wire.max_tokens, default 65536", thinking: "wire.thinking, default {type: enabled, budget_tokens: LOOP_THINK_BUDGET 32768}"}
-  wire: "loop-wire/1; at run start api.snapshot() records the request-static fields into a wire event, and later turns pass that snapshot to api.call, so a soft reload cannot change the cached prefix"
+  body: "{model: \"wire.model, default LOOP_MODEL deepseek-flash\", messages: \"the folded list\", tools: \"wire.tools\", max_tokens: \"wire.max_tokens, default 65536\", thinking: \"wire.thinking, default {type: enabled, budget_tokens: LOOP_THINK_BUDGET 32768}\"}"
+  wire: "loop-wire/2; at run start api.snapshot() records the request-static fields into a wire event, and later turns pass that snapshot to api.call, so a soft reload cannot change the cached prefix"
+  wire_v2: "the header carries the tool lines rendered from tools.SIGNATURES plus one note each, so the block that used to name four tools by hand cannot drift from the dispatcher; a loop-wire/1 record still replays with its recorded system text and is never rewritten"
   auth: "Bearer LOOP_API_KEY, else LOOP_AUTH_FILE.deepseek.key"
   timeout: "LOOP_HTTP_TIMEOUT_S; 0 or unset (the default) means no urlopen timeout; a positive value is a per-call cap in seconds"
 
 tools:
-  source: harness/api.py TOOLS; run_start.tools records the four names in order
+  source: harness/api.py TOOLS; run_start.tools records the five names in order
+  spelling: harness/tools.py SIGNATURES is the one spelling of each call; api.signatures() renders the header lines from it plus one note per tool (api.NOTES), and tests/test_tools.py pins TOOLS names and order to SIGNATURES
   exec:
-    signature: "exec(argv: [str], cwd?: str, stdin?: str, timeout_ms?: int)"
-    behavior: spawn argv literally; return exit, duration, stdout, stderr
+    signature: "exec(cmd?|argv?, cwd?, stdin?, timeout_ms?)"
+    behavior: cmd runs through sh -c; argv spawns literally; return exit, duration, stdout, stderr
     details:
-      - no shell, globs, pipes, redirects or expansion; use ["sh","-c","..."] only when a shell is required
+      - cmd alone, or argv alone; a str argv becomes ["sh","-c",str]; command is accepted as an alias for cmd; cwd and the command's effects persist nowhere, so batch with a compound cmd
+      - no shell, globs, pipes, redirects or expansion for argv; use cmd or ["sh","-c","..."] when a shell is required
       - cwd resolves against the run root (LOOP_ROOT for api, the recorded root on resume) when relative; default cwd is .
       - default timeout is LOOP_EXEC_TIMEOUT_MS (600000 ms in production); 0 disables the per-command timeout; the model may pass timeout_ms per call; sims default to 10000 ms
       - a timeout kills the process group and reports code=TIMEOUT
       - "a spawn failure reports code=127 and TypeName: message on stderr"
       - stdin is encoded UTF-8; the runner starts a new session so the timeout can kill the group
-      - bad or empty argv returns err bad_args exec requires argv:list[str], got <type>; a str argv also names the ["sh","-c","..."] fix
-      - a standalone shell operator token or a shell keyword in argv[0] returns err shell_syntax <detail>; exec has no shell, so use ["sh","-c","..."]
+      - no cmd and no argv list[str] returns 'err bad_args exec needs cmd:"<shell line>" or argv:["prog","arg"]'
+      - a standalone shell operator token or a shell keyword in argv[0] returns err shell_syntax <detail> from harness/cmds.py; exec has no shell, so use cmd
       - output is always exit=<code> ms=<dur> followed by the bounded payload
+  read:
+    signature: "read(path, start?, end?, find?, ctx?, offset?)"
+    behavior: "numbered lines of one file, paged; prints shown a-b of N and one executable next: call"
+    details:
+      - "path is resolved against the run root; a directory yields \"obs <path> kind=dir entries=<n>\" plus names with / on directories, and a next: call when the list is cut"
+      - start and end are 1-based inclusive; start clamps to 1..total, end<=0 or absent means total, end below start collapses to start; rows render as "<n>| <line>" with an aligned number width
+      - find is a regular expression (invalid regex falls back to a literal substring) and each hit keeps ctx context lines; overlapping or adjacent hit ranges merge; at most 12 groups; no hit returns "obs <path> lines=<n> matches=0 hint=check find, or pass start/end"
+      - "offset is a byte offset into the file and pages one long line: \"obs <path> bytes=<n> offset=<start>\" plus utf8-safe text and a next: read(path=..., offset=<next byte>) when bytes remain; it wins over start/end/find"
+      - "every shape ends in at most one continuation line, \"next: read(path=P, start=N)\" or \"next: read(path=P, offset=N)\"; P is quoted only when it holds a space or a quote"
+      - the row budget is LOOP_READ_INLINE (8192 bytes) or the run max_inline; lines that do not fit are cut by bound.cut and the first omitted line number becomes start in next:
+      - binary content returns "kind=binary <path> bytes= sha256= head_hex=", like an observation digest, and empty files return "obs <path> lines=0 bytes=0" plus "(empty)"
+      - "a missing path or an OSError returns \"err read <path>: <strerror>\""
+      - a missing or empty path returns "err bad_args read requires path:str; optional start, end, find, ctx, offset"
+      - "no shell quoting, no globs and no refetch: run the printed next: line literally, and read a saved obs file the same way"
   write:
-    signature: "write(path: str, data: str, append?: bool)"
+    signature: "write(path, data, append?)"
     behavior: write UTF-8 at path; replace unless append is exactly true; create parents
     details:
       - data must be str; content is accepted as an alias for data and adds note=content taken as data
-      - missing or non-str data returns "err bad_args write requires data:str (content accepted), got <Type>"
-      - missing or empty path returns err bad_args write requires path:str
+      - a missing or non-str data returns "err bad_args write needs path:str and data:str, got data=<Type>; for a large body send two calls with append=true"
+      - a missing or empty path returns err bad_args write needs path:str and data:str
       - success is "ok wrote <n>B <path>" plus " replaced=<prior>B" or " appended_to=<prior>B" when the file existed
       - append is true only when the JSON value is exactly true; any other value replaces
   edit:
-    signature: "edit(path: str, old: str, new: str)"
-    behavior: replace exactly one byte occurrence; return a 40-byte context window
+    signature: "edit(path, old?, new?, edits?, replace_all?)"
+    behavior: replace unique spans atomically in one call; a miss changes nothing
     details:
-      - missing or empty path returns err bad_args edit requires path:str
-      - old and new must be str; otherwise "err bad_args edit requires old:str and new:str; <key> incorrect"
-      - exactly one match is required; zero or multiple returns err match=<n> expected=1 <path> plus diagnostics and does not change the file
-      - multiple matches add lines=<1-based line numbers> hint=extend old with adjacent unique text; zero matches add near=<line> hint=check whitespace/indent, hint=file uses CRLF, or lines=<first significant-line hits>
-      - success is "ok -<old bytes> +<new bytes> <path>" and a window from 40 bytes before to 40 bytes after the replacement
+      - "three accepted shapes: old+new, edits:[{old,new}, ...], or find+replace; edits[] must be a non-empty list whose every hunk has old:str and new:str"
+      - "hunks apply in order to the evolving bytes and the file is written once at the end, so the batch is all-or-nothing: one failing hunk leaves the original bytes intact"
+      - each hunk must match exactly once unless replace_all is exactly true; old must not be empty
+      - one matching old is still one hunk; independent edits belong in edits[] or in parallel calls of one assistant message
+      - a miss returns "err match=<n> expected=1 <path>" plus diagnostics and does not change the file; with more than one hunk it is prefixed "hunk=<i>/<n> "
+      - multiple matches add "lines=<1-based line numbers>" and hint=extend old with adjacent unique text, or pass replace_all=true; zero matches add near=<line> hint=check whitespace/indent, or hint=file uses CRLF; include \\r\\n in old, or lines=<first signature line> hint=old text differs from this line, or hint=old not found; read the file and copy its exact bytes
+      - a missing file adds hint=create it with write(path=<path>, data=...) when the error is ENOENT
+      - success is "ok -<old bytes> +<new bytes> <path>" (prefixed "ok edits=<n> " for a batch, suffixed " all=true" under replace_all) with "lines=<match lines>" and a numbered window of the changed region, so no read turn is needed to confirm
   done:
-    signature: "done(result: str)"
+    signature: "done(result)"
     behavior: finish the task; result goes to turn.done.result and end.result
     details:
       - result must be str; a non-str result becomes err bad_args done requires result:str, got <Type> and the run continues
-    dispatch: not dispatched; harness/turn.py sets turn.done and breaks the call list; any other name returns err unknown_tool <name> expected one of exec, write, edit, done
+    dispatch: not dispatched; harness/turn.py sets turn.done and breaks the call list; any other name returns err unknown_tool <name> expected one of exec, read, write, edit, done plus the signatures line
 
 verify:
   entry: "run.py api --verify CMD [--] [TASK|-]"
@@ -97,32 +117,38 @@ observation:
     - {when: byte-identical to an earlier observation in the run, output: "same=obs-<k> bytes=<n> [saved=<path>] [next: sed -n <a>,<b>p <path> | tail -c +<byte> <path>]"}
     - {when: no output, output: empty string}
   bounding:
-    - valid UTF-8 text is never binary: only control bytes (<9, 14..31, 127) count, so non-ASCII characters stay readable; an invalid sample falls back to the byte rule (>20% of the first 4096 bytes outside printable ASCII)
+    - "valid UTF-8 text is never binary: only control bytes (<9, 14..31, 127) count, so non-ASCII characters stay readable; an invalid sample falls back to the byte rule (>20% of the first 4096 bytes outside printable ASCII)"
     - a multi-byte character cut by the 4096-byte sample boundary still counts as text
     - binary output is not saved; the digest is the only recoverable description
     - large text is saved at .logs/runs/<run_id>/obs/obs-<k>.txt; k counts dispatched tool observations over the run; done and malformed-argument calls do not consume a name
     - saved paths are root-relative (.logs/runs/<run_id>/obs/obs-<k>.txt), so the agent reads one from the run cwd without knowing the run id; an obs dir outside the run root yields an absolute path
-    - head and tail lines are cut to 120 characters; a cut line emits tail -c +<byte> so no byte is unreachable; a single over-bound line fills the byte allowance and resumes with tail -c; a line appears once; when the text has at most 11 lines the two halves cover every line
+    - head and tail lines are cut to 200 characters (bound.LINE_WIDTH); a cut line emits tail -c +<byte> so no byte is unreachable; a single over-bound line fills the byte allowance and resumes with tail -c; a line appears once; when the text has at most 11 lines the two halves cover every line
     - the ledger is derived from record events plus saved artifacts, so resume rebuilds the same sha->obs map; an exact repeat becomes a one-line reference because the earlier payload is already in the append-only message list
-    - follow next: literally: sed -n for hidden lines, tail -c +n for a cut line; re-reading the whole saved file is summarized again
+    - "follow next: literally: sed -n for hidden lines, tail -c +n for a cut line; re-reading the whole saved file is summarized again"
     - call.bytes is the byte length of the rendered observation, not the raw subprocess payload; call.saved is set when a large text file was saved, including a reference to an earlier archive
     - "why 2048: recorded observations have p75 ~2.3KB and p90 ~6KB; the 2KB bound keeps ordinary calls verbatim, and the summary now spends that bound on whole head/tail lines (median ~40 visible lines, ~56% of a saved payload) plus a byte-sized next slice, so one read replaces several chunked probes"
 
 failures:
   rule: tool errors are observations, not harness crashes; the model decides whether to retry
+  bad_args_rule: "an unparseable call is never dispatched; it becomes \"err bad_args <fn> not dispatched: <why>; re-send the call as one JSON object\" and the recorded arguments keep the caller's raw text"
   table:
-    - {trigger: arguments is not valid JSON or not an object, observation: "err malformed_arguments <detail>"}
-    - {trigger: write missing or non-str data, observation: "err bad_args write requires data:str (content accepted), got <Type>"}
-    - {trigger: "write missing or empty path", observation: "err bad_args write requires path:str"}
-    - {trigger: "edit missing or empty path", observation: "err bad_args edit requires path:str"}
-    - {trigger: "edit missing or non-str old or new", observation: "err bad_args edit requires old:str and new:str; <key> incorrect"}
-    - {trigger: edit match count is not 1, observation: "err match=<n> expected=1 <path> [lines=... | near=... | hint=file uses CRLF]"}
+    - {trigger: "arguments is not valid JSON, is empty, or is not one object", observation: "err bad_args <fn> not dispatched: <why>; re-send the call as one JSON object"}
+    - {trigger: "exec has neither cmd nor argv:list[str]", observation: "err bad_args exec needs cmd:\"<shell line>\" or argv:[\"prog\",\"arg\"]"}
+    - {trigger: "write missing, empty or non-str data", observation: "err bad_args write needs path:str and data:str, got data=<Type>; for a large body send two calls with append=true"}
+    - {trigger: "write missing or empty path", observation: "err bad_args write needs path:str and data:str"}
+    - {trigger: "read missing or empty path", observation: "err bad_args read requires path:str; optional start, end, find, ctx, offset"}
+    - {trigger: "edit missing or empty path", observation: "err bad_args edit needs path:str"}
+    - {trigger: "edit carries none of old+new, edits[], find+replace", observation: "err bad_args edit needs path, then old:str + new:str, edits:[{old,new}, ...] or find+replace"}
+    - {trigger: "edit edits[] is empty or a hunk lacks old or new", observation: "err bad_args edit edits must be a non-empty list of {old,new} | err bad_args edit edits[<i>] needs old:str and new:str"}
+    - {trigger: "edit old is empty", observation: "err bad_args edit old must not be empty"}
+    - {trigger: "edit hunk match count is not 1", observation: "[hunk=<i>/<n> ]err match=<n> expected=1 <path> [lines=... | near=... | hint=file uses CRLF]"}
     - {trigger: "done result is not a str", observation: "err bad_args done requires result:str, got <Type>"}
-    - {trigger: "exec argv carries a standalone shell operator or a shell keyword at argv[0]", observation: "err shell_syntax <detail>; exec has no shell. Use [\"sh\",\"-c\",\"...\"]"}
-    - {trigger: tool name is not exec, write, edit or done, observation: "err unknown_tool <name> expected one of exec, write, edit, done"}
-    - {trigger: tool body raises, observation: "err harness <TypeName>: <detail>; exec argv, write path+data, edit path+old+new"}
-    - {trigger: file open or write fails, observation: "err <TypeName>: <detail>"}
-  malformed_rule: malformed arguments and harness errors are appended as call observations; the turn continues
+    - {trigger: "read hits a missing path or an OSError", observation: "err read <path>: <strerror>"}
+    - {trigger: "exec argv carries a standalone shell operator or a shell keyword at argv[0]", observation: "err shell_syntax <detail>; exec has no shell. Use cmd:\"...\" for pipes, redirects or compound commands"}
+    - {trigger: "tool name is not exec, read, write, edit or done", observation: "err unknown_tool <name> expected one of exec, read, write, edit, done; signatures: <SIGNATURES>"}
+    - {trigger: "tool body raises", observation: "err harness <TypeName>: <detail>; exec argv or cmd, read path, write path+data, edit path+old+new or edits"}
+    - {trigger: "file open or write fails", observation: "err <TypeName>: <detail>"}
+  malformed_rule: every row above is appended as the call observation and the turn continues; a malformed-arguments call is also left undispatched and consumes no obs name
 
 cost:
   rates: manifest.cost_model.pricing_per_1M, re-read when the manifest mtime/size changes
@@ -136,15 +162,16 @@ cost:
   accounting:
     - each turn.usage.cost is rounded to 6 decimals
     - end sums hit, miss, out, reasoning_c and computes the run cost once
-    - output is completion tokens: reasoning + tool arguments + result; scripts/output_audit.py splits the recorded total
+    - "output is completion tokens: reasoning + tool arguments + result; scripts/output_audit.py splits the recorded total"
     - the unchanged prefix is a cache hit; only the appended suffix is a miss; output bills highest; because reasoning_content is replayed, it joins the cached prefix after its turn
     - the sim projection uses bytes/4 as tokens and pricing.cost, so rates come from the manifest
   audit: "python3 scripts/cache_audit.py [RUN_ID] [--json] replays the recorded prefixes offline; prefix_ok=True and no suspected cache breaks mean the static prefix only grew; make audit RUN=<id> is the wrapper"
+  call_audit: "python3 scripts/call_audit.py [RUN_ID] [--json] (loop-call-audit/1) replays the recorded calls: per-run call names and argument shapes, fail kinds, repeated or refetched reads and the hit/miss/out/reasoning_c split; no model call"
   output_audit: "make output RUN=<id> wraps python3 scripts/output_audit.py [RUN_ID] [--json]; it splits completion tokens into reasoning, tool arguments and result, names the turns with the largest output and counts length truncations; no model call"
 
 header:
   function: api.header()
-  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, output rules (reason as deeply as needed, smallest change, chunked writes only when a file is too large, uncapped result), done and one-nudge stop semantics with unlimited length retries, parallel-call and repeated-probe-script guidance, large-observation guidance, and the four tool signatures
+  content: append-only messages, one JSONL event per fsynced record line, end as the only completion marker, one run per tree, literal argv, the cost model, output rules (reason as deeply as needed, smallest change, chunked writes only when a file is too large, uncapped result), done and one-nudge stop semantics with unlimited length retries, parallel-call and repeated-probe-script guidance, large-observation guidance, and five tool signatures rendered from tools.SIGNATURES
   stability: constant bytes for every run; no max_inline, task, root or model value enters it, so the first system message is a reusable cache prefix; each run also stores the text in its wire event
   migration: records with no wire event replay with the current api.header(); a resumed old run appends a wire event before its next turn, paying one prefix change
   refresh: a soft reload may re-import api, but the worker passes the run's recorded wire snapshot to context and call, so the static prefix does not change mid-run; new runs pick up edited text
@@ -170,7 +197,7 @@ long_run:
     event: "compact {after, from, count, digest, state, bytes, tokens, prompt}; the next request is system + task + digest + turns > after"
     hysteresis: "when the post-compact floor is already above high, the next compact waits for floor + max(1024, high/4) so the prefix does not change every turn"
   retry:
-    transient: "HTTP 408/409/425/429/5xx and URLError/timeout/empty choices retry with capped exponential backoff"
+    transient: "HTTP 408/409/425/429/5xx, URLError/timeout/empty choices and http.client.HTTPException (a response body cut mid-read, including IncompleteRead) retry with capped exponential backoff; a cut body is transport, not a fatal outcome"
     retry_after: "Retry-After wins, capped at 120 s"
     context: "a 400 whose body names a context limit appends a forced compact and retries the same turn; four attempts max"
     record: "retry {attempt, code, delay_ms, text} is audited but is not part of the message list"

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import unittest.mock
 
-from harness import agent, fold, recwrite
+from harness import agent, fold, recwrite, tools
 from tests.support import END, NUDGE, RUN_ID, RUN_START, TURN, event, sandbox
 
 
@@ -34,22 +34,17 @@ class AgentContextTest(unittest.TestCase):
                   turn_with_call(2),
                   turn_with_call(3, done)]
         got = agent.derive(events)
-        self.assertEqual(got["task"], RUN_START["task"])
-        self.assertEqual(got["root"], RUN_START["root"])
-        self.assertEqual(got["turn"], 3)
-        self.assertEqual(got["obs_n"], 2)
-        self.assertEqual(got["done"], done)
+        self.assertEqual((got["task"], got["root"], got["turn"], got["obs_n"], got["done"]),
+                         (RUN_START["task"], RUN_START["root"], 3, 2, done))
         self.assertEqual(got["max_inline"], RUN_START["max_inline"])
 
     def test_context_fold(self):
         events = [event(RUN_ID, 1, "run_start", dict(RUN_START)),
                   turn_with_call(2)]
         msgs = agent.context(events, RUN_START["task"])
-        self.assertEqual(msgs[0]["role"], "system")
-        self.assertEqual(msgs[1], {"role": "user", "content": RUN_START["task"]})
         self.assertEqual(msgs[2]["role"], "assistant")
         self.assertEqual(msgs[3], {"role": "tool", "tool_call_id": "c1", "content": "ok"})
-        self.assertEqual(len(msgs), 4)
+        self.assertEqual(tuple(m["role"] for m in msgs), ("system", "user", "assistant", "tool"))
 
     def test_derive_and_context_include_one_nudge(self):
         events = [event(RUN_ID, 1, "run_start", dict(RUN_START)),
@@ -60,8 +55,8 @@ class AgentContextTest(unittest.TestCase):
         msgs = agent.context(events, RUN_START["task"])
         self.assertEqual(msgs[2]["content"], None)
         self.assertNotIn("tool_calls", msgs[2])
-        self.assertEqual(msgs[3], {"role": "user", "content": NUDGE["text"]})
-        self.assertEqual(msgs[4]["role"], "assistant")
+        self.assertEqual((msgs[3], msgs[4]["role"]),
+                         ({"role": "user", "content": NUDGE["text"]}, "assistant"))
         self.assertEqual(msgs[5], {"role": "tool", "tool_call_id": "c1", "content": "ok"})
     def test_context_header_is_stable_across_inline_limits(self):
         one = dict(RUN_START, max_inline=1234)
@@ -80,9 +75,11 @@ class AgentContextTest(unittest.TestCase):
         self.assertIn("done(result)", text)
         self.assertIn("batch independent calls", text)
         self.assertIn("one script", text)
-        self.assertIn("shown a-b of N", text)
-        self.assertIn("sed", text)
+        self.assertIn("shown a b of N", text)
+        self.assertIn("next:", text)
         self.assertIn("read-like", text.lower())
+        for line in tools.SIGNATURES.values():
+            self.assertIn(line, text)
         self.assertIn("no turn or time cap", text)
         self.assertNotIn("{max_inline}", text)
 
@@ -122,16 +119,22 @@ class AgentContextTest(unittest.TestCase):
         self.assertEqual(msgs[0]["content"], "PINNED HEADER")
         self.assertEqual(fold.derive(events)["wire"]["sha"], "x")
 
-    def test_run_calls_malformed_and_done(self):
+    def test_run_calls_bad_arguments_are_not_dispatched(self):
+        cases = (("[]", "arguments are list"), ("", "arguments are empty"),
+                 ("   ", "arguments are empty"), ("{oops", "expected one JSON object"))
         with tempfile.TemporaryDirectory() as tmp:
-            message = {"tool_calls": [
-                {"id": "bad", "function": {"name": "exec", "arguments": "[]"}},
-                {"id": "done", "function": {"name": "done", "arguments": '{"result":"r"}'}}]}
-            calls, done, obs_n = agent.run_calls(message, tmp, tmp, 0)
-            self.assertEqual(len(calls), 1)
-            self.assertIn("malformed_arguments", calls[0]["observation"])
-            self.assertEqual(done, {"id": "done", "result": "r"})
-            self.assertEqual(obs_n, 0)
+            for raw, expect in cases:
+                message = {"tool_calls": [
+                    {"id": "bad", "function": {"name": "exec", "arguments": raw}},
+                    {"id": "ok", "function": {"name": "done",
+                                              "arguments": '{"result":"r"}'}}]}
+                calls, done, obs_n = agent.run_calls(message, tmp, tmp, 0)
+                obs = calls[0]["observation"]
+                self.assertTrue(obs.startswith("err bad_args exec"), obs)
+                self.assertIn("not dispatched", obs)
+                self.assertIn(expect, obs)
+                self.assertNotIn("requires argv", obs)
+                self.assertEqual((done, obs_n), ({"id": "ok", "result": "r"}, 0))
 
     def test_run_calls_use_run_inline_limit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -172,9 +175,8 @@ class AgentContextTest(unittest.TestCase):
                 summary = agent.finish(writer, lambda ev: ev, events, 1, "done", "ok", 0)
             finally:
                 writer.close()
-            self.assertEqual(summary["exit"], 0)
-            self.assertEqual(summary["finish"], "done")
-            self.assertEqual(summary["turns"], 1)
+            self.assertEqual((summary["exit"], summary["finish"], summary["turns"]),
+                             (0, "done", 1))
             self.assertEqual(summary["hit"], TURN["usage"]["hit"])
             self.assertTrue(os.path.isfile(os.path.join(
                 os.path.dirname(writer.path), "record.jsonl")))
@@ -187,8 +189,7 @@ class AgentContextTest(unittest.TestCase):
                 summary = agent.stopped(writer, events, 0)
             finally:
                 writer.close()
-            self.assertEqual(summary["exit"], 130)
-            self.assertEqual(summary["finish"], "stopped")
+            self.assertEqual((summary["exit"], summary["finish"]), (130, "stopped"))
 
     def test_end_shape(self):
         self.assertEqual(END["result"], "ok")

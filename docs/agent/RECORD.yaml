@@ -12,7 +12,8 @@ paths:
   tree_lock: .logs/run.lock
   rule: one record per run, co-located with its obs/; the tree lock allows one run per tree
 
-wire_schema: loop-wire/1
+wire_schema: loop-wire/2
+wire_schema_note: "the wire event stores whatever schema its run was started with; a loop-wire/1 record is replayed with its recorded system text and tools and is never rewritten, so only new runs carry the five-tool header"
 
 run_id:
   pattern: "^[0-9]{8}T[0-9]{6}[0-9]{3}Z-[0-9a-f]{8}$"

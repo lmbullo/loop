@@ -27,6 +27,7 @@ entrypoints:
 execution_model:
   api_client: starts or attaches to the daemon, submits a front-of-queue task, streams record bytes from disk
   worker: detached process; owns the run, the tree lock and the record writer
+  calls: turn.run_calls dispatches exec, read, write and edit; done settles without dispatch; an unparseable call is answered err bad_args and never reaches a tool body
   server: control plane only; never executes a model turn
   resume: exception; executes in the client process and takes the tree lock itself
   second_api: queues a new front item and streams that run; it does not attach to the in-flight run
@@ -46,7 +47,7 @@ runtime_flow: |
               -> fold.context()       wire + turns + nudges -> messages
               -> api.call()           model
               -> turn.read_turn()     usage, message, text
-              -> turn.run_calls()     exec/write/edit; done settles without dispatch
+              -> turn.run_calls()     exec/read/write/edit; done settles without dispatch
               -> writer.append("turn")
               -> turn.stop()          continue | one nudge | done/no_tool_call
               -> writer.append("nudge") only for the one silent-stop retry
@@ -66,12 +67,15 @@ modules:
     - {path: harness/close.py, owns: "finish/stop summaries, credential gate, verify-at-end"}
     - {path: harness/budget.py, owns: "token estimates and deterministic compaction boundary"}
     - {path: harness/memo.py, owns: "checkpoint state and bounded digest over compacted turns"}
-    - {path: harness/retry.py, owns: "transport retry/backoff and context-length classification"}
-    - {path: harness/turn.py, owns: "one model turn: response parsing, canonical short call ids and compact args, tool-call dispatch, done-result validation, terminal/nudge stop policy"}
+    - {path: harness/retry.py, owns: "transport retry/backoff and context-length classification; http.client.HTTPException counts as transport (a body cut mid-read)"}
+    - {path: harness/turn.py, owns: "one model turn: response parsing, canonical short call ids and compact args, tool-call dispatch, err bad_args for an unparseable call (never dispatched as {}), done-result validation, terminal/nudge stop policy"}
     - {path: harness/fold.py, owns: "pure record fold: totals, derived state, wire snapshot, pending verify, request messages"}
     - {path: harness/verifier.py, owns: "run the verify command through sh -c at the run root; exit code plus one evidence line"}
     - {path: harness/api.py, owns: "tool schemas, system header, per-run wire snapshot, model id, HTTP call"}
-    - {path: harness/tools.py, owns: "exec, write, edit bodies and dispatch; edit reports match lines and near misses; exec forwards the bounded ledgered renderer"}
+    - {path: harness/tools.py, owns: "exec, read, write, edit bodies and one dispatch; read pages a file with an executable next:; edit delegates to edits.py; exec forwards the bounded ledgered renderer"}
+    - {path: harness/cmds.py, owns: "shell classification only, never execution: argv tokens, quoted compound segments, read-like vs mixed for the observation shape, shell_syntax fix"}
+    - {path: harness/read.py, owns: "numbered file access: start/end range, find+ctx ranges, offset paging of one long line, shown a-b of N plus one executable next: call"}
+    - {path: harness/edits.py, owns: "atomic multi-hunk edit: old+new, edits[] or find+replace applied all-or-nothing, replace_all opt-in, match lines and CRLF/whitespace hints"}
     - {path: harness/observe.py, owns: "render_api bound with read mode, same=obs-N references, render_v1, render_v2"}
     - {path: harness/bound.py, owns: "content-aware shape: contiguous read head, stderr tail, head/tail split, long-line byte page, one executable next continuation"}
     - {path: harness/ledger.py, owns: "content-addressed observation memory derived from record events and saved artifacts"}
@@ -167,6 +171,7 @@ modules:
     - {path: scripts/verify.py, owns: "run manifest.checks[] offline; --skip-server, --only, --json, --list"}
     - {path: scripts/check_manifest.py, owns: "registered files, importable entries, record/check/scenario integrity"}
     - {path: scripts/repo_map.py, owns: "generated manifest map with line counts"}
+    - {path: scripts/call_audit.py, owns: "offline call audit loop-call-audit/1: per-run call names and shapes, failure kinds, repeats and refetches, hit/miss/out/reasoning_c split; text or --json; no model call"}
     - {path: scripts/output_audit.py, owns: "offline output audit: splits completion tokens into reasoning, tool arguments and result; names the top turns and truncations"}
     - {path: scripts/cache_audit.py, owns: "offline cache audit: rebuilds request prefixes from record bytes, reports hit/miss/out/cost, reuse references and suspected cache breaks"}
     - {path: scripts/doctor.py, owns: "local health; never starts the daemon"}
@@ -197,7 +202,9 @@ imports:
   - no absolute paths; roots come from __file__, LOOP_ROOT or LOOP_RUNS
 
 change_map:
-  - {change: tool or observation shape, start: [harness/tools.py, harness/observe.py, harness/bound.py, harness/ledger.py], test: [tests/test_tools.py, tests/test_observe.py, tests/test_bound.py]}
+  - {change: tool or observation shape, start: [harness/tools.py, harness/cmds.py, harness/read.py, harness/edits.py, harness/observe.py, harness/bound.py, harness/ledger.py], test: [tests/test_tools.py, tests/test_cmds.py, tests/test_read.py, tests/test_edits.py, tests/test_observe.py, tests/test_bound.py]}
+  - {change: tool arguments or dispatch, start: [harness/turn.py, harness/tools.py], test: [tests/test_bad_args.py, tests/test_agent_context.py, tests/test_tools.py]}
+  - {change: call shape, failure or refetch audit, start: [scripts/call_audit.py], test: [tests/test_call_audit.py]}
   - {change: prompt prefix, wire snapshot, model or thinking budget, start: [harness/api.py, harness/agent.py, harness/fold.py, manifest.record], test: [tests/test_agent_context.py, tests/test_agent_loop.py, scripts/cache_audit.py]}
   - {change: turn loop, compaction, retry, output ceiling, end payload, start: [harness/loop.py, harness/agent.py, harness/turn.py, harness/fold.py, harness/budget.py, harness/memo.py, harness/retry.py], test: [tests/test_agent_context.py, tests/test_agent_loop.py, tests/test_loop_compaction.py, tests/test_context_compact.py, tests/test_retry.py, tests/test_view.py]}
   - {change: verify command, start: [harness/agent.py, harness/fold.py, harness/verifier.py], test: [tests/test_verify.py, tests/test_view.py]}

@@ -3,7 +3,7 @@ import sys
 import tempfile
 import unittest
 
-from harness import tools
+from harness import api, ledger, tools
 
 
 class ToolsTest(unittest.TestCase):
@@ -68,7 +68,7 @@ class ToolsTest(unittest.TestCase):
                      ["for", "x", "in", "a"]):
             out = tools.do_exec({"argv": argv}, self.obs, "o1", sandbox=self.root)
             self.assertIn("err shell_syntax", out)
-            self.assertIn('["sh","-c","..."]', out)
+            self.assertIn('cmd:"..."', out)
         self.assertFalse(os.path.exists(os.path.join(self.root, "a")))
 
     def test_exec_allows_quoted_operators_and_real_sh(self):
@@ -100,9 +100,42 @@ class ToolsTest(unittest.TestCase):
         self.assertIn("ok -1 +1", out)
 
     def test_dispatch_unknown_tool(self):
-        out = tools.dispatch("read", {"path": "d.txt"}, self.obs, "o1", self.root)
-        self.assertIn("err unknown_tool read", out)
-        self.assertIn("exec, write, edit, done", out)
+        out = tools.dispatch("bogus", {}, self.obs, "o1", self.root)
+        self.assertIn("err unknown_tool bogus", out)
+        self.assertIn("exec, read, write, edit, done", out)
+        self.assertIn("read(path, start?", out)
+
+    def test_wire_schema_matches_signatures(self):
+        names = [t["function"]["name"] for t in api.TOOLS]
+        self.assertEqual(names, ["exec", "read", "write", "edit", "done"])
+        self.assertEqual(set(names), set(tools.SIGNATURES))
+        for tool in api.TOOLS:
+            fn = tool["function"]
+            self.assertTrue(fn["description"])
+            self.assertIn("parameters", fn)
+            for required in fn["parameters"].get("required") or []:
+                self.assertIn(required, fn["parameters"]["properties"])
+            self.assertIn(fn["name"] + "(", tools.SIGNATURES[fn["name"]])
+        text = api.header()
+        for name in names:
+            self.assertIn(tools.SIGNATURES[name], text)
+        self.assertEqual(api.WIRE_SCHEMA, "loop-wire/2")
+
+    def test_read_repeat_becomes_same_reference(self):
+        tools.do_write({"path": "s.txt", "data": "a\nb\n"}, self.root)
+        led = ledger.Ledger()
+        first = tools.dispatch("read", {"path": "s.txt"}, self.obs, "obs-1", self.root,
+                               ledger=led, obs_id="obs-1")
+        again = tools.dispatch("read", {"path": "s.txt"}, self.obs, "obs-2", self.root,
+                               ledger=led, obs_id="obs-2")
+        self.assertIn("1| a", first)
+        self.assertTrue(again.startswith("same=obs-1 bytes="), again)
+
+    def test_dispatch_read_routes_to_numbered_read(self):
+        tools.do_write({"path": "r.txt", "data": "a\nb\n"}, self.root)
+        out = tools.dispatch("read", {"path": "r.txt"}, self.obs, "o1", self.root)
+        self.assertIn("obs r.txt lines=2", out)
+        self.assertIn("1| a", out)
 
 
 if __name__ == "__main__":

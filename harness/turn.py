@@ -30,6 +30,8 @@ def parse_args(raw):
     if not isinstance(raw, str):
         return None, f"arguments are {type(raw).__name__}, not object"
     text = raw.strip()
+    if not text:
+        return None, "arguments are empty, expected one JSON object"
     if text.startswith("```"):
         text = text.strip("`")
         if "\n" in text:
@@ -41,26 +43,30 @@ def parse_args(raw):
     start = text.find("{")
     if start > 0:
         candidates.append(text[start:])
+    last = "expected one JSON object"
     for candidate in candidates:
         try:
             args = json.loads(candidate, strict=False)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            last = f"expected one JSON object: {e}"
             continue
         if isinstance(args, dict):
             return args, None
         return None, f"arguments are {type(args).__name__}, not object"
-    return None, "malformed_arguments expected one JSON object"
+    return None, f"malformed arguments {last}"
 
 
 def canonical_args(raw):
     args, err = parse_args(raw)
     if err is not None:
-        return raw if isinstance(raw, str) and raw else "{}"
+        # Keep the caller's broken text verbatim: normalizing it to "{}" would
+        # dispatch the tool with no arguments and hide the parse error.
+        return raw if isinstance(raw, str) else "{}"
     try:
         return json.dumps(args, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=False, allow_nan=False)
     except (ValueError, TypeError):
-        return raw if isinstance(raw, str) and raw else "{}"
+        return raw if isinstance(raw, str) else "{}"
 
 
 def record_args(fn, args):
@@ -101,11 +107,12 @@ def read_turn(r, turn=0):
                "reasoning_content": msg.get("reasoning_content") or ""}
     for index, call in enumerate(msg.get("tool_calls") or []):
         fn = call.get("function") or {}
+        raw = fn.get("arguments")
         message["tool_calls"].append({
             "id": f"c{turn}.{index}" if turn else (call.get("id") or ""),
             "type": call.get("type") or "function",
             "function": {"name": fn.get("name") or "",
-                         "arguments": canonical_args(fn.get("arguments") or "{}")}})
+                         "arguments": canonical_args("{}" if raw is None else raw)}})
     text = msg.get("content")
     if not message["tool_calls"] and not (isinstance(text, str) and text.strip()):
         # A silent stop may be followed by the nudge; an empty assistant turn
@@ -123,7 +130,10 @@ def run_calls(message, obs_dir, root, obs_n, max_inline=None, ledger=None,
         fn = call["function"]["name"]
         args, err = parse_args(call["function"]["arguments"])
         if err is not None:
-            obs = f"err {err}" if err.startswith("bad_args") else f"err malformed_arguments {err}"
+            # Dispatch would see {} and report a missing-argument error from the
+            # wrong tool; name the parse failure here and send nothing.
+            obs = (f"err bad_args {fn} not dispatched: {err}; "
+                   f"re-send the call as one JSON object")
             calls.append({"id": call["id"], "name": fn, "observation": obs,
                           "bytes": len(obs.encode()), "saved": None})
             continue

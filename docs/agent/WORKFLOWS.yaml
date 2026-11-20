@@ -53,6 +53,11 @@ test_map:
   - {test: test_bound.py, contract: line-range and tail -c observation continuations, utf8-safe clipping}
   - {test: test_audit.py, contract: "offline cache audit projection: prefix growth, reuse references, wire sha"}
   - {test: test_output_audit.py, contract: "offline output audit: reasoning/argument/result split, top turns and truncations"}
+  - {test: test_call_audit.py, contract: "offline call audit: call names and shapes, fail kinds, repeats and refetches, hit/miss/out/reasoning_c split, json mode"}
+  - {test: test_cmds.py, contract: "shell classification: read-like argv, compound segment splitting, shell_syntax fix messages"}
+  - {test: test_read.py, contract: "read tool: numbered ranges and clamping, find+ctx merging, offset paging, executable next: continuations"}
+  - {test: test_edits.py, contract: "multi-hunk edit: all-or-nothing apply, hunk failure report, replace_all opt-in, CRLF hint"}
+  - {test: test_bad_args.py, contract: "unparseable or non-object arguments answered err bad_args and never dispatched with {}"}
   - {test: test_length_nudge.py, contract: "loop integration: one length-specific nudge after a truncated reply"}
   - {test: test_turn_budget.py, contract: "no turn or attach cap: a 400-turn task runs to done and srvclient.stream defaults to no total budget"}
   - {test: test_spawn.py, contract: literal argv, cwd/stdin, timeout, OSError, empty argv}
@@ -171,11 +176,12 @@ recipes:
     - update tests/test_verify.py and the verify event in manifest.record and docs/agent/RECORD.yaml
     - "run: python3 -m unittest tests.test_verify and python3 run.py view --schema"
   tool_or_observation:
-    - update harness/tools.py, harness/observe.py or harness/spawn.py
-    - update tests/test_tools.py, tests/test_observe.py, tests/test_bound.py or tests/test_spawn.py
-    - update manifest.wire shape/threshold text
-    - update docs/agent/WIRE.yaml
+    - update harness/tools.py, harness/observe.py or harness/spawn.py; read/next: lives in harness/read.py, multi-hunk edit in harness/edits.py, shell classification in harness/cmds.py
+    - update tests/test_tools.py, tests/test_observe.py, tests/test_bound.py, tests/test_spawn.py, tests/test_read.py, tests/test_edits.py or tests/test_cmds.py
+    - a new tool needs a tools.SIGNATURES entry plus an api.TOOLS schema; tests/test_tools.py fails when the two disagree, and the header renders from SIGNATURES
+    - update manifest.wire shape/threshold text and the docs/agent/WIRE.yaml tool block in the same commit
     - exercise python3 run.py sim1 edge and python3 run.py sim2 edge2
+    - after a real run: python3 scripts/call_audit.py RUN_ID to see call shapes, failures and refetched reads
   cache_prefix:
     - keep api.header(), the tool schema and the observation rendering byte-identical on replay; run-specific values enter after the wire event
     - update harness/api.py, harness/observe.py, harness/ledger.py or harness/turn.py and the matching tests
@@ -234,6 +240,7 @@ definition_of_done:
   - python3 scripts/check_manifest.py exits 0
   - python3 scripts/verify.py --skip-server exits 0
   - "when the wire prefix, observation rendering or record schema changed: make audit RUN=<id> reports prefix_ok=True with no suspected cache breaks"
+  - "when tool call shapes changed: python3 scripts/call_audit.py RUN_ID reports no unexpected fail kinds or refetched reads"
   - git status --short is clean except intended files
   - commit subject and body pass scripts/commit_check.py
   - any changed public behavior is reflected in manifest.json and docs/agent/ in the same commit
@@ -249,7 +256,7 @@ long_run_workflow:
   goal: "finish 400 turns without a total cap while keeping the cached prefix stable and output small"
   steps:
     - [1, "use the compact default: LOOP_CONTEXT_HIGH=64000, LOOP_CONTEXT_LOW=32000, LOOP_KEEP_TURNS=16"]
-    - [2, "batch independent reads in one assistant message; read-like exec output is contiguous up to 8192 bytes"]
+    - [2, "batch independent reads in one assistant message; read one file with read(path=...) and run the printed next: line, or let read-like exec output keep a contiguous head up to 8192 bytes"]
     - [3, "on a length stop the harness records the truncated turn, escalates to LOOP_MAX_TOKENS, and retries; split a write if it repeats"]
     - [4, "on a 5xx/429/network error the harness emits retry events and resumes the turn; a context 400 forces one compact"]
     - [5, "after the run, audit: make audit RUN=... and make output RUN=...; compact breaks should be separated from accidental breaks"]
@@ -259,3 +266,6 @@ long_run_workflow:
     - [tests/test_context_compact.py, "deterministic digest and checkpoint context"]
     - [tests/test_retry.py, "transient retry, auth fatal, context classification"]
     - [tests/test_obs_read.py, "contiguous read window and stderr tail"]
+    - [tests/test_read.py, "numbered ranges, find+ctx and offset paging with a resuming next: line"]
+    - [tests/test_bad_args.py, "malformed arguments are answered, never dispatched as {}"]
+    - [tests/test_call_audit.py, "call shapes, fails and refetches from record bytes"]

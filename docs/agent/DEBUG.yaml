@@ -54,7 +54,9 @@ symptoms:
   - {symptom: "mobile layout test fails", inspect: "mobile/lib/home.dart, navigation.dart, task_list.dart, activity_view.dart, workspace_view.dart, prompt_box.dart, widgets.dart; mobile/test/layout_test.dart", action: "keep the Gruvbox floating prompt and nav rail above system/keyboard insets, the activity/workspace tabs reachable and task cards scrollable; fix the layout, not the assertion"}
   - {symptom: check tui fails, inspect: "tui/panes.py, tui/nav.py, tui/prompt.py, tui/render.py, tui/logview.py, tui/indicator.py, tui/frame.py, tui/highlight.py", action: "fix fit/reflow/width/free-scroll/scroll-indicator/highlight geometry; do not weaken the audit"}
   - {symptom: sim fails, inspect: ".logs/<sim>/<label>/log.json; obs/; scenario JSON", action: "check the sim field, fixture, step schema, exit behavior and mounted workspace"}
-  - {symptom: docs look stale, inspect: "manifest.json, owning module, tests", action: "code wins; update the doc and, if the contract changed, the manifest in the same commit"}
+  - {symptom: "call observation is 'err bad_args <fn> not dispatched'", inspect: "turn.calls[i].observation and the recorded arguments text; tests/test_bad_args.py", action: "the model's arguments were not one JSON object, so nothing ran; the recorded arguments keep the raw text on purpose. Never normalize a broken call to {} in turn.canonical_args or dispatch it anyway: that reports a missing-argument error from the wrong tool"}
+  - {symptom: a tool call repeated and refetched the same bytes, inspect: "python3 scripts/call_audit.py RUN_ID", action: "run the printed next: line instead of re-reading; the call audit lists repeats, refetches and hot paths, and a failure kind that repeated means the fix hint did not land"}
+  - {symptom: run ends in a transport error after a partial body, inspect: "record retry events; the error text names IncompleteRead or HTTPException", action: "http.client.HTTPException is a transport failure and retries with backoff; if it still ends the run the retry streak is exhausted, so check LOOP_RETRY_ATTEMPTS and the connection, not the tool code"}
 
 safe_commands:
   - python3 run.py
@@ -75,6 +77,9 @@ safe_commands:
   - python3 scripts/doctor.py
   - python3 run.py sim1 task
   - python3 run.py sim2 task2
+  - python3 scripts/call_audit.py [RUN_ID] [--json]
+  - python3 scripts/cache_audit.py [RUN_ID] [--json]
+  - python3 scripts/output_audit.py [RUN_ID] [--json]
 
 mutating_or_expensive:
   - {cmd: "run.py api / run.py resume RUN_ID", effect: "network, tokens, record writes"}
@@ -105,7 +110,7 @@ recovery_order:
 escalation:
   - {layer: record bytes, read: docs/agent/RECORD.yaml, change: recwrite.py only through Writer}
   - {layer: turn loop, read: docs/agent/WIRE.yaml, change: agent.py, turn.py plus tests}
-  - {layer: tools/observations, read: docs/agent/WIRE.yaml, change: tools.py, observe.py plus tests}
+  - {layer: tools/observations, read: docs/agent/WIRE.yaml, change: tools.py, cmds.py, read.py, edits.py, observe.py plus tests}
   - {layer: daemon/workers, read: docs/agent/SERVER.yaml, change: srv*.py, worker.py, queue.py plus tests}
   - {layer: contract, read: manifest.json, change: scripts/check_manifest.py must pass}
   - {layer: docs, read: docs/agent/, change: manifest.files plus index.yaml}
@@ -117,4 +122,4 @@ long_run_symptoms:
   retry_storm: "retry events with growing delay_ms are transport backoff; check code and text, then LOOP_RETRY_ATTEMPTS/base/max. A 4xx is never retried"
   stale_history: "a fact vanished from context: it was older than the last compact. Read compact.digest; the full bytes remain in record.jsonl and obs/. Add the durable fact to a workspace file before compacting"
   lost_reasoning: "reasoning_content is present in the record but empty in later requests by design (LOOP_REPLAY_REASONING=0); set it to 1 only when a provider or task needs old thought replayed"
-  read_slice_repeats: "a read-mode next: command should advance by the shown line count; if it repeats, inspect bound.summary hidden_from/hidden_to and test_obs_read"
+  read_slice_repeats: "a read-mode or read-tool next: command should advance by the shown line count or byte offset; if it repeats, inspect bound.summary hidden_from/hidden_to for observations, read.page for the read tool, and test_obs_read/test_read"

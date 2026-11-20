@@ -6,9 +6,9 @@
 
 **An agent-first research harness for a tool-calling coding loop.**
 
-`loop` drives a model through exactly four tools — `exec`, `write`, `edit`,
-`done` — against a workspace, and writes every event to an append-only JSONL
-record. State is derived from those bytes, never stored beside them. The point
+`loop` drives a model through exactly five tools — `exec`, `read`, `write`,
+`edit`, `done` — against a workspace, and writes every event to an append-only
+JSONL record. State is derived from those bytes, never stored beside them. The point
 is to measure tool and observation designs by token cost and correctness.
 
 The repository is intentionally agent-first: source, contracts and most docs are
@@ -19,9 +19,10 @@ the human-facing layer.
 
 ## Design
 
-- **One exec waist.** Instead of a large tool menu, the model gets one way to
-  act on the world. Editing a file means writing a program that edits it. This
-  keeps the wire small and makes every action reproducible.
+- **One small waist.** Instead of a large tool menu, the model gets five named
+  calls: one to act (`exec`), one to page bytes into context (`read`) and three
+  to settle a change (`write`, `edit`, `done`). Editing a file usually means
+  writing a program that edits it, so every action stays reproducible.
 - **Bounded observations.** Small results stay inline. Text over the run's
   bound becomes a budget-filling head/tail/stderr index with a byte-sized `next:`
   slice and the raw bytes saved under the run's `obs/` directory; binary output becomes a digest, and an exact repeat
@@ -147,13 +148,17 @@ bytes.
 
 | tool | contract |
 | --- | --- |
-| `exec` | spawn literal `argv`; no shell unless the caller passes `sh -c`; returns exit code, stdout, stderr |
+| `exec` | spawn literal `argv`, or run `cmd` through `sh -c`; returns exit code, stdout, stderr |
+| `read` | numbered lines of one file (`start`/`end`), pattern hits (`find`/`ctx`) or byte paging (`offset`); prints `shown a-b of N` plus one runnable `next:` call |
 | `write` | UTF-8 write, creates parent directories, optional append |
-| `edit` | replace exactly one occurrence of `old` with `new` |
+| `edit` | replace unique spans atomically: `old`+`new`, `edits: [...]`, or `find`+`replace` |
 | `done` | finish the run with a result string |
 
 Independent tool calls are issued together and run in order. Repeated probes
-should be scripted once rather than re-run one step at a time.
+should be scripted once rather than re-run one step at a time, and a printed
+`next:` line is meant to be run literally: it resumes the same slice instead of
+re-reading the file. A call whose arguments are malformed is answered with
+`err bad_args <fn> not dispatched` and is never executed with `{}`.
 
 ## Architecture
 
@@ -208,7 +213,7 @@ connection and build details.
 
 `loop` is a pre-1.0 research harness, not a hosted product or a general-purpose
 agent framework. The wire and record formats are versioned (`loop-index/1`,
-`loop-record/1`, `loop-wire/1`, `loop-view/1`); other interfaces may change.
+`loop-record/1`, `loop-wire/2`, `loop-view/1`); other interfaces may change.
 The offline suite and CI are the compatibility gate.
 
 The repository is one tree, one run at a time. There is no multi-user

@@ -1,3 +1,4 @@
+import http.client
 import io
 import unittest
 import urllib.error
@@ -56,6 +57,22 @@ class RetryTest(unittest.TestCase):
                                             urllib.error.URLError("reset"), ok()]):
             row = retry.call([], "k", {})
         self.assertEqual(row["choices"][0]["message"]["content"], "ok")
+
+    def test_body_cut_mid_read_retries_then_raises(self):
+        cut = http.client.IncompleteRead(b'{"choices": [')
+        seen = []
+        with mock.patch.object(retry.api, "call", side_effect=[cut, ok()]):
+            row = retry.call([], "k", {}, on_retry=lambda *a: seen.append(a))
+        self.assertEqual(row["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(seen[0][1], 0)
+        self.assertIn("IncompleteRead", seen[0][3])
+        base = self.sleep.call_count
+        with mock.patch.object(retry.api, "call", side_effect=cut):
+            with self.assertRaises(retry.Error) as cm:
+                retry.call([], "k", {})
+        self.assertIn("IncompleteRead", cm.exception.text)
+        self.assertEqual(cm.exception.attempts, 4)
+        self.assertEqual(self.sleep.call_count - base, 3)
 
     def test_exhaustion_reports_attempts(self):
         with mock.patch.object(retry.api, "call", side_effect=http_error(500)):
